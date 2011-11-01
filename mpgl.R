@@ -1,18 +1,27 @@
 
 # Formulation of MPGL as group lasso
 
+set.seed(343439)
+
 p <- 10
 C <- 5
 N <- rep(100, C)
 pop <- rep(1:C, N)
 Bpop <- rep(1:C, each=p)
+Bp <- rep(1:p, C)
 
-lambda1 <- 0
+lambda1 <- 3e-2
 lambda2 <- 0
 
 B <- cbind(unlist(lapply(1:C, function(i) {
    rnorm(p, i, 0.01)
 })))
+
+# make B group-sparse
+for(j in 1:p)
+{
+   B[Bp == j,] <- B[Bp == j,] * sample(0:1, size=1, prob=c(0.5, 0.5))
+}
 
 X <- matrix(0, sum(N), p * C) 
 s1 <- seq(1, sum(N), N[1])
@@ -42,10 +51,9 @@ for(iter in 1:maxiter)
    {
       S <- Bhat[s + j,] - grad[s + j, ]
       normS <- sqrt(drop(crossprod(S)))
-      #if(normS > 0) {
-      #	 Bhat[s + g, ] <- pmax(0, 1 - lambda1 / normS) * S / (1 + lambda2)
-      #}
-      Bhat[s + j, ] <- S
+      if(normS > 0) {
+      	 Bhat[s + j, ] <- pmax(0, 1 - lambda1 / normS) * S / (1 + lambda2)
+      }
    }
 
    if(abs(loss - oldloss) <= eps) {
@@ -54,4 +62,6 @@ for(iter in 1:maxiter)
    oldloss <- loss
    
 }
+
+cor(sign(B), sign(Bhat))
 
