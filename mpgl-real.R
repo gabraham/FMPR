@@ -3,6 +3,8 @@ library(glmnet)
 library(ROCR)
 library(ggplot2)
 
+source("mpgl.R")
+
 options(error=dump.frames)
 
 #d <- read.table("Data/sim.out.raw", header=TRUE, stringsAsFactors=FALSE)
@@ -19,6 +21,7 @@ Bpop <- rep(1:C, each=p)
 Bp <- rep(1:p, C)
 
 lambda1 <- 1e-2
+L <- seq(lambda1, lambda1 / 100, length=20)
 
 getB <- function(C)
 {
@@ -49,15 +52,23 @@ for(i in 1:C) {
 Y <- scale(X %*% B + rnorm(nrow(X) * ncol(B)), scale=FALSE)
 
 g.pooled <- glmnet(X, drop(Y))
+B.lasso.pooled <- as.matrix(coef(g.pooled))[-1,]
 
+B.mpgl <- lapply(L, function(lambda1) mpgl(X, Y, p=p, C=C, lambda1=lambda1))
+B.mpgl.mat <- do.call(cbind, B.mpgl)
+
+
+stop("need to separate the models for each penalty")
 pred <- prediction(
    labels=list(
-      matrix(B != 0, byrow=FALSE, ncol=100, nrow=1000),
-      matrix(B != 0, byrow=FALSE, ncol=100, nrow=1000),
+      matrix(B != 0, byrow=FALSE, ncol=ncol(B.lasso.pooled),
+	 nrow=nrow(B.lasso.pooled)),
+      matrix(B != 0, byrow=FALSE, ncol=ncol(B.mpgl.mat),
+	 nrow=nrow(B.mpgl.mat))
    ),
    predictions=list(
-      LassoPool=abs(as.matrix(coef(g.pooled))[-1,]),
-      LassoSep=
+      LassoPool=abs(B.lasso.pooled),
+      LassoSep=abs(B.mpgl.mat)
    )
 )
 
@@ -65,10 +76,10 @@ perf.prc <- performance(pred, "prec", "rec")
 
 d.prc <- data.frame(
    Prec=unlist(perf.prc@y.values),
-   Rec=unlist(perf.prc@x.values)#,
-   #Method=rep(c("LassoSep", "LassoPool", "MPGL"), sapply(perf.roc@x.values, length))
+   Rec=unlist(perf.prc@x.values),
+   Method=rep(c("LassoPool", "MPGL"), sapply(perf.prc@x.values, length))
 )
-g.prc <- ggplot(d.prc, aes(x=Rec, y=Prec))
+g.prc <- ggplot(d.prc, aes(x=Rec, y=Prec, colour=Method))
 g.prc <- g.prc + geom_point(size=3) + geom_line()
 
 #print(g.roc)
