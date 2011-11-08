@@ -18,12 +18,12 @@ pop <- rep(1:C, N)
 Bpop <- rep(1:C, each=p)
 Bp <- rep(1:p, C)
 
-lambda1 <- 5e-1
+lambda1 <- 7e-1
 
 getB <- function(C)
 {
    B <- cbind(unlist(lapply(1:C, function(i) {
-      rnorm(p, i, 1)
+      rnorm(p, i/2, 1)
    })))
 
    # make B group-sparse
@@ -94,8 +94,9 @@ d.prc <- data.frame(
    Rec=unlist(perf.prc@x.values),
    Method=rep(c("LassoSep", "LassoPool", "MPGL"), sapply(perf.roc@x.values, length))
 )
-g.prc <- ggplot(d.prc, aes(x=Rec, y=Prec, colour=Method)) + geom_line()
+g.prc <- ggplot(d.prc, aes(x=Rec, y=Prec, colour=Method, shape=Method))
+g.prc <- g.prc + geom_point(size=3) + geom_line()
 
-print(g.roc)
+#print(g.roc)
 print(g.prc)
 
