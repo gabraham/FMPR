@@ -6,7 +6,7 @@
 # p: number of variables in each population
 # C: number of populations
 #
-mpgl <- function(X, Y, p, C, lambda1=0, maxiter=1e4L, eps=1e-4)
+mpgl <- function(X, Y, p, C, lambda1=0, maxiter=1e4L, eps=1e-3)
 {
    B <- cbind(numeric(p * C))
    s <- seq(0, p * C - 1, p)
@@ -22,7 +22,12 @@ mpgl <- function(X, Y, p, C, lambda1=0, maxiter=1e4L, eps=1e-4)
       {
 	 Err <- X %*% B - Y
 	 loss <- mean(Err^2)
-	 S <- B[s + j, ] - qr.solve(X[, s + j], Err)
+
+	 # qr will only work if input matrix is invertible
+	 #S <- B[s + j, ] - qr.solve(X[, s + j], Err)
+	 w <- apply(X[, s+j], 2, function(x) all(x == 0))
+	 S <- numeric(length(s))
+	 S[!w] <- B[(s + j)[!w], ] - qr.solve(X[, (s+j)[!w]], Err)
          normS <- sqrt(drop(crossprod(S)))
          if(normS > 0) {
 	    B[s + j, ] <- pmax(0, 1 - lambda1 / normS) * S
