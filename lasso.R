@@ -106,3 +106,45 @@ lasso.activeset <- function(x, y, lambda1=0,
    beta
 }
 
+sphere <- function(X, y, lambda1max, lambda)
+{
+   X <- scale(X) / sqrt(nrow(X)-1)
+   z <- drop(abs(crossprod(X, y))) 
+   z < lambda1max * (1 - 2 * sqrt(1/lambda1max^2 - 1) * (lambda1max/lambda - 1))
+}
+
+# Xiang NIPS 2011 screening
+lasso.sphere <- function(X, y, lambda1=0, maxepoch=5000, eps=1e-3)
+{
+   X <- scale(X)
+   p <- ncol(X)
+   beta <- numeric(p)
+   oldloss <- Inf
+   loss <- Inf
+   lp <- X %*% beta
+   Err <- lp - y
+   loss <- mean(Err^2)
+
+   s <- sphere(X, y, lambda1)
+
+   V <- apply(X, 2, function(x) sum(x^2))
+
+   for(epoch in 1:maxepoch)
+   {
+      cat("epoch", epoch, "loss:", loss, "\n")   
+      for(j in 1:p)
+      {
+	 grad <- crossprod(X[,j], Err)
+	 if(grad != 0) {
+	    beta_new <- soft(beta[j] - grad / V[j], lambda1)
+	    diff <- beta_new - beta[j]
+	    lp <- lp + x[,j] * diff
+	    Err <- lp - y
+	    beta[j] <- beta_new
+	 }
+      }
+      loss <- mean(Err^2)
+   }
+   beta
+}
+
