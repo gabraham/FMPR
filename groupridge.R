@@ -2,12 +2,13 @@
 library(MASS)
 
 
-seed <- sample(1e9, 1)
-set.seed(seed)
+#seed <- sample(1e9, 1)
+#set.seed(seed)
+set.seed(4398790)
 
 N <- 100
-p <- 50
-K <- 2
+p <- 20
+K <- 3
 
 ## save to file
 #write.table(X, file="X.txt", col.names=FALSE, row.names=FALSE)
@@ -87,6 +88,15 @@ K <- 2
 
 groupridge <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, g)
 {
+   if(length(lambda1) == 1)
+      lambda1 <- rep(lambda1, K)
+   
+   if(length(lambda2) == 1)
+      lambda2 <- rep(lambda2, K)
+
+   if(length(lambda3) == 1)
+      lambda3 <- rep(lambda3, K)
+
    r <- .C("groupridge", as.numeric(X), as.numeric(Y), 
       numeric(p * K), nrow(X), ncol(X), ncol(Y),
       as.numeric(lambda1), as.numeric(lambda2), as.numeric(lambda3),
@@ -94,6 +104,12 @@ groupridge <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, g)
    matrix(r[[3]], p, K)
 }
 
+maxlambda1 <- function(X, Y)
+{
+   r <- .C("maxlambda1", as.numeric(X), as.numeric(Y),
+      numeric(K), nrow(X), ncol(X), ncol(Y))
+   r[[3]]
+}
 
 blockX <- function(X, p, C)
 {
@@ -118,11 +134,27 @@ blockX <- function(X, p, C)
 dyn.load("groupridge.so")
 X <- scale(matrix(rnorm(N * p), N, p))
 g <- sample(3, size=K, replace=TRUE)
-B <- sapply(g, function(k) rep(k, p))
+#B <- sapply(g, function(k) rep(k, p))
+B <- matrix(sample(0:1, p * K, TRUE), p, K)
 Y <- scale(X %*% B + rnorm(N, 0, 1), scale=FALSE)
 B0 <- ginv(X) %*% Y
+
+maxL <- maxlambda1(X, Y)
 B1 <- groupridge(X, Y, lambda1=0, lambda2=0, lambda3=0, g=g)
 mean((B0 - B1)^2)
+B1.1 <- groupridge(X, Y, lambda1=maxL, lambda2=0, lambda3=0, g=g)
+B1.2 <- groupridge(X, Y, lambda1=maxL * 0.99, lambda2=0, lambda3=0, g=g)
+B1.3 <- groupridge(X, Y, lambda1=maxL * 0.9, lambda2=0, lambda3=0, g=g)
+B1.4 <- groupridge(X, Y, lambda1=maxL * 0.8, lambda2=0, lambda3=0, g=g)
+
+stop()
+
+#B1.2 <- groupridge(X, Y, lambda1=0.8, lambda2=0, lambda3=0, g=g)
+#B1.3 <- groupridge(X, Y, lambda1=0.7, lambda2=0, lambda3=0, g=g)
+#B1.4 <- groupridge(X, Y, lambda1=0.6, lambda2=0, lambda3=0, g=g)
+#B1.5 <- groupridge(X, Y, lambda1=0.5, lambda2=0, lambda3=0, g=g)
+#B1.6 <- groupridge(X, Y, lambda1=0.1, lambda2=0, lambda3=0, g=g)
+#B1.7 <- groupridge(X, Y, lambda1=0.01, lambda2=0, lambda3=0, g=g)
 
 stop()
 
