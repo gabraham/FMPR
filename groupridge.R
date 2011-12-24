@@ -4,11 +4,11 @@ library(MASS)
 
 #seed <- sample(1e9, 1)
 #set.seed(seed)
-set.seed(4398790)
+#set.seed(4398790)
 
 N <- 100
-p <- 20
-K <- 3
+p <- 5000
+K <- 10
 
 ## save to file
 #write.table(X, file="X.txt", col.names=FALSE, row.names=FALSE)
@@ -86,7 +86,8 @@ K <- 3
 #   B1
 #}
 
-groupridge <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, g)
+groupridge <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, g,
+      maxiter=1e6, eps=1e-4)
 {
    if(length(lambda1) == 1)
       lambda1 <- rep(lambda1, K)
@@ -100,7 +101,7 @@ groupridge <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, g)
    r <- .C("groupridge", as.numeric(X), as.numeric(Y), 
       numeric(p * K), nrow(X), ncol(X), ncol(Y),
       as.numeric(lambda1), as.numeric(lambda2), as.numeric(lambda3),
-      as.integer(g))
+      as.integer(g), as.integer(maxiter), as.double(eps))
    matrix(r[[3]], p, K)
 }
 
@@ -133,28 +134,35 @@ blockX <- function(X, p, C)
 
 dyn.load("groupridge.so")
 X <- scale(matrix(rnorm(N * p), N, p))
-g <- sample(3, size=K, replace=TRUE)
+#g <- sample(3, size=K, replace=TRUE)
+g <- rep(1, K)
 #B <- sapply(g, function(k) rep(k, p))
-B <- matrix(sample(0:1, p * K, TRUE), p, K)
+B <- matrix(1, p, K)
+#B <- matrix(sample(0:1, p * K, TRUE, prob=c(0.9, 0.1)), p, K)
 Y <- scale(X %*% B + rnorm(N, 0, 1), scale=FALSE)
 B0 <- ginv(X) %*% Y
 
 maxL <- maxlambda1(X, Y)
 B1 <- groupridge(X, Y, lambda1=0, lambda2=0, lambda3=0, g=g)
 mean((B0 - B1)^2)
-B1.1 <- groupridge(X, Y, lambda1=maxL, lambda2=0, lambda3=0, g=g)
-B1.2 <- groupridge(X, Y, lambda1=maxL * 0.99, lambda2=0, lambda3=0, g=g)
-B1.3 <- groupridge(X, Y, lambda1=maxL * 0.9, lambda2=0, lambda3=0, g=g)
-B1.4 <- groupridge(X, Y, lambda1=maxL * 0.8, lambda2=0, lambda3=0, g=g)
+L <- 10^seq(-6, 6, length=20)
 
-stop()
+R1 <- lapply(L, function(l) {
+   groupridge(X, Y, lambda1=0, lambda2=0, lambda3=l, g=g)
+})
+R2 <- lapply(L, function(l) {
+   groupridge(X, Y, lambda1=0, lambda2=1e2, lambda3=l, g=g)
+})
+R3 <- lapply(L, function(l) {
+   groupridge(X, Y, lambda1=0, lambda2=1e4, lambda3=l, g=g)
+})
 
-#B1.2 <- groupridge(X, Y, lambda1=0.8, lambda2=0, lambda3=0, g=g)
-#B1.3 <- groupridge(X, Y, lambda1=0.7, lambda2=0, lambda3=0, g=g)
-#B1.4 <- groupridge(X, Y, lambda1=0.6, lambda2=0, lambda3=0, g=g)
-#B1.5 <- groupridge(X, Y, lambda1=0.5, lambda2=0, lambda3=0, g=g)
-#B1.6 <- groupridge(X, Y, lambda1=0.1, lambda2=0, lambda3=0, g=g)
-#B1.7 <- groupridge(X, Y, lambda1=0.01, lambda2=0, lambda3=0, g=g)
+r1 <- sapply(R1, function(x) rowMeans(x[1:p, , drop=FALSE]))
+r2 <- sapply(R2, function(x) rowMeans(x[1:p, , drop=FALSE]))
+r3 <- sapply(R3, function(x) rowMeans(x[1:p, , drop=FALSE]))
+matplot(L, t(r1), type="l", log="x", col=1, lty=1)
+matlines(L, t(r2), type="l", log="x", col=2, lty=1)
+matlines(L, t(r3), type="l", log="x", col=3, lty=1)
 
 stop()
 

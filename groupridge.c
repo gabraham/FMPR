@@ -18,8 +18,8 @@ void maxlambda1(double *x, double *y, double *lambda,
    int N = *N_p,
        p = *p_p,
        K = *K_p;
-   int i, j, k;
-   double d1, d2, s;
+   int i, j, k, m;
+   double d1, d2, s, xij;
 
    for(k = 0 ; k < K ; k++)
    {
@@ -27,24 +27,33 @@ void maxlambda1(double *x, double *y, double *lambda,
       {
 	 d1 = 0;
 	 d2 = 0;
-	 for(i = 0 ; i < N ; i++)
+	 for(i = N - 1 ; i >= 0 ; --i)
 	 {
-	    d1 += -x[i + j * N] * y[i + k * N];
-	    d2 += pow(x[i + j * N], 2);
+	    xij = x[i + j * N];
+	    d1 += -xij * y[i + k * N];
+	    d2 += xij * xij;
 	 }
-	 s = fabs((d1 / N) / (d2 / (N - 1)));
+	 /*s = fabs((d1 / N) / (d2 / (N - 1)));*/
+	 s = fabs(d1 / d2);
 	 lambda[k] = (lambda[k] > s ? lambda[k] : s);
       }
    }
 }
 
-void groupridge(double *x, double *y, double *B, int *N_p, int *p_p, int *K_p,
-      double *lambda1, double *lambda2, double *lambda3, int *g)
+/*
+ * lambda1: lasso penalty within each task
+ * lambda2: ridge penalty within each task
+ * lambda3: ridge penalty across tasks
+ */
+void groupridge(double *x, double *y, double *B,
+      int *N_p, int *p_p, int *K_p,
+      double *lambda1, double *lambda2, double *lambda3,
+      int *grp, int const maxiter, double const eps)
 {
    int N = *N_p,
        p = *p_p,
        K = *K_p;
-   int i, j, k;
+   int i, j, k, q;
    int iter;
    double d1, d2;
    double loss = INFINITY, oldloss = 1e9;
@@ -52,8 +61,7 @@ void groupridge(double *x, double *y, double *B, int *N_p, int *p_p, int *K_p,
    int *oldactive = malloc(sizeof(int) * p * K);
    double *var = malloc(sizeof(double) * p);
    double *LP = calloc(N * K, sizeof(double));
-   double s, s2, delta;
-   int const maxiter = 5e2L;
+   double s, s2, delta, Bjk;
 
    for(i = p * K - 1 ; i >= 0 ; --i)
       active[i] = oldactive[i] = 1.0;
@@ -63,7 +71,7 @@ void groupridge(double *x, double *y, double *B, int *N_p, int *p_p, int *K_p,
       var[j] = 0;
       for(i = N - 1 ; i >= 0 ; --i)
 	 var[j] +=  x[i + j * N] * x[i + j * N];
-      var[j] = var[j] / (N - 1);
+      /*var[j] = var[j] / (N - 1);*/
    }
 
    for(iter = 0 ; iter < maxiter ; iter++)
@@ -74,30 +82,44 @@ void groupridge(double *x, double *y, double *B, int *N_p, int *p_p, int *K_p,
 	 {
 	    d1 = 0;
 	    d2 = var[j];
-	    for(i = 0 ; i < N ; i++)
+	    for(i = N - 1 ; i >= 0 ; --i)
 	       d1 += x[i + j * N] * (LP[i + k * N] - y[i + k * N]);
-	    d1 /= N;
+	    /*d1 /= N;*/
 
 	    s = B[j + k * p] - d1 / d2;
-	    s2 = sign(s) * fmax(fabs(s) - lambda1[k], 0);
-	    if(s2 == 0)
+	    /* beta is zero */
+	    if(fabs(s) <= lambda1[k])
 	    {
-	       delta = s2 - B[j + k * p];
-	       B[j + k * p] = s2;
+	       delta = - B[j + k * p];
+	       B[j + k * p] = 0;
 	       for(i = 0 ; i < N ; i++)
 	          LP[i + k * N] += x[i + j * N] * delta;
 	       continue;
 	    }
 
-	    /* from here on, beta isn't zero */
+	    Bjk = B[j + k * p];
+	    /* lasso penalty when beta!=0, no 2nd derivative */
+	    d1 += lambda1[k] * sign(Bjk);
 
-	    printf("s2: %.5f\n", s2); 
+	    /* ridge penalty intra-class */
+	    d1 += lambda2[k] * Bjk;
+	    d2 += lambda2[k];
 
-	    s = (d1 + lambda1[k] * sign(B[j + k * p])) / d2;
-	    s2 = B[j + k * p] - s;
-	    delta = s2 - B[j + k * p];
+	    /* ridge penalty inter-class */
+	    for(q = 0 ; q < K ; q++)
+	    {
+	       if(grp[k] == grp[q] && k != q)
+	       {
+		  d1 += lambda3[k] * (Bjk - B[j + q * p]);
+		  d2 += lambda3[k] * N;
+	       }
+	    }
+	    
+	    s = d1 / d2;
+	    s2 = Bjk - s;
+	    delta = s2 - Bjk;
 	    B[j + k * p] = s2;
-	    for(i = 0 ; i < N ; i++)
+	    for(i = N - 1 ; i >= 0 ; --i)
 	       LP[i + k * N] += x[i + j * N] * delta;
 
 	 }
@@ -108,7 +130,7 @@ void groupridge(double *x, double *y, double *B, int *N_p, int *p_p, int *K_p,
       for(i = N * K - 1 ; i >= 0 ; --i)
 	 loss += pow(LP[i] - y[i], 2);
       loss /= N;
-      if(fabs(oldloss - loss) < 1e-5)
+      if(fabs(oldloss - loss) < eps)
 	 break;
       oldloss = loss;
    }
