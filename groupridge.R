@@ -1,94 +1,21 @@
 
 library(MASS)
+library(glmnet)
 
+options(error=dump.frames)
 
 #seed <- sample(1e9, 1)
 #set.seed(seed)
 #set.seed(4398790)
 
-N <- 100
-p <- 5000
-K <- 10
-
-## save to file
-#write.table(X, file="X.txt", col.names=FALSE, row.names=FALSE)
-#write.table(Y, file="Y.txt", col.names=FALSE, row.names=FALSE)
-#
-#adj <- outer(g, g, function(X, Y) { as.integer(X == Y) })
-#write.table(adj, file="Ynetwork.txt", col.names=FALSE, row.names=FALSE)
-
-
-# g: a vector of length K partitioned into M values
-#groupridge <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, g)
-#{
-#   N <- nrow(X)
-#   p <- ncol(X)
-#   K <- ncol(Y)
-#   B1 <- matrix(0, p, K)
-#   colnames(B1) <- g
-#   S <- table(g)
-#   loss <- 0
-#   oldloss <- Inf
-#   active <- matrix(1, p, K)
-#   oldactive <- matrix(1, p, K)
-#
-#   v <- diag(crossprod(X))
-#
-#   for(iter in 1:5000)
-#   {
-#      cat("iter:", iter, loss, "\n")
-#      for(k in 1:K)
-#      {
-#         for(j in 1:p)
-#         {
-#            d1 <- crossprod(X[, j], X %*% B1[, k] - Y[, k])
-#            d2 <- v[j]
-#	    
-#	    # soft thresholding
-#	    if(lambda1 > 0) 
-#	    {
-#	       s <- B1[j, k] - d1 / d2
-#	       s2 <- sign(s) * max(abs(s) - lambda1, 0)
-#
-#	       if(s2 == 0)
-#	       {
-#		  B1[j, k] <- 0
-#		  active[j, k] <- 0
-#		  break
-#	       }
-#	    
-#	       # l1 shrinkage when weight isn't zero
-#	       d1 <- d1 + lambda1 * sign(B1[j, k])
-#	    }
-#   
-#	    # Penalise by the differences from all other variables
-#   	    # in the same partition, don't penalise an empty partition
-#   	    w <- which(g == g[k])
-#   	    d1 <- d1 + lambda2 * sum(B1[j, k] - B1[j, w])
-#   	    d2 <- d2 + lambda2 * N
-#   
-#   	    # standard ridge penalty
-#   	    d1 <- d1 + lambda3 * B1[j, k]
-#   	    d2 <- d2 + lambda3
-#   
-#            B1[j, k] <- B1[j, k] - d1 / d2
-#         }
-#      }
-#
-#
-#      loss <- mean((X %*% B1 - Y)^2)
-#      if(all(active == oldactive) && abs(oldloss - loss) < 1e-3)
-#	 break
-#      oldloss <- loss
-#      oldactive <- active
-#   }
-#   
-#   B1
-#}
+dyn.load("groupridge.so")
 
 groupridge <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, g,
       maxiter=1e6, eps=1e-4)
 {
+   p <- ncol(X)
+   K <- ncol(Y)
+
    if(length(lambda1) == 1)
       lambda1 <- rep(lambda1, K)
    
@@ -108,7 +35,7 @@ groupridge <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, g,
 maxlambda1 <- function(X, Y)
 {
    r <- .C("maxlambda1", as.numeric(X), as.numeric(Y),
-      numeric(K), nrow(X), ncol(X), ncol(Y))
+      numeric(ncol(Y)), nrow(X), ncol(X), ncol(Y))
    r[[3]]
 }
 
@@ -130,148 +57,113 @@ blockX <- function(X, p, C)
    Xblock
 }
 
-#L <- 10^seq(-4, 2, length=10)
-
-dyn.load("groupridge.so")
-X <- scale(matrix(rnorm(N * p), N, p))
-#g <- sample(3, size=K, replace=TRUE)
-g <- rep(1, K)
-#B <- sapply(g, function(k) rep(k, p))
-B <- matrix(1, p, K)
-#B <- matrix(sample(0:1, p * K, TRUE, prob=c(0.9, 0.1)), p, K)
-Y <- scale(X %*% B + rnorm(N, 0, 1), scale=FALSE)
-B0 <- ginv(X) %*% Y
-
-maxL <- maxlambda1(X, Y)
-B1 <- groupridge(X, Y, lambda1=0, lambda2=0, lambda3=0, g=g)
-mean((B0 - B1)^2)
-L <- 10^seq(-6, 6, length=20)
-
-R1 <- lapply(L, function(l) {
-   groupridge(X, Y, lambda1=0, lambda2=0, lambda3=l, g=g)
-})
-R2 <- lapply(L, function(l) {
-   groupridge(X, Y, lambda1=0, lambda2=1e2, lambda3=l, g=g)
-})
-R3 <- lapply(L, function(l) {
-   groupridge(X, Y, lambda1=0, lambda2=1e4, lambda3=l, g=g)
-})
-
-r1 <- sapply(R1, function(x) rowMeans(x[1:p, , drop=FALSE]))
-r2 <- sapply(R2, function(x) rowMeans(x[1:p, , drop=FALSE]))
-r3 <- sapply(R3, function(x) rowMeans(x[1:p, , drop=FALSE]))
-matplot(L, t(r1), type="l", log="x", col=1, lty=1)
-matlines(L, t(r2), type="l", log="x", col=2, lty=1)
-matlines(L, t(r3), type="l", log="x", col=3, lty=1)
-
-stop()
-
-
-run <- function()
+crossval <- function(X, Y, grp, nfolds=10)
 {
-   X <- scale(matrix(rnorm(N * p), N, p))
-   Xtest <- scale(matrix(rnorm(N * p), N, p))
-   
-   # put tasks in groups
-   g <- sample(3, size=K, replace=TRUE)
-   
-   # same weights across all variables in one task for convenience
-   B <- sapply(g, function(k) rep(k, p))
-   
-   # shared sparsity pattern for same variable across all tasks
-   for(j in 1:p)
-      B[j, ] <- B[j, ] * sample(0:1, 1)
-   Y <- scale(X %*% B + rnorm(N, 0, 1), scale=FALSE)
-   Ytest <- scale(Xtest %*% B + rnorm(N, 0, 1), scale=FALSE)
+   N <- nrow(X)
+   K <- ncol(Y)
+   p <- ncol(X)
 
-   B0 <- ginv(X) %*% Y
+   folds <- sample(nfolds, N, TRUE)
+   lapply(1:nfolds, function(fold) {
+      Xtrain <- X[folds != fold, ]
+      Ytrain <- Y[folds != fold, ]
+      Xtest <- X[folds == fold, ]
+      Ytest <- Y[folds == fold, ]
 
-   B1 <- lapply(L, function(l1) {
-      cat("lambda:", l1, "\n")
-      lapply(L, function(l2) {
-	 groupridge(X, Y, lambda1=0, lambda2=l1, lambda3=l2, g=g)
+      maxL <- maxlambda1(Xtrain, Ytrain)
+      #B1 <- groupridge(Xtrain, Ytrain, lambda1=0, lambda2=0, lambda3=0, g=g)
+      #mean((B0 - B1)^2)
+      L2 <- 10^seq(-6, 6, length=20)
+      # highest L1 penalty that makes all coefs zero, can also select
+      # per task
+      L1 <- seq(1, 0.1, length=20) * max(maxL)
+
+      R <- lapply(L1, function(l1) {
+         lapply(L2, function(l2) {
+            groupridge(Xtrain, Ytrain,
+		  lambda1=l1, lambda2=0, lambda3=l2, g=grp)
+         })
       })
-   })
+      
+      r <- lapply(R, function(r) {
+         sapply(r, function(x) rowMeans(x[1:p, , drop=FALSE]))
+      })
+      
+      P <- lapply(R, function(r) {
+         lapply(r, function(m) {
+            Xtest %*% m
+         })
+      })
+      
+      R2 <- lapply(P, function(p) {
+         sapply(p, function(r) {
+            mean(sapply(1:K, function(k) {
+               1 - mean((r[,k] - Ytest[,k])^2) / var(Ytest[, k])
+            }))
+         })
+      })
 
-   B1 <- unlist(B1, recursive=FALSE)
-
-   # standard ridge regression over each task separately
-   B2 <- lapply(L, function(l) {
-      qr.solve(crossprod(X) + l * diag(p), crossprod(X, Y))
+      #m <- do.call(cbind, R2)
+      #w <- which(m == max(m), arr.ind=TRUE)
+      #c(L2=L2[w[1]], L1=L1[w[2]], R2=m[w[1], w[2]] )
+      list(L1=L1, L2=L2, R2=R2)
    })
-   
-   # ridge regression, combining the tasks into one task
-   Yv <- as.numeric(Y)
-   Xblock <- blockX(X, p, K)
-   B3 <- lapply(L, function(l) {
-      b <- qr.solve(crossprod(Xblock) + l * diag(ncol(Xblock)),
-   	 crossprod(Xblock, Yv))
-      matrix(b, p, K)
-   })
-   
-   # training
-   loss0 <- colSums((Y - X %*% B0)^2)
-   loss1 <- sapply(B1, function(b) colSums((Y - X %*% b)^2))
-   loss2 <- sapply(B2, function(b) colSums((Y - X %*% b)^2))
-   loss3 <- sapply(B3, function(b) colSums((Y - X %*% b)^2))
-   
-   R2.0 <- 1 - loss0 / colSums(sweep(Y, 2, colMeans(Y))^2)
-   R2.1 <- rbind(apply(rbind(loss1), 2, function(l) {
-      1 - l / colSums(sweep(Y, 2, colMeans(Y))^2)
-   }))
-   R2.2 <- rbind(apply(rbind(loss2), 2, function(l) {
-      1 - l / colSums(sweep(Y, 2, colMeans(Y))^2)
-   }))
-   R2.3 <- rbind(apply(rbind(loss3), 2, function(l) {
-      1 - l / colSums(sweep(Y, 2, colMeans(Y))^2)
-   }))
-   
-   # test
-   loss0t <- colSums((Ytest - Xtest %*% B0)^2)
-   loss1t <- sapply(B1, function(b) colSums((Ytest - Xtest %*% b)^2))
-   loss2t <- sapply(B2, function(b) colSums((Ytest - Xtest %*% b)^2))
-   loss3t <- sapply(B3, function(b) colSums((Ytest - Xtest %*% b)^2))
-   
-   R2.0t <- 1 - loss0t / colSums(sweep(Ytest, 2, colMeans(Ytest))^2)
-   R2.1t <- rbind(apply(rbind(loss1t), 2, function(l) {
-      1 - l / colSums(sweep(Ytest, 2, colMeans(Ytest))^2)
-   }))
-   R2.2t <- rbind(apply(rbind(loss2t), 2, function(l) {
-      1 - l / colSums(sweep(Ytest, 2, colMeans(Ytest))^2)
-   }))
-   R2.3t <- rbind(apply(rbind(loss3t), 2, function(l) {
-      1 - l / colSums(sweep(Ytest, 2, colMeans(Ytest))^2)
-   }))
-
-   list(mean(R2.0t), colMeans(R2.1t), colMeans(R2.2t), colMeans(R2.3t))
 }
 
-Nrep <- 10
-res <- replicate(Nrep, run(), simplify=FALSE)
-r0 <- sapply(res, function(x) x[[1]])
-r1 <- sapply(res, function(x) x[[2]])
-r2 <- sapply(res, function(x) x[[3]])
-r3 <- sapply(res, function(x) x[[4]])
+run <- function(N=100, p=200, K=5, M=sample(K, 1))
+{
+   Xtrain <- scale(matrix(sample(0:2, N * p, replace=TRUE), N, p))
+   Xtest <- scale(matrix(sample(0:2, N * p, replace=TRUE), N, p))
+   grp <- sample(M, K, TRUE)
+   B <- matrix(sample(0:1, p * K, TRUE, prob=c(0.9, 0.1)), p, K)
+   Ytrain <- scale(Xtrain %*% B + rnorm(N, 0, 1), scale=FALSE)
+   Ytest <- scale(Xtest %*% B + rnorm(N, 0, 1), scale=FALSE)
+   Ynet <- outer(grp, grp, function(x, y) as.integer(x == y))
+   
+   write.table(Xtrain, file="X.txt",
+         col.names=FALSE, row.names=FALSE, quote=FALSE)
+   write.table(Ytrain, file="Y.txt",
+         col.names=FALSE, row.names=FALSE, quote=FALSE)
+   write.table(Ynet, file="Ynetwork.txt",
+         col.names=FALSE, row.names=FALSE, quote=FALSE)
 
-r0m <- mean(r0)
-r1m <- matrix(rowMeans(r1), length(L))
-r2m <- rowMeans(r2)
-r3m <- rowMeans(r3)
+   XtrainB <- blockX(Xtrain, p, K)
+   XtestB <- blockX(Xtest, p, K)
+   ytrain <- as.numeric(Ytrain)
+   ytest <- as.numeric(Ytest)
+   g <- cv.glmnet(XtrainB, ytrain, nfolds=10)
+   B.lasso <- as.matrix(coef(g))[-1, ]
+   P.lasso <- XtestB %*% B.lasso
+   R2.lasso <- 1 - mean((P.lasso - ytest)^2) / var(ytest)
+   
+   res <- crossval(Xtrain, Ytrain, grp, nfolds=10)
+   
+   b <- lapply(res, function(r) {
+      m <- do.call(cbind, r$R2)
+      w <- which(m == max(m), arr.ind=TRUE)
+      c(L2=r$L2[w[1]], L1=r$L1[w[2]], R2=m[w[1], w[2]])
+   })
+   
+   b2 <- colMeans(do.call(rbind, b))
+   
+   Btrain <- groupridge(Xtrain, Ytrain, lambda1=b2[2],
+         lambda2=0, lambda3=b2[1], g=grp)
+   Ptest <- Xtest %*% Btrain
+   R2test <- mean(sapply(1:K, function(k) {
+      1 - mean((Ptest[,k] - Ytest[,k])^2) / var(Ytest[, k])
+   }))
+   
+   system("./gflasso.sh")
+   B.gfl <- matrix(scan("gflasso_betas.txt", what=numeric()), byrow=TRUE,
+      nrow=p, ncol=K)
+   P.gfl <- Xtest %*% B.gfl
+   
+   R2.gfl <- mean(sapply(1:K, function(k) {
+      1 - mean((P.gfl[,k] - Ytest[,k])^2) / var(Ytest[, k])
+   }))
+   
+   c(lasso=R2.lasso, l1l2=R2test, gflasso=R2.gfl)
+}
 
-rowSD <- function(x) apply(x, 1, sd)
+res <- replicate(10, run())
 
-r0s <- sd(r0) / sqrt(Nrep)
-r1s <- matrix(rowSD(r1) / sqrt(Nrep), length(L))
-r2s <- rowSD(r2) / sqrt(Nrep)
-r3s <- rowSD(r3) / sqrt(Nrep)
-
-r <- cbind(r1m, r2m)
-
-pdf("groupridge.pdf")
-# Average R^2 across the K outputs
-matplot(L, r, log="x",
-      type="b", main="test", ylab=expression(R^2), lty=1,
-      lwd=2,
-      pch=c(rep(20, length(L), 21)),
-      col=c(rep(1, length(L)), 2))
-dev.off()
