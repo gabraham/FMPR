@@ -48,7 +48,7 @@ void maxlambda1(double *x, double *y, double *lambda,
 void groupridge(double *x, double *y, double *B,
       int *N_p, int *p_p, int *K_p,
       double *lambda1, double *lambda2, double *lambda3,
-      int *grp, int const maxiter, double const eps)
+      int *grp, int *maxiter_p, double *eps_p)
 {
    int N = *N_p,
        p = *p_p,
@@ -56,22 +56,25 @@ void groupridge(double *x, double *y, double *B,
    int i, j, k, q;
    int iter;
    double d1, d2;
-   double loss = INFINITY, oldloss = 1e9;
+   double loss = INFINITY, oldloss = INFINITY;
    int *active = malloc(sizeof(int) * p * K);
    int *oldactive = malloc(sizeof(int) * p * K);
-   double *var = malloc(sizeof(double) * p);
+   double *v = malloc(sizeof(double) * p);
    double *LP = calloc(N * K, sizeof(double));
    double s, s2, delta, Bjk;
+   double eps = *eps_p;
+   int maxiter = *maxiter_p;
+
+   printf("eps: %.6f\n", eps);
 
    for(i = p * K - 1 ; i >= 0 ; --i)
       active[i] = oldactive[i] = 1.0;
 
    for(j = p - 1 ; j >= 0 ; --j)
    {
-      var[j] = 0;
+      v[j] = 0;
       for(i = N - 1 ; i >= 0 ; --i)
-	 var[j] +=  x[i + j * N] * x[i + j * N];
-      /*var[j] = var[j] / (N - 1);*/
+	 v[j] +=  x[i + j * N] * x[i + j * N];
    }
 
    for(iter = 0 ; iter < maxiter ; iter++)
@@ -81,13 +84,13 @@ void groupridge(double *x, double *y, double *B,
 	 for(j = 0 ; j < p ; j++)
 	 {
 	    d1 = 0;
-	    d2 = var[j];
+	    d2 = v[j];
 	    for(i = N - 1 ; i >= 0 ; --i)
 	       d1 += x[i + j * N] * (LP[i + k * N] - y[i + k * N]);
-	    /*d1 /= N;*/
 
 	    s = B[j + k * p] - d1 / d2;
-	    /* beta is zero */
+
+	    /* beta is zero, skip the other penalties */
 	    if(fabs(s) <= lambda1[k])
 	    {
 	       delta = - B[j + k * p];
@@ -121,25 +124,29 @@ void groupridge(double *x, double *y, double *B,
 	    B[j + k * p] = s2;
 	    for(i = N - 1 ; i >= 0 ; --i)
 	       LP[i + k * N] += x[i + j * N] * delta;
-
 	 }
       }
-      printf("iter: %d loss: %.5f\n", iter, loss);
 
       loss = 0;
       for(i = N * K - 1 ; i >= 0 ; --i)
 	 loss += pow(LP[i] - y[i], 2);
-      loss /= N;
+      loss /= (N * K);
+      printf("iter: %d oldloss: %.5f loss: %.5f\n", iter, oldloss,
+	    loss);
       if(fabs(oldloss - loss) < eps)
+      {
+	 printf("converged after %d iterations\n", iter);
 	 break;
+      }
       oldloss = loss;
    }
 
    printf("done\n");
+   printf("final loss: %.7f\n", loss);
 
    free(active);
    free(oldactive);
-   free(var);
+   free(v);
    free(LP);
 }
 
