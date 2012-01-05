@@ -117,7 +117,7 @@ simpler <- function(x, y, lambda, maxiter=200)
 source("lasso.R")
 
 N <- 100
-p <- 1500
+p <- 200
 K <- 1
 grp <- 1
 
@@ -155,8 +155,23 @@ g6 <- groupridge_simple(X, Y, lambda1=1e-2, lambda2=0, lambda3=0, g=grp,
 (err6 <- mean((X %*% g6 - Y)^2))
 g7 <- simpler(X, drop(Y), lambda=1e-2)
 (err7 <- mean((X %*% g7 - Y)^2))
+system.time({
+   g8 <- groupridge2(X, Y, lambda1=1e-2, lambda2=0, lambda3=0, g=grp,
+      eps=1e-4, verbose=TRUE)
+})
 
 (r <- cbind(True=drop(B), glmnet=b, gr1=drop(g1), gr2=drop(g2), gr3=drop(g3),
-      l1=g4, l2=g5, simple=drop(g6), simpler=drop(g7)))
+      l1=g4, l2=g5, simple=drop(g6), simpler=drop(g7), gr8=drop(g8)))
 cor(r)
+
+#Xs <- scale(X0)
+#system.time({
+#   g31 <- groupridge2(X, Y, lambda1=1e-2, lambda2=0, lambda3=0, g=grp,
+#      eps=1e-4, verbose=TRUE)
+#})
+#system.time({
+#   g32 <- groupridge2(Xs, Y, lambda1=1e-2, lambda2=0, lambda3=0, g=grp,
+#      eps=1e-4, verbose=TRUE)
+#})
+
 

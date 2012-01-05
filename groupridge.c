@@ -155,9 +155,12 @@ void groupridge_simple(double *x, double *y, double *B,
       if(fabs(oldloss - loss) < eps)
       {
 	 if(verbose)
+	 {
 	    printf(
 	       "terminating at iteration %d with loss %.7f and %d active vars\n",
 		  iter, loss, numactive);
+	    fflush(stdout);
+	 }
 	 break;
       }
       /*else if(iter > 1 && numactive >= N)
@@ -171,7 +174,7 @@ with loss %.7f and %d active vars\n",
       oldloss = loss;
    }
    
-   if(iter == maxiter && verbose)
+   if(iter >= maxiter && verbose)
       printf("failed to converge after %d iterations\n", maxiter);
 
    free(v);
@@ -306,7 +309,7 @@ with loss %.7f and %d active vars\n",
       oldloss = loss;
    }
    
-   if(iter == maxiter && verbose)
+   if(iter >= maxiter && verbose)
       printf("failed to converge after %d iterations\n", maxiter);
 
    free(v);
@@ -339,20 +342,22 @@ void groupridge2(double *x, double *y, double *B,
    double s, s2, delta, Bjk;
    double eps = *eps_p;
    int maxiter = *maxiter_p;
-   int numactive, allconverged = 0;
+   int numactive, allconverged = 1, numconverged = 0;
    int pK1 = p * K - 1;
    int verbose = *verbose_p;
+   int *converged = calloc(p * K, sizeof(int));
 
-   for(i = pK1 ; i >= 0 ; --i)
-      active[i] = oldactive[i] = TRUE;
+   for(j = pK1 ; j >= 0 ; --j)
+      active[j] = oldactive[j] = TRUE;
 
    for(j = p - 1 ; j >= 0 ; --j)
       for(i = N - 1 ; i >= 0 ; --i)
 	 v[j] +=  x[i + j * N] * x[i + j * N];
-
+   
    for(iter = 0 ; iter < maxiter ; iter++)
    {
       numactive = 0;
+      oldloss = loss;
       loss = 0;
       for(k = 0 ; k < K ; k++)
       {
@@ -376,84 +381,89 @@ void groupridge2(double *x, double *y, double *B,
 	    {
 	       delta = - B[j + k * p];
 	       B[j + k * p] = 0;
-	       lossk = 0;
-	       for(i = 0 ; i < N ; i++)
-	       {
-	          LP[i + k * N] += x[i + j * N] * delta;
-		  lossk += pow(LP[i + k * N] - y[i + k * N], 2);
-	       }
-	       loss += lossk / N;
-	       continue;
 	    }
-
-	    Bjk = B[j + k * p];
-	    /* lasso penalty when beta!=0, no 2nd derivative */
-	    d1 += lambda1[k] * sign(Bjk);
-
-	    /* ridge penalty intra-class */
-	    d1 += lambda2[k] * Bjk;
-	    d2 += lambda2[k];
-
-	    /* ridge penalty inter-class */
-	    for(q = 0 ; q < K ; q++)
+	    else
 	    {
-	       if(grp[k] == grp[q] && k != q)
+	       Bjk = B[j + k * p];
+	       /* lasso penalty when beta!=0, no 2nd derivative */
+	       d1 += lambda1[k] * sign(Bjk);
+
+	       /* ridge penalty intra-class */
+	       d1 += lambda2[k] * Bjk;
+	       d2 += lambda2[k];
+
+	       /* ridge penalty inter-class */
+	       for(q = 0 ; q < K ; q++)
 	       {
-		  d1 += lambda3[k] * (Bjk - B[j + q * p]);
-		  d2 += lambda3[k] * N;
+	          if(grp[k] == grp[q] && k != q)
+	          {
+	             d1 += lambda3[k] * (Bjk - B[j + q * p]);
+	             d2 += lambda3[k] * N;
+	          }
 	       }
+	       
+	       s = d1 / d2;
+	       s2 = Bjk - s;
+	       delta = s2 - Bjk;
+	       B[j + k * p] = s2;
 	    }
-	    
-	    s = d1 / d2;
-	    s2 = Bjk - s;
-	    delta = s2 - Bjk;
-	    B[j + k * p] = s2;
+
 	    lossk = 0;
 	    for(i = N - 1 ; i >= 0 ; --i)
 	    {
 	       LP[i + k * N] += x[i + j * N] * delta;
 	       lossk += pow(LP[i + k * N] - y[i + k * N], 2);
 	    }
-	    loss += lossk / N;
+	    loss += lossk / N; 
+	    converged[j + k * p] = fabs(loss - oldloss) < 1e-6;
+	    numconverged += converged[j + k * p];
 
 	    active[j + k * p] = B[j + k * p] != 0;
 	    numactive += active[j + k * p];
 	 }
       }
 
-      allconverged++;
-
-      if(allconverged == 1)
+      if(numconverged == p * K)
       {
-	 for(j = pK1; j >= 0 ; --j)
-	    oldactive[j] = active[j];
-      }
-      else
-      {
-	 for(j = pK1 ; j >= 0 ; --j)
-	    if(active[j] != oldactive[j])
-	       break;
-
-	 if(j < 0 && fabs(oldloss - loss) < eps)
+	 if(allconverged == 1)
 	 {
-	    if(verbose)
-	       printf("terminating at iteration %d with %d active vars\n",
-		     iter, numactive);
-	    break;
+	    for(j = pK1; j >= 0 ; --j)
+	    {
+	       oldactive[j] = active[j];
+	       active[j] = TRUE;
+	    }
+	    allconverged = 2;
 	 }
+	 else
+	 {
+	    for(j = pK1 ; j >= 0 ; --j)
+	       if(active[j] != oldactive[j])
+		  break;
+	    if(j < 0)
+	    {
+	       if(verbose)
+		  printf("terminating at iteration %d with %d active vars\n",
+		     iter, numactive);
+	       break;
+	    }
 
-	 for(j = pK1 ; j >= 0 ; --j)
-	    oldactive[j] = active[j];
-
-	 allconverged = 1;
+	    allconverged = 1;
+	    for(j = pK1; j >= 0 ; --j)
+	    {
+	       oldactive[j] = active[j];
+	       active[j] = TRUE;
+	    }
+	 }
       }
-
-      oldloss = loss;
    }
+
+   if(iter >= maxiter && verbose)
+      printf("failed to converge after %d iterations\n", maxiter);
 
    free(active);
    free(oldactive);
    free(v);
    free(LP);
+   free(converged);
 }
 
