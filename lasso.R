@@ -23,7 +23,7 @@ lasso <- function(X, y, lambda1=0, maxepoch=5000, eps=1e-3)
 	 if(grad != 0) {
 	    beta_new <- soft(beta[j] - grad / V[j], lambda1)
 	    diff <- beta_new - beta[j]
-	    lp <- lp + x[,j] * diff
+	    lp <- lp + X[,j] * diff
 	    Err <- lp - y
 	    beta[j] <- beta_new
 	 }
