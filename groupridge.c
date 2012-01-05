@@ -1007,36 +1007,35 @@ void groupridge3(double *x, double *y, double *b,
 
 	       // different implementation of the soft-thresholding
 	       bjk = b[j + p * k];
-	       b[j + p * k] = soft_threshold(bjk - d1 / d2, lambda1[k]);
-	       delta = b[j + p * k] - bjk;
+	       //b[j + p * k] = soft_threshold(bjk - d1 / d2, lambda1[k]);
+	       //delta = b[j + p * k] - bjk;
 
-	       ///* Apply inter-task ridge regression */
-	       //for(q = 0 ; q < K ; q++)
-	       //{
-	       //   if(grp[k] == grp[q] && k != q)
-	       //   {
-	       //      d1 += lambda3 * (bjk - b[j + p * q]);
-	       //      // TODO: fix the second derivative
-	       //      d2 += lambda3 * N;
-	       //   }
-	       //}
+	       /* Apply inter-task ridge regression */
+	       for(q = 0 ; q < K ; q++)
+	       {
+	          if(grp[k] == grp[q] && k != q)
+	          {
+	             d1 += lambda3 * (bjk - b[j + p * q]);
+	             // TODO: fix the second derivative
+	             d2 += lambda3 * N;
+	          }
+	       }
 
 	       /* Apply intra-task ridge regression */
-	       //s = (bjk - d1 / d2) / (1 + lambda2[k]);
+	       s = (bjk - d1 / d2) / (1 + lambda2[k]);
 
-	       ///* Now apply intra-task lasso */
-	       //if(fabs(s) <= lambda1[k])
-	       //{
-	       //   b[j + p * k] = 0;
-	       //   delta = -bjk;
-	       //}
-	       //else
-	       //{
-	       //   b[j + p * k] = s - lambda1[k] * sign(s);
-	       //   delta = b[j + p * k] - bjk;
-	       //}
+	       /* Now apply intra-task lasso */
+	       if(fabs(s) <= lambda1[k])
+	       {
+	          b[j + p * k] = 0;
+	          delta = -bjk;
+	       }
+	       else
+	       {
+	          b[j + p * k] = s - lambda1[k] * sign(s);
+	          delta = b[j + p * k] - bjk;
+	       }
 
-	       // TODO: loss over all samples, not just for this task
 	       oldloss[k] = loss[k];
 	       loss[k] = 0;
 	       for(i = N - 1 ; i >= 0 ; --i)

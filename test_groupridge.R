@@ -95,7 +95,7 @@ groupridge3 <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, g=NULL,
       maxiter=1e5, eps=1e-6, verbose=TRUE)
 {
    p <- ncol(X)
-   K <- ncol(Y)
+   K <- ncol(cbind(Y))
 
    if(length(lambda1) == 1)
       lambda1 <- rep(lambda1, K)
@@ -107,7 +107,7 @@ groupridge3 <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, g=NULL,
       g <- 1:K
 
    r <- .C("groupridge3", as.numeric(X), as.numeric(Y), 
-      numeric(p * K), nrow(X), ncol(X), ncol(Y),
+      numeric(p * K), nrow(X), ncol(X), K,
       as.numeric(lambda1), as.numeric(lambda2), as.numeric(lambda3),
       as.integer(g), as.integer(maxiter),
       as.double(eps), as.integer(verbose))
@@ -181,18 +181,21 @@ simpler <- function(x, y, lambda, maxiter=2000)
 
 source("lasso.R")
 
-N <- 100
-p <- 500
-K <- 1
-grp <- 1
+################################################################################
+# Test groupridge in standard lasso setting, single task
 
-# scale to zero mean and unit norm (not unit variance)
-X0 <- matrix(rnorm(N * p), N, p)
-X1 <- sweep(X0, 2, colMeans(X0))
-X <- sweep(X1, 2, sqrt(diag(crossprod(X1))), FUN="/")
-B <- matrix(rnorm(p * K), p, K)
-B[sample(p, p - 10),] <- 0
-Y <- X %*% B
+#N <- 100
+#p <- 500
+#K <- 1
+#grp <- 1
+#
+## scale to zero mean and unit norm (not unit variance)
+#X0 <- matrix(rnorm(N * p), N, p)
+#X1 <- sweep(X0, 2, colMeans(X0))
+#X <- sweep(X1, 2, sqrt(diag(crossprod(X1))), FUN="/")
+#B <- matrix(rnorm(p * K), p, K)
+#B[sample(p, p - 10),] <- 0
+#Y <- X %*% B
 #
 ##system.time({
 ##   g1 <- groupridge(X, Y, lambda1=1e-2, lambda2=0, lambda3=0, g=grp,
@@ -210,9 +213,9 @@ Y <- X %*% B
 ##g5 <- lasso.activeset(X, drop(Y), lambda1=1e-2)
 ##(err5 <- mean((X %*% g5 - Y)^2))
 #system.time({
-   g <- glmnet(X, drop(Y), lambda=1e-2)
+#   g <- glmnet(X, drop(Y), lambda=1e-2)
 #})
-b <- as.matrix(coef(g))[-1, ]
+#b <- as.matrix(coef(g))[-1, ]
 ##g6 <- groupridge_simple(X, Y, lambda1=1e-2, lambda2=0, lambda3=0, g=grp,
 ##      eps=1e-16,  verbose=TRUE)
 ##(err6 <- mean((X %*% g6 - Y)^2))
@@ -224,35 +227,35 @@ b <- as.matrix(coef(g))[-1, ]
 ##})
 #
 #system.time({
-   g2 <- groupridge2(X, Y, lambda1=1e-2, maxiter=1e4, verbose=FALSE)
+#   g2 <- groupridge2(X, Y, lambda1=1e-2, maxiter=1e4, verbose=FALSE)
 #})
 #system.time({
-   g3 <- groupridge3(X, Y, lambda1=1e-2, maxiter=1e4, verbose=FALSE)
+#   g3 <- groupridge3(X, Y, lambda1=1e-2, maxiter=1e4, verbose=FALSE)
 #})
 #system.time({
-   l2 <- lasso2(X, drop(Y), lambda1=1e-2, maxiter=1e4, verbose=FALSE)
+#   l2 <- lasso2(X, drop(Y), lambda1=1e-2, maxiter=1e4, verbose=FALSE)
 #})
 #system.time({
-   l3 <- lasso3(X, drop(Y), lambda1=1e-2, maxiter=1e4, verbose=FALSE)
+#   l3 <- lasso3(X, drop(Y), lambda1=1e-2, maxiter=1e4, verbose=FALSE)
 #})
 
-r <- cbind(
-   True=drop(B),
-   glmnet=b,
-   #gr1=drop(g1),
-   #gr2=drop(g2),
-   gr2=drop(g2),
-   gr3=drop(g3),
-   #l1=g4,
-   #l2=g5,
-   #simple=drop(g6),
-   #simpler=drop(g7),
-   #gr8=drop(g8))
-   l2=drop(l2),
-   l3=drop(l3)
-)
-cor(r)
-cor(sign(r))
+#r <- cbind(
+#   True=drop(B),
+#   glmnet=b,
+#   #gr1=drop(g1),
+#   #gr2=drop(g2),
+#   gr2=drop(g2),
+#   gr3=drop(g3),
+#   #l1=g4,
+#   #l2=g5,
+#   #simple=drop(g6),
+#   #simpler=drop(g7),
+#   #gr8=drop(g8))
+#   l2=drop(l2),
+#   l3=drop(l3)
+#)
+#cor(r)
+#cor(sign(r))
 
 #Y1 <- matrix(rep(Y, ncol(r)), nrow=N)
 #Y2 <- X %*% r
@@ -268,19 +271,51 @@ cor(sign(r))
 ##      eps=1e-4, verbose=TRUE)
 ##})
 
-#N <- 100
-#p <- 100
-#K <- 10
-#grp <- 1:K
-#
-## scale to zero mean and unit norm (not unit variance)
-#X0 <- matrix(rnorm(N * p), N, p)
-#X1 <- sweep(X0, 2, colMeans(X0))
-#X <- sweep(X1, 2, sqrt(diag(crossprod(X1))), FUN="/")
+
+################################################################################
+# Test groupridge in multi-task setting, lasso only
+N <- 100
+p <- 1000
+K <- 10
+
+# scale to zero mean and unit norm (not unit variance)
+X0 <- matrix(rnorm(N * p), N, p)
+X1 <- sweep(X0, 2, colMeans(X0))
+X <- sweep(X1, 2, sqrt(diag(crossprod(X1))), FUN="/")
 #B <- matrix(rnorm(p * K), p, K)
-##B[sample(p, p - 10),] <- 0
-#Y <- X %*% B
-#
-#g3 <- groupridge3(X, Y, lambda1=1e-2, lambda2=0, lambda3=0, g=grp,
-#      maxiter=1e3)
-#
+#B[sample(p, p - 10),] <- 0
+b <- rnorm(p) * sample(0:1, p, TRUE, prob=c(0.9, 0.1))
+B <- sapply(1:K, function(k) b)
+
+Y <- X %*% B
+
+g2 <- groupridge3(X, Y[,1], lambda1=1e-2, maxiter=1e6)
+g3 <- groupridge3(X, Y, lambda1=1e-2, maxiter=1e6)
+l3 <- lasso3(X, Y[,1], lambda1=1e-2, maxiter=1e6)
+cor(cbind(g2, g3[,1], l3))
+cor(g3)
+
+stop()
+
+################################################################################
+# Test groupridge in multi-task setting, lasso + ridge + group ridge
+N <- 100
+p <- 1000
+K <- 10
+
+# scale to zero mean and unit norm (not unit variance)
+X0 <- matrix(rnorm(N * p), N, p)
+X1 <- sweep(X0, 2, colMeans(X0))
+X <- sweep(X1, 2, sqrt(diag(crossprod(X1))), FUN="/")
+#B <- matrix(rnorm(p * K), p, K)
+#B[sample(p, p - 10),] <- 0
+b <- rnorm(p) * sample(0:1, p, TRUE, prob=c(0.9, 0.1))
+B <- sapply(1:K, function(k) b)
+Y <- X %*% B
+
+#g2 <- groupridge3(X, Y[,1], lambda1=1e-2, maxiter=1e6)
+g3 <- groupridge3(X, Y, lambda1=1e-2, lambda2=1e-3, maxiter=1e6)
+#l3 <- lasso3(X, Y[,1], lambda1=1e-2, maxiter=1e6)
+cor(cbind(g2, g3[,1], l3))
+cor(g3)
+
