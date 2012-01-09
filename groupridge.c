@@ -28,6 +28,7 @@ void maxlambda1(double *x, double *y, double *lambda,
        K = *K_p;
    int i, j, k, m;
    double d1, d2, s, xij;
+   double eps = 1e-16;
 
    for(k = 0 ; k < K ; k++)
    {
@@ -41,10 +42,12 @@ void maxlambda1(double *x, double *y, double *lambda,
 	    d1 += -xij * y[i + k * N];
 	    d2 += xij * xij;
 	 }
-	 /*s = fabs((d1 / N) / (d2 / (N - 1)));*/
 	 s = fabs(d1 / d2);
 	 lambda[k] = (lambda[k] > s ? lambda[k] : s);
       }
+      /* small fudge factor to ensure penalty is high enough
+       * to truly make everything zero */
+      lambda[k] += eps;
    }
 }
 
@@ -851,6 +854,8 @@ void lasso3(double *x, double *y, double *b,
 	 else
 	 {
 	    b[j] = s - lambda1 * sign(s);
+	    if(fabs(b[j]) < 1e-15)
+	       b[j] = 0;
 	    delta = b[j] - bj;
 	 }
 
@@ -899,6 +904,9 @@ void lasso3(double *x, double *y, double *b,
 	       break;
 	    }
 
+	    if(verbose)
+	       printf("active set has changed\n");
+
 	    allconverged = 1;
 	    for(j = p - 1; j >= 0 ; --j)
 	    {
@@ -925,7 +933,8 @@ void lasso3(double *x, double *y, double *b,
 void groupridge3(double *x, double *y, double *b,
       int *N_p, int *p_p, int *K_p,
       double *lambda1, double *lambda2, double *lambda3_p,
-      int *grp, int *maxiter_p, double *eps_p, int *verbose_p)
+      int *grp, int *maxiter_p, double *eps_p, int *verbose_p,
+      int *status)
 {
    int N = *N_p,
        p = *p_p,
@@ -953,7 +962,16 @@ void groupridge3(double *x, double *y, double *b,
 	  *lossnullF = calloc(K, sizeof(double));
    double losstotal = 0, oldlosstotal = 0;
 
-   printf("N: %d p: %d K: %d\n", N, p, K);
+   if(verbose)
+   {
+      printf("N: %d p: %d K: %d\n", N, p, K);
+      printf("l3: %.6f\n", lambda3);
+      for(k = 0 ; k < K ; k++)
+      {
+	 printf("lambda1[%d]: %.6f lambda2[%d]: %.6f grp[%d]: %d\n",
+	    k, lambda1[k], k, lambda2[k], k, grp[k]);
+      }
+   }
 
    for(j = pK1 ; j >= 0 ; --j)
       active[j] = oldactive[j] = TRUE;
@@ -1016,7 +1034,6 @@ void groupridge3(double *x, double *y, double *b,
 	          if(grp[k] == grp[q] && k != q)
 	          {
 	             d1 += lambda3 * (bjk - b[j + p * q]);
-	             // TODO: fix the second derivative
 	             d2 += lambda3 * N;
 	          }
 	       }
@@ -1033,6 +1050,8 @@ void groupridge3(double *x, double *y, double *b,
 	       else
 	       {
 	          b[j + p * k] = s - lambda1[k] * sign(s);
+		  if(fabs(b[j + p * k]) < 1e-15)
+		     b[j + p * k] = 0;
 	          delta = b[j + p * k] - bjk;
 	       }
 
@@ -1086,6 +1105,7 @@ void groupridge3(double *x, double *y, double *b,
                if(verbose)
         	  printf("terminating at iteration %d with %d active vars\n",
         	     iter, numactive);
+	       *status = TRUE;
                break;
             }
 
@@ -1103,7 +1123,10 @@ void groupridge3(double *x, double *y, double *b,
    }
 
    if(iter >= maxiter && verbose)
+   {
       printf("failed to converge after %d iterations\n", maxiter);
+      *status = FALSE;
+   }
 
    free(active);
    free(oldactive);
