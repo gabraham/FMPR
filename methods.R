@@ -1,7 +1,7 @@
 library(glmnet)
 library(gdata)
 
-dyn.load("groupridge.so")
+dyn.load("~/Code/L1L2/groupridge.so")
 
 # lambda1: scalar or K-vector
 # lambda2: scalar or K-vector
@@ -27,6 +27,40 @@ groupridge3 <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, grp=NULL,
       as.numeric(lambda1), as.numeric(lambda2), as.numeric(lambda3),
       as.integer(grp), as.integer(maxiter),
       as.double(eps), as.integer(verbose), integer(1))
+
+   status <- r[[14]]
+   if(!status)
+      warning("groupridge failed to converge")
+   matrix(r[[3]], p, K)
+}
+
+# lambda1: scalar or K-vector
+# lambda2: scalar or K-vector
+# lambda3: scalar 
+groupridge4 <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
+      maxiter=1e5, eps=1e-6, verbose=FALSE)
+{
+   p <- ncol(X)
+   Y <- cbind(Y)
+   K <- ncol(Y)
+
+   if(length(lambda1) == 1)
+      lambda1 <- rep(lambda1, K)
+   
+   if(length(lambda2) == 1)
+      lambda2 <- rep(lambda2, K)
+
+   if(is.null(G))
+      G <- matrix(0, K, K)
+
+   r <- .C("groupridge4", as.numeric(X), as.numeric(Y), 
+      numeric(p * K), nrow(X), ncol(X), K,
+      as.numeric(lambda1), as.numeric(lambda2), as.numeric(lambda3),
+      as.integer(G), as.integer(maxiter),
+      as.double(eps), as.integer(verbose), integer(1))
+   status <- r[[14]]
+   if(!status)
+      warning("groupridge failed to converge")
    matrix(r[[3]], p, K)
 }
 
@@ -86,4 +120,14 @@ blockX <- function(X, p, C)
 
    Xblock
 }
+
+## Threshold the correlation matrix and convert into groups, finding the graph
+## that spans the connected vertices. Each connected subgraph is a group.
+#cor2grp <- function(Y, thresh=0.7)
+#{
+#   R <- abs(cor(Y))
+#   diag(R) <- 0
+#   w <- which(R >= thresh, arr.ind=TRUE)
+#   K <- numeric(length(unique(w)))
+#}
 

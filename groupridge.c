@@ -929,6 +929,7 @@ void lasso3(double *x, double *y, double *b,
 /*
  *  Assumes that columns of x matrix are
  *  standardised to zero-mean and unit-norm
+ *  and y is scaled so there's no intercept
  */
 void groupridge3(double *x, double *y, double *b,
       int *N_p, int *p_p, int *K_p,
@@ -953,7 +954,6 @@ void groupridge3(double *x, double *y, double *b,
 
    int *active = malloc(sizeof(int) * p * K);
    int *oldactive = malloc(sizeof(int) * p * K);
-   //double *d2 = calloc(p, sizeof(double));
    double *LP = calloc(N * K, sizeof(double));
    double *meany = calloc(K, sizeof(double));
    double *loss = malloc(sizeof(double) * K),
@@ -976,10 +976,6 @@ void groupridge3(double *x, double *y, double *b,
    for(j = pK1 ; j >= 0 ; --j)
       active[j] = oldactive[j] = TRUE;
 
-   //for(j = p - 1 ; j >= 0 ; --j)
-   // for(i = N - 1 ; i >= 0 ; --i)
-   // d2[j] +=  x[i + j * N] * x[i + j * N];
-
    /* null loss mean((y - mean(y))^2)*/
    for(k = 0 ; k < K ; k++)
    {
@@ -996,10 +992,6 @@ void groupridge3(double *x, double *y, double *b,
       lossnullF[k] = lossnull[k] * 1e-8;
    }
 	 
-   //   if(verbose)
-   //      printf("null loss: %.5f lossnullF: %.10f\n",
-   //	    lossnull, lossnullF);
-
    for(iter = 0 ; iter < maxiter ; iter++)
    {
       numactive = 0;
@@ -1014,10 +1006,7 @@ void groupridge3(double *x, double *y, double *b,
 	    d1 = 0;
 	    d2 = 1; // assumes standardised inputs
 	    if(!active[j + p * k])
-	    {
 	       numconverged++;
-	       //printf("j: %d k: %d lossdiff: (NA)\n", j, k);
-	    }
 	    else
 	    {
 	       for(i = N - 1 ; i >= 0 ; --i)
@@ -1025,8 +1014,6 @@ void groupridge3(double *x, double *y, double *b,
 
 	       // different implementation of the soft-thresholding
 	       bjk = b[j + p * k];
-	       //b[j + p * k] = soft_threshold(bjk - d1 / d2, lambda1[k]);
-	       //delta = b[j + p * k] - bjk;
 
 	       /* Apply inter-task ridge regression */
 	       for(q = 0 ; q < K ; q++)
@@ -1064,8 +1051,6 @@ void groupridge3(double *x, double *y, double *b,
 	       }
 	       loss[k] /= N;
 	       numconverged += fabs(loss[k] - oldloss[k]) < lossnullF[k];
-	       //printf("j: %d k: %d loss: %.10f oldloss: %.10f diff: %.10f d1: %.10f\n", j, k,
-	       //	     loss[k], oldloss[k], fabs(loss[k] - oldloss[k]), d1);
 	    }
 
 	    active[j + p * k] = b[j + p * k] != 0;
@@ -1130,7 +1115,201 @@ void groupridge3(double *x, double *y, double *b,
 
    free(active);
    free(oldactive);
-   //free(d2);
+   free(LP);
+   free(meany);
+   free(loss);
+   free(oldloss);
+   free(lossnull);
+   free(lossnullF);
+}
+
+/*
+ * Assumes that columns of x matrix are
+ * standardised to zero-mean and unit-norm
+ * and y is scaled so there's no intercept
+ * 
+ * Uses a different formulation of the groups, based on 
+ * the symmetric K * K matrix G (diagonal is zero), G_{ij} \in {-1, 0, 1} to
+ * denote positive, zero, and negative correlation, resp.,
+ * rather than the group K-vector grp.
+ *
+ */
+void groupridge4(double *x, double *y, double *b,
+      int *N_p, int *p_p, int *K_p,
+      double *lambda1, double *lambda2, double *lambda3_p,
+      int *G, int *maxiter_p, double *eps_p, int *verbose_p,
+      int *status)
+{
+   int N = *N_p,
+       p = *p_p,
+       K = *K_p;
+   int i, j, k;
+   int iter;
+   double d1, d2;
+   double delta, bjk;
+   double eps = *eps_p;
+   int maxiter = *maxiter_p;
+   int numactive, allconverged = 1, numconverged = 0;
+   int verbose = *verbose_p;
+   int pK = p * K, pK1 = p * K - 1;
+   double s, lambda3 = *lambda3_p;
+   int q;
+
+   int *active = malloc(sizeof(int) * p * K);
+   int *oldactive = malloc(sizeof(int) * p * K);
+   double *LP = calloc(N * K, sizeof(double));
+   double *meany = calloc(K, sizeof(double));
+   double *loss = malloc(sizeof(double) * K),
+	  *oldloss = malloc(sizeof(double) * K),
+	  *lossnull = calloc(K, sizeof(double)),
+	  *lossnullF = calloc(K, sizeof(double));
+   double losstotal = 0, oldlosstotal = 0;
+   int g;
+
+   for(j = pK1 ; j >= 0 ; --j)
+      active[j] = oldactive[j] = TRUE;
+
+   /* null loss mean((y - mean(y))^2)*/
+   for(k = 0 ; k < K ; k++)
+   {
+      for(i = N - 1 ; i >= 0 ; --i)
+         meany[k] += y[i];
+      meany[k] /= N;
+   }
+
+   for(k = 0 ; k < K ; k++)
+   {
+      for(i = N - 1 ; i >= 0 ; --i)
+	 lossnull[k] += pow(y[i + N * k] - meany[k], 2);
+      lossnull[k] /= N;
+      lossnullF[k] = lossnull[k] * 1e-8;
+   }
+	 
+   for(iter = 0 ; iter < maxiter ; iter++)
+   {
+      numactive = 0;
+      numconverged = 0;
+      losstotal = 0;
+      oldlosstotal = 0;
+
+      for(k = 0 ; k < K ; k++)
+      {
+	 for(j = 0 ; j < p ; j++)
+	 {
+	    d1 = 0;
+	    d2 = 1; // assumes standardised inputs
+	    if(!active[j + p * k])
+	       numconverged++;
+	    else
+	    {
+	       for(i = N - 1 ; i >= 0 ; --i)
+	          d1 += x[i + j * N] * (LP[i + N * k] - y[i + N * k]);
+
+	       // different implementation of the soft-thresholding
+	       bjk = b[j + p * k];
+
+	       /* Apply inter-task ridge regression */
+	       // TODO: what about negative correlation?
+	       for(q = 0 ; q < K ; q++)
+	       {
+		  g = G[k + q * K];
+	          if(k != q && g != 0)
+	          {
+	             d1 += lambda3 * (bjk - sign(g) * b[j + p * q]);
+	             d2 += lambda3 * N;
+	          }
+	       }
+
+	       /* Apply intra-task ridge regression */
+	       s = (bjk - d1 / d2) / (1 + lambda2[k]);
+
+	       /* Now apply intra-task lasso */
+	       if(fabs(s) <= lambda1[k])
+	       {
+	          b[j + p * k] = 0;
+	          delta = -bjk;
+	       }
+	       else
+	       {
+	          b[j + p * k] = s - lambda1[k] * sign(s);
+		  if(fabs(b[j + p * k]) < 1e-15)
+		     b[j + p * k] = 0;
+	          delta = b[j + p * k] - bjk;
+	       }
+
+	       oldloss[k] = loss[k];
+	       loss[k] = 0;
+	       for(i = N - 1 ; i >= 0 ; --i)
+	       {
+	          LP[i + N * k] += x[i + N * j] * delta;
+	          loss[k] += pow(LP[i + N * k] - y[i + N * k], 2);
+	       }
+	       loss[k] /= N;
+	       numconverged += fabs(loss[k] - oldloss[k]) < lossnullF[k];
+	    }
+
+	    active[j + p * k] = b[j + p * k] != 0;
+	    numactive += active[j + p * k];
+	 }
+
+	 losstotal += loss[k];
+	 oldlosstotal += oldloss[k];
+      }
+
+      if(verbose)
+      {
+	 printf("%d iter loss %.10f\n", iter, losstotal);
+	 printf("%d converged at iter %d\n", numconverged, iter);
+      }
+
+      if(numconverged == pK)
+      {
+         if(verbose)
+            printf("all converged at iter %d\n", iter);
+         if(allconverged == 1)
+         {
+            for(j = pK1; j >= 0 ; --j)
+            {
+               oldactive[j] = active[j];
+               active[j] = TRUE;
+            }
+            allconverged = 2;
+         }
+         else
+         {
+            for(j = pK1 ; j >= 0 ; --j)
+               if(active[j] != oldactive[j])
+        	  break;
+            if(j < 0)
+            {
+               if(verbose)
+        	  printf("terminating at iteration %d with %d active vars\n",
+        	     iter, numactive);
+	       *status = TRUE;
+               break;
+            }
+
+	    if(verbose)
+	       printf("activeset changed at iter %d\n", iter);
+
+            allconverged = 1;
+            for(j = pK1; j >= 0 ; --j)
+            {
+               oldactive[j] = active[j];
+               active[j] = TRUE;
+            }
+         }
+      }
+   }
+
+   if(iter >= maxiter && verbose)
+   {
+      printf("failed to converge after %d iterations\n", maxiter);
+      *status = FALSE;
+   }
+
+   free(active);
+   free(oldactive);
    free(LP);
    free(meany);
    free(loss);

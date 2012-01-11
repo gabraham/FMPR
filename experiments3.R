@@ -1,4 +1,7 @@
-# Test groupridge
+# Code for simulating multi-task data
+#
+# Gad Abraham, 2011 (c)
+#
 
 library(ROCR)
 
@@ -23,8 +26,6 @@ makedata <- function(rep, dir=".", N=100, p=50, K=5, B)
    XtrainBs <- standardise(XtrainB)
    XtestBs <- standardise(XtestB)
    
-   #b <- 1 * sample(0:1, p, TRUE, prob=c(0.8, 0.2))
-   #B <- sapply(1:K, function(k) b)
    write.table(B, file=sprintf("%s/B_%s.txt", dir, rep),
          col.names=FALSE, row.names=FALSE, quote=FALSE)
    
@@ -108,7 +109,8 @@ run.lasso <- function(rep, dir=".", nfolds=10, r=25)
    K <- ncol(Ytrain)
    p <- ncol(Xtrain)
 
-   L1mult <- seq(1, 1e-9, length=r) # a multiplier on maxL1, not penalty itself
+   # a multiplier on maxL1, not penalty itself
+   L1mult <- seq(1, 1e-9, length=r)
    maxL1B <- maxlambda1(XtrainB, ytrain)
    r.gl <- sapply(L1mult, function(m) {
       crossval(XtrainB, ytrain, fun=lasso3, lambda1=m * maxL1B,
@@ -185,8 +187,9 @@ run.groupridge <- function(rep, dir=".", nfolds=10, r=25)
    K <- ncol(Ytrain)
    p <- ncol(Xtrain)
 
-   # different L1 on rows, different L3 on columns
-   L1mult <- seq(1, 1e-6, length=r) # a multiplier on maxL1, not penalty itself
+   # different L1 on rows, different L3 on columns,
+   # L1mult is a multiplier on maxL1, not penalty itself
+   L1mult <- seq(1, 1e-6, length=r)
    maxL1 <- maxlambda1(Xtrain, Ytrain)
    L3 <- seq(0, 3, length=r)
    r <- sapply(L1mult, function(m) {
@@ -268,33 +271,38 @@ run <- function(setup, grid=3, nfolds=3, nreps=3)
    R2.gr <- sapply(r.gr, function(x) x$R2)
    R2.lasso <- sapply(r.lasso, function(x) x$R2)
    R2.ridge <- sapply(r.ridge, function(x) x$R2)
-   R2.spg <- sapply(r.spg, function(x) x$R2[1])
+   #R2.spg <- sapply(r.spg, function(x) x$R2[1])
    
-   R2.all <- cbind(GR=R2.gr, lasso=R2.lasso, ridge=R2.ridge, SPG=R2.spg)
+   R2.all <- cbind(GR=R2.gr, lasso=R2.lasso, ridge=R2.ridge)#, SPG=R2.spg)
    
    rec.gr <- recovery(r.gr, dir)
    rec.lasso <- recovery(r.lasso, dir)
    rec.ridge <- recovery(r.ridge, dir)
-   rec.spg <- recovery(r.spg, dir)
+   #rec.spg <- recovery(r.spg, dir)
 
    list(
-      recovery=list(gr=rec.gr, lasso=rec.lasso,
-	    ridge=rec.ridge, spg=rec.spg),
+      recovery=list(
+	 gr=rec.gr,
+	 lasso=rec.lasso,
+	 ridge=rec.ridge#, spg=rec.spg),
+      ),
       R2=R2.all
    )
 }
 
+################################################################################
+# Configure the experiments here
 setup <- list(
    
    # Change sample size, all else fixed
    list(dir=c("Expr1"), N=50, p=50, K=10,
-	 B=getB(p=10, K=3, w=0.5, type="same")),
+	 B=getB(p=50, K=10, w=0.5, type="same")),
    list(dir=c("Expr2"), N=100, p=50, K=10,
-	 B=getB(p=10, K=3, w=0.5, type="same"))
+	 B=getB(p=50, K=10, w=0.5, type="same")),
    list(dir=c("Expr2"), N=150, p=50, K=10,
-	 B=getB(p=10, K=3, w=0.5, type="same"))
+	 B=getB(p=50, K=10, w=0.5, type="same"))
 )
 
-res <- lapply(setup, run, nreps=20)
+res <- lapply(setup, run, nreps=20, grid=10, nfolds=5)
 save(setup, res, file="results.RData")
 
