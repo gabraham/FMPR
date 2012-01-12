@@ -6,7 +6,7 @@ library(gdata)
 library(ROCR)
 library(ggplot2)
 
-dyn.load("groupridge.so")
+#dyn.load("groupridge.so")
 
 options(error=dump.frames)
 
@@ -332,31 +332,34 @@ source("methods.R")
 ##})
 
 
-#################################################################################
-## Test groupridge in multi-task setting, lasso only
+##################################################################################
+### Test groupridge in multi-task setting, lasso only
 #N <- 100
-#p <- 1000
-#K <- 10
-#
-## scale to zero mean and unit norm (not unit variance)
-#X0 <- matrix(rnorm(N * p), N, p)
-#X1 <- sweep(X0, 2, colMeans(X0))
-#X <- sweep(X1, 2, sqrt(diag(crossprod(X1))), FUN="/")
-##B <- matrix(rnorm(p * K), p, K)
-##B[sample(p, p - 10),] <- 0
-#b <- rnorm(p) * sample(0:1, p, TRUE, prob=c(0.9, 0.1))
-#B <- sapply(1:K, function(k) b)
-#
-#Y <- X %*% B
-#
-#g2 <- groupridge3(X, Y[,1], lambda1=1e-2, maxiter=1e6)
-#g3 <- groupridge3(X, Y, lambda1=1e-2, maxiter=1e6)
-#l3 <- lasso3(X, Y[,1], lambda1=1e-2, maxiter=1e6)
-#cor(cbind(g2, g3[,1], l3))
-#cor(g3)
-#
+#p <- 50
+#K <- 5
+##
+### scale to zero mean and unit norm (not unit variance)
+##X0 <- matrix(rnorm(N * p), N, p)
+##X1 <- sweep(X0, 2, colMeans(X0))
+##X <- sweep(X1, 2, sqrt(diag(crossprod(X1))), FUN="/")
+###B <- matrix(rnorm(p * K), p, K)
+###B[sample(p, p - 10),] <- 0
+##b <- rnorm(p) * sample(0:1, p, TRUE, prob=c(0.9, 0.1))
+##B <- sapply(1:K, function(k) b)
+##
+##Y <- X %*% B
+##
+#X <- standardise(matrix(rnorm(N * p), N, p))
+#Y <- scale(matrix(rnorm(N * K), N, K))
+#g4 <- groupridge4(X, Y, lambda1=1e-2, maxiter=1e5, verbose=FALSE)
 #stop()
-
+##g3 <- groupridge3(X, Y, lambda1=1e-2, maxiter=1e6)
+##l3 <- lasso3(X, Y[,1], lambda1=1e-2, maxiter=1e6)
+##cor(cbind(g2, g3[,1], l3))
+##cor(g3)
+##
+#stop()
+#
 #################################################################################
 ## Test groupridge in multi-task setting, lasso + ridge + group ridge
 ## B is same for all tasks
@@ -407,8 +410,8 @@ source("methods.R")
 # B weights differ between tasks, to see effect of group ridge
 run <- function()
 {
-   N <- 200
-   p <- 50
+   N <- 100
+   p <- 200
    K <- 10
    
    # scale to zero mean and unit norm (not unit variance)
@@ -455,7 +458,7 @@ run <- function()
    list(roc=perf.roc, prc=perf.roc)
 }
 
-res <- lapply(1:50, function(i) run())
+res <- lapply(1:1, function(i) run())
 
 meth <- c("groupridge", "lasso")
 
@@ -475,10 +478,10 @@ resd <- lapply(res, function(r) {
 resd2 <- do.call(rbind, resd)
 
 gg1 <- ggplot(resd2, aes(x=Specificity, y=Sensitivity, colour=Method))
-gg1 <- gg1 + geom_point()
+gg1 <- gg1 + geom_line(size=2)
 
 gg2 <- ggplot(resd2, aes(x=Recall, y=Precision, colour=Method))
-gg2 <- gg2 + geom_point()
+gg2 <- gg2 + geom_line(size=2)
 
 pdf("groupridge_block.pdf", width=12)
 print(gg1)

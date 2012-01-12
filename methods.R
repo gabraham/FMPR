@@ -1,5 +1,5 @@
-library(glmnet)
-library(gdata)
+#library(glmnet)
+#library(gdata)
 
 dyn.load("~/Code/L1L2/groupridge.so")
 
@@ -60,7 +60,7 @@ groupridge4 <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
       as.double(eps), as.integer(verbose), integer(1))
    status <- r[[14]]
    if(!status)
-      warning("groupridge failed to converge")
+      warning("groupridge failed to converge within", maxiter, "iterations")
    matrix(r[[3]], p, K)
 }
 
