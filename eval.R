@@ -60,14 +60,15 @@ crossval.ridge <- function(X, Y, nfolds=5, lambda2)
 optim.groupridge <- function(X, Y, nfolds, G, grid=20,
    L1=seq(0, 10, length=grid),
    L2=seq(0, 10, length=grid),
-   L3=seq(0, 10, length=grid), maxiter)
+   L3=seq(0, 10, length=grid), maxiter, verbose=FALSE)
 {
    r <- array(0, dim=c(length(L1), length(L2), length(L3)))
 
    for(i in seq(along=L1)) {
       for(j in seq(along=L2)) {
 	 for(k in seq(along=L3)) {
-	    cat(i, j, k, "\n")
+	    if(verbose)
+	       cat(i, j, k, "\n")
 	    r[i, j, k] <- crossval.groupridge(X=X, Y=Y, nfolds=nfolds,
 		  lambda1=L1[i], lambda2=L2[j], lambda3=L3[k],
 		  G, maxiter=maxiter)

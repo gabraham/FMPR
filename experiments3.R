@@ -332,7 +332,7 @@ setup <- list(
    Expr15=list(dir=c("Expr15"), N=200, p=50, K=10, sigma=0.5,
 	 B=getB(p=50, K=10, w=0.8, type="same")),
    Expr16=list(dir=c("Expr16"), N=200, p=50, K=10, sigma=0.5,
-	 B=getB(p=50, K=10, w=1, type="same"))
+	 B=getB(p=50, K=10, w=1, type="same")),
    # Different correlation thresholds
    Expr17=list(dir=c("Expr17"), N=200, p=50, K=10, sigma=0.5,
 	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.1),
@@ -344,10 +344,10 @@ setup <- list(
 	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.9)
 )
 
-res <- lapply(setup[id], run, nreps=30, grid=20, nfolds=10)
+res <- lapply(setup[id], run, nreps=2, grid=5, nfolds=10)
 save(setup, res, id, file=sprintf("results_%s.RData", id))
 
-pdf(sprint("Expr_%s.pdf", id), width=12)
+pdf(sprintf("Expr_%s.pdf", id), width=12)
 par(mfrow=c(1, 2))
 plot(res[[1]]$recovery$gr$roc, avg="threshold", col=1, main="ROC")
 plot(res[[1]]$recovery$lasso$roc, avg="threshold", add=TRUE, col=2)
