@@ -311,7 +311,7 @@ setup <- list(
    Expr6=list(dir=c("Expr6"), N=200, p=50, K=10, sigma=0.5,
 	 B=getB(p=50, K=10, w=0.5, type="same")),
    Expr7=list(dir=c("Expr7"), N=200, p=50, K=10, sigma=1,
-	 B=getB(p=51, K=10, w=0.5, type="same")),
+	 B=getB(p=50, K=10, w=0.5, type="same")),
    Expr8=list(dir=c("Expr8"), N=200, p=50, K=10, sigma=2,
 	 B=getB(p=50, K=10, w=0.5, type="same")),
    # Different number of tasks
