@@ -124,7 +124,7 @@ run.lasso <- function(rep, dir=".", nfolds=10, r=25)
    g <- lasso3(X=XtrainB, y=ytrain, lambda1=r$opt[1])
    P <- XtestB %*% g
    res <- R2(as.numeric(P), as.numeric(ytest))
-   cat("R2 lasso:", res, "\n")
+   cat("rep", rep, "R2 lasso:", res, "\n")
 
    setwd(oldwd)
 
@@ -161,7 +161,7 @@ run.ridge <- function(rep, dir=".", nfolds=10, r=25)
    g <- ridge(XtrainB, ytrain, lambda2=r$opt[1])
    P <- XtestB %*% g
    res <- R2(as.numeric(P), as.numeric(ytest))
-   cat("R2 ridge:", res, "\n")
+   cat("rep", rep, "R2 ridge:", res, "\n")
 
    setwd(oldwd)
 
@@ -197,7 +197,7 @@ run.groupridge <- function(rep, dir=".", nfolds=10, r=25, Rthresh=0.5)
    P <- Xtest %*% g
    res <- R2(as.numeric(P), as.numeric(Ytest))
 
-   cat("R2 groupridge:", res, "\n")
+   cat("rep", rep, "R2 groupridge:", res, "\n")
 
    setwd(oldwd)
 
@@ -299,40 +299,40 @@ run <- function(setup, grid=3, nfolds=3, nreps=3)
 setup <- list(
    # Different sample size
    Expr1=list(dir=c("Expr1"), N=50, p=50, K=10, sigma=0.5,
-	 B=getB(p=50, K=10, w=0.5, type="same")),
+	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
    Expr2=list(dir=c("Expr2"), N=100, p=50, K=10, sigma=0.5,
-	 B=getB(p=50, K=10, w=0.5, type="same")),
+	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
    Expr3=list(dir=c("Expr3"), N=200, p=50, K=10, sigma=0.5,
-	 B=getB(p=50, K=10, w=0.5, type="same")),
+	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
    Expr4=list(dir=c("Expr4"), N=500, p=50, K=10, sigma=0.5,
-	 B=getB(p=50, K=10, w=0.5, type="same")),
+	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
    # Different noise levels
    Expr5=list(dir=c("Expr5"), N=200, p=50, K=10, sigma=0.01,
-	 B=getB(p=50, K=10, w=0.5, type="same")),
+	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
    Expr6=list(dir=c("Expr6"), N=200, p=50, K=10, sigma=0.5,
-	 B=getB(p=50, K=10, w=0.5, type="same")),
+	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
    Expr7=list(dir=c("Expr7"), N=200, p=50, K=10, sigma=1,
-	 B=getB(p=50, K=10, w=0.5, type="same")),
+	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
    Expr8=list(dir=c("Expr8"), N=200, p=50, K=10, sigma=2,
-	 B=getB(p=50, K=10, w=0.5, type="same")),
+	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
    # Different number of tasks
    Expr9=list(dir=c("Expr9"), N=200, p=50, K=2, sigma=0.5,
-	 B=getB(p=50, K=2, w=0.5, type="same")),
+	 B=getB(p=50, K=2, w=0.5, type="same"), Rthresh=0.3),
    Expr10=list(dir=c("Expr10"), N=200, p=50, K=5, sigma=0.5,
-	 B=getB(p=50, K=5, w=0.5, type="same")),
+	 B=getB(p=50, K=5, w=0.5, type="same"), Rthresh=0.3),
    Expr11=list(dir=c("Expr11"), N=200, p=50, K=10, sigma=0.5,
-	 B=getB(p=50, K=10, w=0.5, type="same")),
+	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
    Expr12=list(dir=c("Expr12"), N=200, p=50, K=20, sigma=0.5,
-	 B=getB(p=50, K=20, w=0.5, type="same")),
+	 B=getB(p=50, K=20, w=0.5, type="same"), Rthresh=0.3),
    # Different weights
    Expr13=list(dir=c("Expr13"), N=200, p=50, K=10, sigma=0.5,
-	 B=getB(p=50, K=10, w=0.1, type="same")),
+	 B=getB(p=50, K=10, w=0.1, type="same"), Rthresh=0.3),
    Expr14=list(dir=c("Expr14"), N=200, p=50, K=10, sigma=0.5,
-	 B=getB(p=50, K=10, w=0.5, type="same")),
+	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
    Expr15=list(dir=c("Expr15"), N=200, p=50, K=10, sigma=0.5,
-	 B=getB(p=50, K=10, w=0.8, type="same")),
+	 B=getB(p=50, K=10, w=0.8, type="same"), Rthresh=0.3),
    Expr16=list(dir=c("Expr16"), N=200, p=50, K=10, sigma=0.5,
-	 B=getB(p=50, K=10, w=1, type="same")),
+	 B=getB(p=50, K=10, w=1, type="same"), Rthresh=0.3),
    # Different correlation thresholds
    Expr17=list(dir=c("Expr17"), N=200, p=50, K=10, sigma=0.5,
 	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.1),
@@ -347,7 +347,7 @@ setup <- list(
 res <- lapply(setup[id], run, nreps=30, grid=20, nfolds=10)
 save(setup, res, id, file=sprintf("results_%s.RData", id))
 
-pdf(sprintf("Expr_%s.pdf", id), width=12)
+pdf(sprintf("Expr%s.pdf", id), width=12)
 par(mfrow=c(1, 2))
 plot(res[[1]]$recovery$gr$roc, avg="threshold", col=1, main="ROC")
 plot(res[[1]]$recovery$lasso$roc, avg="threshold", add=TRUE, col=2)
