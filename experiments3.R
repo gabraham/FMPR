@@ -344,7 +344,7 @@ setup <- list(
 	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.9)
 )
 
-res <- lapply(setup[id], run, nreps=2, grid=5, nfolds=10)
+res <- lapply(setup[id], run, nreps=30, grid=20, nfolds=10)
 save(setup, res, id, file=sprintf("results_%s.RData", id))
 
 pdf(sprintf("Expr_%s.pdf", id), width=12)
