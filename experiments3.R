@@ -239,7 +239,8 @@ run <- function(setup, grid=3, nfolds=3, nreps=3)
    cat("Simulation done\n")
    
    cat("Running inference\n")
-   r.gr <- lapply(1:nreps, run.groupridge, dir=dir, r=grid, nfolds=nfolds)
+   r.gr <- lapply(1:nreps, run.groupridge, dir=dir, r=grid, nfolds=nfolds,
+	 Rthresh=setup$Rthresh)
    r.lasso <- lapply(1:nreps, run.lasso, dir=dir, r=grid, nfolds=nfolds)
    #r.spg <- lapply(1:nreps, run.spg, dir=dir, r=grid, nfolds=nfolds)
    r.ridge <- lapply(1:nreps, run.ridge, dir=dir, r=grid, nfolds=nfolds)
@@ -332,6 +333,15 @@ setup <- list(
 	 B=getB(p=50, K=10, w=0.8, type="same")),
    Expr16=list(dir=c("Expr16"), N=200, p=50, K=10, sigma=0.5,
 	 B=getB(p=50, K=10, w=1, type="same"))
+   # Different correlation thresholds
+   Expr17=list(dir=c("Expr17"), N=200, p=50, K=10, sigma=0.5,
+	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.1),
+   Expr18=list(dir=c("Expr18"), N=200, p=50, K=10, sigma=0.5,
+	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
+   Expr19=list(dir=c("Expr19"), N=200, p=50, K=10, sigma=0.5,
+	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.7),
+   Expr20=list(dir=c("Expr20"), N=200, p=50, K=10, sigma=0.5,
+	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.9)
 )
 
 res <- lapply(setup[id], run, nreps=30, grid=20, nfolds=10)
