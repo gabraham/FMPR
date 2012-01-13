@@ -17,6 +17,19 @@ crossval.groupridge <- function(X, Y, nfolds=5, G,
    mean(s)
 }
 
+crossval.lasso <- function(X, Y, nfolds=5, lambda2, maxiter)
+{
+   N <- nrow(X)
+   Y <- cbind(Y)
+   folds <- sample(1:nfolds, N, TRUE)
+   s <- sapply(1:nfolds, function(fold) {
+      g <- ridge(X[folds != fold, ], Y[folds != fold, ], lambda2=lambda2)
+      p <- X[folds == fold, ] %*% g
+      R2(as.numeric(p), as.numeric(Y[folds == fold, ]))
+   })
+   mean(s)
+}
+
 crossval.lasso <- function(X, Y, nfolds=5, lambda1, maxiter)
 {
    N <- nrow(X)
@@ -31,10 +44,23 @@ crossval.lasso <- function(X, Y, nfolds=5, lambda1, maxiter)
    mean(s)
 }
 
-optim.groupridge <- function(X, Y, nfolds, G,
-   L1=seq(0, 10, length=20),
-   L2=seq(0, 10, length=20),
-   L3=seq(0, 10, length=20), maxiter)
+crossval.ridge <- function(X, Y, nfolds=5, lambda2)
+{
+   N <- nrow(X)
+   Y <- cbind(Y)
+   folds <- sample(1:nfolds, N, TRUE)
+   s <- sapply(1:nfolds, function(fold) {
+      g <- ridge(X[folds != fold, ], Y[folds != fold, ], lambda2=lambda2)
+      p <- X[folds == fold, ] %*% g
+      R2(as.numeric(p), as.numeric(Y[folds == fold, ]))
+   })
+   mean(s)
+}
+
+optim.groupridge <- function(X, Y, nfolds, G, grid=20,
+   L1=seq(0, 10, length=grid),
+   L2=seq(0, 10, length=grid),
+   L3=seq(0, 10, length=grid), maxiter)
 {
    r <- array(0, dim=c(length(L1), length(L2), length(L3)))
 
@@ -56,8 +82,8 @@ optim.groupridge <- function(X, Y, nfolds, G,
    )
 }
 
-optim.lasso <- function(X, Y, nfolds,
-   L1=seq(0, 10, length=20), maxiter)
+optim.lasso <- function(X, Y, nfolds, grid=20,
+   L1=seq(0, 10, length=grid), maxiter)
 {
    r <- numeric(length(L1))
 
@@ -70,6 +96,21 @@ optim.lasso <- function(X, Y, nfolds,
    list(
       R2=r,
       opt=c(L1=L1[w[1]])
+   )
+}
+
+optim.ridge <- function(X, Y, nfolds, grid=20, L2=seq(0, 10, length=grid))
+{
+   r <- numeric(length(L2))
+
+   for(i in seq(along=L2)) {
+      r[i] <- crossval.ridge(X=X, Y=Y, nfolds=nfolds, lambda2=L2[i])
+   }
+
+   w <- which(r == max(r, na.rm=TRUE))
+   list(
+      R2=r,
+      opt=c(L2=L2[w[1]])
    )
 }
 

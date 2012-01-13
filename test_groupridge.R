@@ -334,9 +334,9 @@ source("methods.R")
 
 ##################################################################################
 ### Test groupridge in multi-task setting, lasso only
-#N <- 100
-#p <- 50
-#K <- 5
+N <- 100
+p <- 10
+K <- 5
 ##
 ### scale to zero mean and unit norm (not unit variance)
 ##X0 <- matrix(rnorm(N * p), N, p)
@@ -349,9 +349,12 @@ source("methods.R")
 ##
 ##Y <- X %*% B
 ##
-#X <- standardise(matrix(rnorm(N * p), N, p))
-#Y <- scale(matrix(rnorm(N * K), N, K))
-#g4 <- groupridge4(X, Y, lambda1=1e-2, maxiter=1e5, verbose=FALSE)
+X <- standardise(matrix(rnorm(N * p), N, p))
+Y <- scale(matrix(rnorm(N * K), N, K))
+g4 <- groupridge4(X, Y, lambda1=1e-1, maxiter=1e6, verbose=FALSE)
+g5 <- groupridge5(X, Y, lambda1=1e-1, maxiter=1e6, verbose=FALSE)
+diag(cor(g4, g5))
+stop()
 #stop()
 ##g3 <- groupridge3(X, Y, lambda1=1e-2, maxiter=1e6)
 ##l3 <- lasso3(X, Y[,1], lambda1=1e-2, maxiter=1e6)
@@ -410,8 +413,8 @@ source("methods.R")
 # B weights differ between tasks, to see effect of group ridge
 run <- function()
 {
-   N <- 100
-   p <- 200
+   N <- 50
+   p <- 50
    K <- 10
    
    # scale to zero mean and unit norm (not unit variance)
@@ -438,8 +441,8 @@ run <- function()
    Rc2 <- cor(Y)
    G2 <- sign(Rc2) * (abs(Rc2) > 0.3)
    
-   r1 <- optim.groupridge(X=X, Y=Y, G=G2, nfolds=10, maxiter=1e4)
-   r2 <- optim.lasso(X=Xb, Y=as.numeric(Y), nfolds=10, maxiter=1e4)
+   r1 <- optim.groupridge(X=X, Y=Y, G=G2, nfolds=10, maxiter=1e5)
+   r2 <- optim.lasso(X=Xb, Y=as.numeric(Y), nfolds=10, maxiter=1e5)
    
    g1 <- groupridge4(X=X, Y=Y, lambda1=r1$opt[1] * 0.1, lambda2=r1$opt[2],
          lambda3=r1$opt[3], maxiter=1e4, G=G2)
@@ -458,7 +461,7 @@ run <- function()
    list(roc=perf.roc, prc=perf.roc)
 }
 
-res <- lapply(1:1, function(i) run())
+res <- lapply(1:10, function(i) run())
 
 meth <- c("groupridge", "lasso")
 

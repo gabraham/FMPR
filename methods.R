@@ -60,8 +60,44 @@ groupridge4 <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
       as.double(eps), as.integer(verbose), integer(1))
    status <- r[[14]]
    if(!status)
-      warning("groupridge failed to converge within", maxiter, "iterations")
+      warning("groupridge failed to converge within ", maxiter, " iterations")
    matrix(r[[3]], p, K)
+}
+
+# warm restarts
+groupridge5 <- function(X, Y, B=NULL, lambda1=0, lambda2=0, lambda3=0, G=NULL,
+      maxiter=1e5, eps=1e-6, verbose=FALSE)
+{
+   p <- ncol(X)
+   Y <- cbind(Y)
+   K <- ncol(Y)
+
+   if(length(lambda1) == 1)
+      lambda1 <- rep(lambda1, K)
+   
+   if(length(lambda2) == 1)
+      lambda2 <- rep(lambda2, K)
+
+   if(is.null(G))
+      G <- matrix(0, K, K)
+
+   if(is.null(B)) {
+      LP <- numeric(N * K)
+   } else {
+      LP <- as.numeric(X %*% B)
+   }
+
+   r <- .C("groupridge5", as.numeric(X), as.numeric(Y), 
+      numeric(p * K), as.numeric(LP), nrow(X), ncol(X), K,
+      as.numeric(lambda1), as.numeric(lambda2), as.numeric(lambda3),
+      as.integer(G), as.integer(maxiter),
+      as.double(eps), as.integer(verbose), integer(1))
+   status <- r[[15]]
+   if(!status)
+      warning("groupridge failed to converge within ", maxiter, " iterations")
+   m <- matrix(r[[3]], p, K)
+   attr(m, "LP") <- r[[4]]
+   m
 }
 
 lasso3 <- function(X, y, lambda1=0,
