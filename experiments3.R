@@ -8,13 +8,14 @@ for(m in v) {
    eval(parse(text=sprintf("%s=\"%s\"", m[1], m[2])))
 }
 
-if(!exists("id") || id == "" || is.na(id)) {
-   stop("id not specified")
+if(!exists("idv") || idv == "" || is.na(idv)) {
+   stop("idv not specified")
 }
 
-id <- as.integer(id)
+idv <- as.integer(idv)
 
 library(ROCR)
+library(glmnet)
 library(ggplot2)
 
 options(error=dump.frames)
@@ -24,297 +25,7 @@ set.seed(s)
 
 source("methods.R")
 source("eval.R")
-
-makedata <- function(rep, dir=".", N=100, p=50, K=5, B, sigma=0.01)
-{
-   cat("rep", rep, "\n")
-
-   #X0train <- matrix(sample(0:2, N * p, replace=TRUE), N, p)
-   #X0train <- matrix(sample(0:2, N * p, replace=TRUE), N, p)
-   X0train <- matrix(rnorm(N * p), N, p)
-   X0test <- matrix(rnorm(N * p), N, p)
-   Xtrain <- X0train
-   Xtest <- X0test
-   grp <- rep(1, K)
-   XtrainB <- blockX(Xtrain, p, K)
-   XtestB <- blockX(Xtest, p, K)
-
-   XtrainBs <- scale(XtrainB)
-   XtestBs <- scale(XtestB)
-   
-   write.table(B, file=sprintf("%s/B_%s.txt", dir, rep),
-         col.names=FALSE, row.names=FALSE, quote=FALSE)
-   
-   noiseTrain <- rnorm(N * K, 0, sigma)
-   noiseTest <- rnorm(N * K, 0, sigma)
-   Ytrain <- Xtrain %*% B + noiseTrain
-   Ytest <- Xtest %*% B + noiseTest
-   ytrain <- as.numeric(Ytrain)
-   ytest <- as.numeric(Ytest)
-
-   write.table(Xtrain, file=sprintf("%s/Xtrain_%s.txt", dir, rep),
-         col.names=FALSE, row.names=FALSE, quote=FALSE)
-   write.table(Ytrain, file=sprintf("%s/Ytrain_%s.txt", dir, rep),
-         col.names=FALSE, row.names=FALSE, quote=FALSE)
-   write.table(XtrainBs, file=sprintf("%s/XtrainB_%s.txt", dir, rep),
-         col.names=FALSE, row.names=FALSE, quote=FALSE)
-
-   write.table(Xtest, file=sprintf("%s/Xtest_%s.txt", dir, rep),
-         col.names=FALSE, row.names=FALSE, quote=FALSE)
-   write.table(Ytest, file=sprintf("%s/Ytest_%s.txt", dir, rep),
-         col.names=FALSE, row.names=FALSE, quote=FALSE)
-   write.table(XtestBs, file=sprintf("%s/XtestB_%s.txt", dir, rep),
-         col.names=FALSE, row.names=FALSE, quote=FALSE)
-}
-
-run.spg <- function(rep, dir=".", nfolds=10, r=25)
-{
-   oldwd <- getwd()
-   setwd(dir)
-
-   Xtest <- as.matrix(read.table(sprintf("Xtest_%s.txt", rep), header=FALSE))
-   Ytest <- as.matrix(read.table(sprintf("Ytest_%s.txt", rep), header=FALSE))
-
-   system(sprintf("%s/spg.sh %d %d %d", oldwd, rep, nfolds, r))
-   B.spg <- as.matrix(read.table(sprintf("spg_beta_%s.txt", rep), header=FALSE))
-   P.spg <- Xtest %*% B.spg
-   R2.spg <- R2(as.numeric(P.spg), as.numeric(Ytest))
-   cat("R2.spg:", R2.spg, "\n")
-
-   B.spg.l <- as.matrix(read.table(sprintf("spg_beta_lasso_%s.txt", rep),
-	 header=FALSE))
-   P.spg.l <- Xtest %*% B.spg.l
-   R2.spg.l <- R2(as.numeric(P.spg.l), as.numeric(Ytest))
-   cat("R2.spg.l:", R2.spg.l, "\n")
-
-   setwd(oldwd)
-
-   list(
-      R2=R2.spg,
-      R2lasso=R2.spg.l,
-      beta=B.spg,
-      betalasso=B.spg.l
-   )
-}
-
-run.lasso <- function(rep, dir=".", nfolds=10, r=25)
-{
-   oldwd <- getwd()
-   setwd(dir)
-
-   Xtrain <- as.matrix(read.table(sprintf("Xtrain_%s.txt", rep),
-	    header=FALSE))
-   Xtest <- as.matrix(read.table(sprintf("Xtest_%s.txt", rep), header=FALSE))
-   Ytrain <- as.matrix(read.table(sprintf("Ytrain_%s.txt", rep),
-	    header=FALSE))
-   Ytest <- as.matrix(read.table(sprintf("Ytest_%s.txt", rep), header=FALSE))
-   XtrainB <- as.matrix(read.table(sprintf("XtrainB_%s.txt", rep),
-	    header=FALSE))
-   XtestB <- as.matrix(read.table(sprintf("XtestB_%s.txt", rep),
-	    header=FALSE))
-
-   ytrain <- as.numeric(center(Ytrain))
-   ytest <- as.numeric(center(Ytest))
-
-   XtrainB <- scale(XtrainB)
-   XtestB <- scale(XtestB)
-
-   N <- nrow(Xtrain)
-   K <- ncol(Ytrain)
-   p <- ncol(Xtrain)
-
-   l <- maxlambda1(XtrainB, ytrain)
-   r <- optim.lasso(X=XtrainB, Y=ytrain, nfolds=nfolds,
-	 L1=seq(l, l * 1e-3, length=r), verbose=FALSE)
-   g <- lasso3(X=XtrainB, y=ytrain, lambda1=r$opt[1])
-   P <- XtestB %*% g
-   res <- R2(as.numeric(P), ytest)
-   cat("rep", rep, "R2 lasso:", res, "\n")
-
-   setwd(oldwd)
-
-   list(
-      R2=res,
-      beta=matrix(g, p, K)
-   )
-}
-
-run.ridge <- function(rep, dir=".", nfolds=10, r=25)
-{
-   oldwd <- getwd()
-   setwd(dir)
-
-   Xtrain <- as.matrix(read.table(sprintf("Xtrain_%s.txt", rep),
-	    header=FALSE))
-   Xtest <- as.matrix(read.table(sprintf("Xtest_%s.txt", rep), header=FALSE))
-   Ytrain <- as.matrix(read.table(sprintf("Ytrain_%s.txt", rep),
-	    header=FALSE))
-   Ytest <- as.matrix(read.table(sprintf("Ytest_%s.txt", rep), header=FALSE))
-   XtrainB <- as.matrix(read.table(sprintf("XtrainB_%s.txt", rep),
-	    header=FALSE))
-   XtestB <- as.matrix(read.table(sprintf("XtestB_%s.txt", rep),
-	    header=FALSE))
-
-   ytrain <- as.numeric(center(Ytrain))
-   ytest <- as.numeric(center(Ytest))
-
-   N <- nrow(Xtrain)
-   K <- ncol(Ytrain)
-   p <- ncol(Xtrain)
-   
-   r <- optim.ridge(X=XtrainB, Y=ytrain, nfolds=nfolds, grid=r)
-   g <- ridge(scale(XtrainB), center(ytrain), lambda2=r$opt[1])
-   P <- scale(XtestB) %*% g
-   res <- R2(as.numeric(P), ytest)
-   cat("rep", rep, "R2 ridge:", res, "\n")
-
-   setwd(oldwd)
-
-   list(
-      R2=res,
-      beta=matrix(g, p, K)
-   )
-}
-
-run.groupridge <- function(rep, dir=".", nfolds=10, r=25, Rthresh=0.5)
-{
-   oldwd <- getwd()
-   setwd(dir)
-
-   Xtrain <- as.matrix(read.table(sprintf("Xtrain_%s.txt", rep),
-	    header=FALSE))
-   Xtest <- as.matrix(read.table(sprintf("Xtest_%s.txt", rep), header=FALSE))
-   Ytrain <- as.matrix(read.table(sprintf("Ytrain_%s.txt", rep), header=FALSE))
-   Ytest <- as.matrix(read.table(sprintf("Ytest_%s.txt", rep), header=FALSE))
-   R <- cor(Ytrain)
-   diag(R) <- 0
-   G <- sign(R) * (abs(R) > Rthresh)
-   if(all(G == 0))
-      warning("G is all zero in run.groupridge, will not consider groups")
-
-   N <- nrow(Xtrain)
-   K <- ncol(Ytrain)
-   p <- ncol(Xtrain)
-
-   Xtrain <- scale(Xtrain)
-   Ytrain <- center(Ytrain)
-
-   cat("optim.groupridge start\n")
-   l <- maxlambda1(Xtrain, Ytrain)
-   r <- optim.groupridge(X=Xtrain, Y=Ytrain, G=G,
-	 nfolds=nfolds,
-	 L1=seq(l, l * 1e-3, length=r),
-	 L2=seq(0, 10, length=r),
-	 L3=seq(0, 10, length=r),
-	 maxiter=1e3)
-   cat("optim.groupridge end\n")
-   g <- groupridge4(X=Xtrain, Y=Ytrain,
-	 lambda1=r$opt[1], lambda2=r$opt[2], lambda3=r$opt[3],
-	 maxiter=1e4, G=G)
-   g <- g[[1]][[1]][[1]]
-
-   P <- scale(Xtest) %*% g
-   res <- R2(as.numeric(P), as.numeric(center(Ytest)))
-
-   cat("rep", rep, "R2 groupridge:", res, "\n")
-
-   setwd(oldwd)
-
-   list(
-      R2=res,
-      beta=g
-   )
-}
-
-# p: no. variables per task
-# K: no. tasks
-# w: weight per variable, if using type="same"
-# sparsity: [0,1], degree of sparsity per task
-getB <- function(p, K, w, sparsity=0.8, type=NULL)
-{
-   if(type == "same") {
-      b <- 0
-      B <- 0
-      while(all(B == 0)) {
-	 b <- w * sample(0:1, p, TRUE, prob=c(sparsity, 1 - sparsity))
-	 B <- sapply(1:K, function(k) b)
-      }
-   }
-
-   B
-}
-
-# Evaluate methods over each setup
-run <- function(setup, grid=3, nfolds=3, nreps=3)
-{
-   dir <- setup$dir
-
-   if(!file.exists(dir)) {
-      cat("Simulating data in", dir, "\n")
-      dir.create(dir)
-   }
-   m <- sapply(1:nreps, makedata, dir=dir,
-	 N=setup$N, p=setup$p, K=setup$K, B=setup$B, sigma=setup$sigma)
-   cat("Simulation done\n")
-   
-   cat("Running inference\n")
-   r.lasso <- lapply(1:nreps, run.lasso, dir=dir, r=grid, nfolds=nfolds)
-   r.gr <- lapply(1:nreps, run.groupridge, dir=dir, r=grid, nfolds=nfolds,
-   	 Rthresh=setup$Rthresh)
-   r.ridge <- lapply(1:nreps, run.ridge, dir=dir, r=grid, nfolds=nfolds)
-   #r.spg <- lapply(1:nreps, run.spg, dir=dir, r=grid, nfolds=nfolds)
-   cat("Inference done\n")
-
-   # Measure recovery of non-zeros
-   recovery <- function(obj, dir)
-   {
-      beta <- sapply(seq(along=obj), function(rep) {
-         m <- as.matrix(read.table(sprintf("%s/B_%s.txt", dir, rep)))
-	 as.numeric(m)
-      })
-
-      betahat <- sapply(obj, function(r) as.numeric(abs(r$beta)))
-
-      pred <- prediction(
-	    predictions=betahat,
-	    labels=beta != 0
-      )
-      roc <- performance(pred, "sens", "spec")
-      prc <- performance(pred, "prec", "rec")
-      list(roc=roc, prc=prc)
-   }
-   
-   R2.gr <- sapply(r.gr, function(x) x$R2)
-   R2.lasso <- sapply(r.lasso, function(x) x$R2)
-   R2.ridge <- sapply(r.ridge, function(x) x$R2)
-   #R2.spg <- sapply(r.spg, function(x) x$R2[1])
-   
-   R2.all <- cbind(
-      GR=R2.gr,
-      lasso=R2.lasso,
-      ridge=R2.ridge
-      #SPG=R2.spg
-   )
-
-   rec.gr <- recovery(r.gr, dir)
-   rec.lasso <- recovery(r.lasso, dir)
-   rec.ridge <- recovery(r.ridge, dir)
-   #rec.spg <- recovery(r.spg, dir)
-
-   list(
-      weights=list(
-	 gr=r.gr,
-	 lasso=r.lasso,
-	 ridge=r.ridge
-      ),
-      recovery=list(
-	 gr=rec.gr,
-	 lasso=rec.lasso,
-	 ridge=rec.ridge#, spg=rec.spg),
-      ),
-      R2=R2.all
-   )
-}
+source("exprutil.R")
 
 ################################################################################
 # Configure the experiments here
@@ -328,6 +39,7 @@ setup <- list(
 	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
    Expr4=list(dir=c("Expr4"), N=500, p=50, K=10, sigma=1,
 	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
+
    # Different noise levels
    Expr5=list(dir=c("Expr5"), N=200, p=50, K=10, sigma=0.01,
 	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
@@ -337,6 +49,7 @@ setup <- list(
 	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
    Expr8=list(dir=c("Expr8"), N=200, p=50, K=10, sigma=2,
 	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
+
    # Different number of tasks
    Expr9=list(dir=c("Expr9"), N=200, p=50, K=2, sigma=1,
 	 B=getB(p=50, K=2, w=0.5, type="same"), Rthresh=0.3),
@@ -346,6 +59,7 @@ setup <- list(
 	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
    Expr12=list(dir=c("Expr12"), N=200, p=50, K=20, sigma=1,
 	 B=getB(p=50, K=20, w=0.5, type="same"), Rthresh=0.3),
+
    # Different weights
    Expr13=list(dir=c("Expr13"), N=200, p=50, K=10, sigma=1,
 	 B=getB(p=50, K=10, w=0.1, type="same"), Rthresh=0.3),
@@ -355,6 +69,7 @@ setup <- list(
 	 B=getB(p=50, K=10, w=0.8, type="same"), Rthresh=0.3),
    Expr16=list(dir=c("Expr16"), N=200, p=50, K=10, sigma=1,
 	 B=getB(p=50, K=10, w=1, type="same"), Rthresh=0.3),
+
    # Different correlation thresholds
    Expr17=list(dir=c("Expr17"), N=200, p=50, K=10, sigma=1,
 	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.1),
@@ -366,33 +81,69 @@ setup <- list(
 	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.9),
 
    Expr21=list(dir=c("Expr21"), N=200, p=50, K=10, sigma=1,
-	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3)
+	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
+
+   # Different weights across tasks, same sparsity
+   Expr22=list(dir=c("Expr20"), N=200, p=50, K=10, sigma=1,
+	 B=getB(p=50, K=10, w=0.5, type="sparsity"), Rthresh=0.3),
+
+   # Unrelated tasks
+   Expr23=list(dir=c("Expr20"), N=200, p=50, K=10, sigma=1,
+	 B=getB(p=50, K=10, w=0.5, type="random"), Rthresh=0.3)
 )
 
-res <- lapply(setup[id], run, nreps=30, grid=20, nfolds=5)
-save(setup, res, id, file=sprintf("results_%s.RData", id))
+res <- lapply(setup[idv], run, nreps=10, grid=20, nfolds=5)
+save(setup, res, idv, file=sprintf("results_%s.RData", idv))
 
-pdf(sprintf("Expr%s.pdf", id), width=12)
+################################################################################
+
+pdf(sprintf("Expr%s.pdf", idv), width=12)
+
 par(mfrow=c(1, 2))
+
 plot(res[[1]]$recovery$gr$roc, avg="threshold", col=1, main="Partial ROC",
-      xlim=c(0.95, 1), ylim=c(0.95, 1))
+      xlim=c(0.97, 1), ylim=c(0.97, 1))
 plot(res[[1]]$recovery$lasso$roc, avg="threshold", add=TRUE, col=2)
 plot(res[[1]]$recovery$ridge$roc, avg="threshold", add=TRUE, col=3, lwd=3)
+plot(res[[1]]$recovery$elnet.fmpr$roc, avg="threshold", add=TRUE, col=4, lwd=3)
+plot(res[[1]]$recovery$elnet.glmnet$roc, avg="threshold", add=TRUE, col=5, lwd=3)
+
 plot(res[[1]]$recovery$gr$prc, avg="threshold", col=1,
       main="Partial Precision-Recall", xlim=c(0.95, 1), ylim=c(0.95, 1))
 plot(res[[1]]$recovery$lasso$prc, avg="threshold", col=2, add=TRUE)
 plot(res[[1]]$recovery$ridge$prc, avg="threshold", add=TRUE, col=3)
+plot(res[[1]]$recovery$elnet.fmpr$prc, avg="threshold", add=TRUE, col=4)
+plot(res[[1]]$recovery$elnet.glmnet$prc, avg="threshold", add=TRUE, col=5)
+
 dev.off()
 
 t.test(res[[1]]$R2[, 1], res[[1]]$R2[,2])
+
+mytheme <- function(base_size=10)
+{
+   structure(list(
+	 axis.text.x=theme_text(size=20),
+	 axis.text.y=theme_text(size=20, hjust=1),
+	 axis.title.x=theme_text(size=23),
+	 axis.title.y=theme_text(size=23),
+	 axis.ticks=theme_blank(),
+	 plot.title=theme_text(size=30),
+	 legend.text=theme_text(size=20),
+	 legend.title=theme_text(size=20, hjust=0),
+	 legend.key.size=unit(2, "lines"),
+	 legend.background=theme_rect(col=0, fill=0),
+	 legend.key=theme_blank()
+   ), class="options")
+}
 
 r2 <- melt(res[[1]]$R2)
 colnames(r2) <- c("Replication", "Method", "R2")
 g <- ggplot(r2, aes(Method, R2))
 g <- g + geom_boxplot()
 g <- g + scale_y_continuous(expression(R^2))
+g <- g + theme_bw() + mytheme()
 
-pdf(sprintf("Expr%s_R2.pdf", id), width=12)
+pdf(sprintf("Expr%s_R2.pdf", idv), width=12)
 print(g)
 dev.off()
 
