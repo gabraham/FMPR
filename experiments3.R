@@ -1,9 +1,7 @@
 # Code for simulating multi-task data
 #
-# Gad Abraham, 2011 (c)
+# Gad Abraham, 2012 (c)
 #
-
-id <- 21
 
 v <- strsplit(commandArgs(TRUE), "=")
 for(m in v) {
@@ -17,6 +15,7 @@ if(!exists("id") || id == "" || is.na(id)) {
 id <- as.integer(id)
 
 library(ROCR)
+library(ggplot2)
 
 options(error=dump.frames)
 
@@ -321,13 +320,13 @@ run <- function(setup, grid=3, nfolds=3, nreps=3)
 # Configure the experiments here
 setup <- list(
    # Different sample size
-   Expr1=list(dir=c("Expr1"), N=50, p=50, K=10, sigma=0.5,
+   Expr1=list(dir=c("Expr1"), N=50, p=50, K=10, sigma=1,
 	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
-   Expr2=list(dir=c("Expr2"), N=100, p=50, K=10, sigma=0.5,
+   Expr2=list(dir=c("Expr2"), N=100, p=50, K=10, sigma=1,
 	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
-   Expr3=list(dir=c("Expr3"), N=200, p=50, K=10, sigma=0.5,
+   Expr3=list(dir=c("Expr3"), N=200, p=50, K=10, sigma=1,
 	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
-   Expr4=list(dir=c("Expr4"), N=500, p=50, K=10, sigma=0.5,
+   Expr4=list(dir=c("Expr4"), N=500, p=50, K=10, sigma=1,
 	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
    # Different noise levels
    Expr5=list(dir=c("Expr5"), N=200, p=50, K=10, sigma=0.01,
@@ -339,49 +338,61 @@ setup <- list(
    Expr8=list(dir=c("Expr8"), N=200, p=50, K=10, sigma=2,
 	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
    # Different number of tasks
-   Expr9=list(dir=c("Expr9"), N=200, p=50, K=2, sigma=0.5,
+   Expr9=list(dir=c("Expr9"), N=200, p=50, K=2, sigma=1,
 	 B=getB(p=50, K=2, w=0.5, type="same"), Rthresh=0.3),
-   Expr10=list(dir=c("Expr10"), N=200, p=50, K=5, sigma=0.5,
+   Expr10=list(dir=c("Expr10"), N=200, p=50, K=5, sigma=1,
 	 B=getB(p=50, K=5, w=0.5, type="same"), Rthresh=0.3),
-   Expr11=list(dir=c("Expr11"), N=200, p=50, K=10, sigma=0.5,
+   Expr11=list(dir=c("Expr11"), N=200, p=50, K=10, sigma=1,
 	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
-   Expr12=list(dir=c("Expr12"), N=200, p=50, K=20, sigma=0.5,
+   Expr12=list(dir=c("Expr12"), N=200, p=50, K=20, sigma=1,
 	 B=getB(p=50, K=20, w=0.5, type="same"), Rthresh=0.3),
    # Different weights
-   Expr13=list(dir=c("Expr13"), N=200, p=50, K=10, sigma=0.5,
+   Expr13=list(dir=c("Expr13"), N=200, p=50, K=10, sigma=1,
 	 B=getB(p=50, K=10, w=0.1, type="same"), Rthresh=0.3),
-   Expr14=list(dir=c("Expr14"), N=200, p=50, K=10, sigma=0.5,
+   Expr14=list(dir=c("Expr14"), N=200, p=50, K=10, sigma=1,
 	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
-   Expr15=list(dir=c("Expr15"), N=200, p=50, K=10, sigma=0.5,
+   Expr15=list(dir=c("Expr15"), N=200, p=50, K=10, sigma=1,
 	 B=getB(p=50, K=10, w=0.8, type="same"), Rthresh=0.3),
-   Expr16=list(dir=c("Expr16"), N=200, p=50, K=10, sigma=0.5,
+   Expr16=list(dir=c("Expr16"), N=200, p=50, K=10, sigma=1,
 	 B=getB(p=50, K=10, w=1, type="same"), Rthresh=0.3),
    # Different correlation thresholds
-   Expr17=list(dir=c("Expr17"), N=200, p=50, K=10, sigma=0.5,
+   Expr17=list(dir=c("Expr17"), N=200, p=50, K=10, sigma=1,
 	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.1),
-   Expr18=list(dir=c("Expr18"), N=200, p=50, K=10, sigma=0.5,
+   Expr18=list(dir=c("Expr18"), N=200, p=50, K=10, sigma=1,
 	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
-   Expr19=list(dir=c("Expr19"), N=200, p=50, K=10, sigma=0.5,
+   Expr19=list(dir=c("Expr19"), N=200, p=50, K=10, sigma=1,
 	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.7),
-   Expr20=list(dir=c("Expr20"), N=200, p=50, K=10, sigma=0.5,
+   Expr20=list(dir=c("Expr20"), N=200, p=50, K=10, sigma=1,
 	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.9),
 
-   Expr21=list(dir=c("Expr21"), N=200, p=50, K=5, sigma=1,
-	 B=getB(p=50, K=5, w=0.5, type="same"), Rthresh=0.3)
+   Expr21=list(dir=c("Expr21"), N=200, p=50, K=10, sigma=1,
+	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3)
 )
 
-res <- lapply(setup[id], run, nreps=10, grid=20, nfolds=5)
+res <- lapply(setup[id], run, nreps=30, grid=20, nfolds=5)
 save(setup, res, id, file=sprintf("results_%s.RData", id))
 
 pdf(sprintf("Expr%s.pdf", id), width=12)
 par(mfrow=c(1, 2))
-plot(res[[1]]$recovery$gr$roc, avg="threshold", col=1, main="ROC")
+plot(res[[1]]$recovery$gr$roc, avg="threshold", col=1, main="Partial ROC",
+      xlim=c(0.95, 1), ylim=c(0.95, 1))
 plot(res[[1]]$recovery$lasso$roc, avg="threshold", add=TRUE, col=2)
 plot(res[[1]]$recovery$ridge$roc, avg="threshold", add=TRUE, col=3, lwd=3)
-plot(res[[1]]$recovery$gr$prc, avg="threshold", col=1, main="Precision-Recall")
+plot(res[[1]]$recovery$gr$prc, avg="threshold", col=1,
+      main="Partial Precision-Recall", xlim=c(0.95, 1), ylim=c(0.95, 1))
 plot(res[[1]]$recovery$lasso$prc, avg="threshold", col=2, add=TRUE)
 plot(res[[1]]$recovery$ridge$prc, avg="threshold", add=TRUE, col=3)
 dev.off()
 
 t.test(res[[1]]$R2[, 1], res[[1]]$R2[,2])
+
+r2 <- melt(res[[1]]$R2)
+colnames(r2) <- c("Replication", "Method", "R2")
+g <- ggplot(r2, aes(Method, R2))
+g <- g + geom_boxplot()
+g <- g + scale_y_continuous(expression(R^2))
+
+pdf(sprintf("Expr%s_R2.pdf", id), width=12)
+print(g)
+dev.off()
 

@@ -6,39 +6,8 @@ dyn.load("~/Code/L1L2/groupridge.so")
 # lambda1: scalar or K-vector
 # lambda2: scalar or K-vector
 # lambda3: scalar 
-groupridge3 <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, grp=NULL,
-      maxiter=1e5, eps=1e-6, verbose=FALSE)
-{
-   p <- ncol(X)
-   Y <- cbind(Y)
-   K <- ncol(Y)
-
-   if(length(lambda1) == 1)
-      lambda1 <- rep(lambda1, K)
-   
-   if(length(lambda2) == 1)
-      lambda2 <- rep(lambda2, K)
-
-   if(is.null(grp))
-      grp <- 1:K
-
-   r <- .C("groupridge3", as.numeric(X), as.numeric(Y), 
-      numeric(p * K), nrow(X), ncol(X), K,
-      as.numeric(lambda1), as.numeric(lambda2), as.numeric(lambda3),
-      as.integer(grp), as.integer(maxiter),
-      as.double(eps), as.integer(verbose), integer(1))
-
-   status <- r[[14]]
-   if(!status)
-      warning("groupridge failed to converge")
-   matrix(r[[3]], p, K)
-}
-
-# lambda1: scalar or K-vector
-# lambda2: scalar or K-vector
-# lambda3: scalar 
 groupridge4 <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
-      maxiter=1e5, eps=1e-6, verbose=FALSE, simplify=FALSE)
+      maxiter=1e5, eps=1e-8, verbose=FALSE, simplify=FALSE)
 {
    p <- ncol(X)
    Y <- cbind(Y)
@@ -91,7 +60,7 @@ groupridge4 <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
 
 # warm restarts
 groupridge5 <- function(X, Y, B=NULL, lambda1=0, lambda2=0, lambda3=0, G=NULL,
-      maxiter=1e5, eps=1e-6, verbose=FALSE)
+      maxiter=1e5, eps=1e-8, verbose=FALSE)
 {
    p <- ncol(X)
    Y <- cbind(Y)
