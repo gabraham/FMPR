@@ -20,8 +20,9 @@ library(ggplot2)
 
 options(error=dump.frames)
 
-s <- sample(1e6L, 1)
-set.seed(s)
+#seed <- sample(1e6L, 1)
+seed <- 705168
+set.seed(seed)
 
 source("methods.R")
 source("eval.R")
@@ -93,61 +94,21 @@ setup <- list(
 
    # Small testing experiment
    Expr24=list(dir=c("Expr24"), N=100, p=30, K=2, sigma=1,
-	 B=getB(p=30, K=2, w=0.5, type="same"), Rthresh=0.3)
+	 B=getB(p=30, K=2, w=0.5, type="same"), Rthresh=0.3),
+
+   # High dimensions, increasing p
+   Expr25=list(dir=c("Expr25"), N=100, p=100, K=10, sigma=1,
+	 B=getB(p=100, K=10, w=0.5, type="same"), Rthresh=0.3),
+   Expr26=list(dir=c("Expr26"), N=100, p=200, K=10, sigma=1,
+	 B=getB(p=200, K=10, w=0.5, type="same"), Rthresh=0.3),
+   Expr27=list(dir=c("Expr27"), N=100, p=500, K=10, sigma=1,
+	 B=getB(p=500, K=10, w=0.5, type="same"), Rthresh=0.3),
+   Expr28=list(dir=c("Expr28"), N=100, p=1000, K=10, sigma=1,
+	 B=getB(p=1000, K=10, w=0.5, type="same"), Rthresh=0.3)
 )
 
 res <- lapply(setup[idv], run, nreps=50, grid=20, nfolds=5)
 save(setup, res, idv, file=sprintf("results_%s.RData", idv))
 
 ################################################################################
-
-pdf(sprintf("Expr%s.pdf", idv), width=12)
-
-par(mfrow=c(1, 2))
-
-plot(res[[1]]$recovery$gr$roc, avg="threshold", col=1, main="Partial ROC")
-plot(res[[1]]$recovery$lasso$roc, avg="threshold", add=TRUE, col=2)
-plot(res[[1]]$recovery$ridge$roc, avg="threshold", add=TRUE, col=3, lwd=1)
-plot(res[[1]]$recovery$elnet.fmpr$roc, avg="threshold", add=TRUE, col=4, lwd=1)
-plot(res[[1]]$recovery$elnet.glmnet$roc, avg="threshold", add=TRUE, col=5,
-      lwd=1)
-
-plot(res[[1]]$recovery$gr$prc, avg="threshold", col=1,
-      main="Partial Precision-Recall")
-plot(res[[1]]$recovery$lasso$prc, avg="threshold", col=2, add=TRUE)
-plot(res[[1]]$recovery$ridge$prc, avg="threshold", add=TRUE, col=3)
-plot(res[[1]]$recovery$elnet.fmpr$prc, avg="threshold", add=TRUE, col=4)
-plot(res[[1]]$recovery$elnet.glmnet$prc, avg="threshold", add=TRUE, col=5)
-
-dev.off()
-
-t.test(res[[1]]$R2[, 1], res[[1]]$R2[,2])
-
-mytheme <- function(base_size=10)
-{
-   structure(list(
-	 axis.text.x=theme_text(size=20),
-	 axis.text.y=theme_text(size=20, hjust=1),
-	 axis.title.x=theme_text(size=23),
-	 axis.title.y=theme_text(size=23),
-	 axis.ticks=theme_blank(),
-	 plot.title=theme_text(size=30),
-	 legend.text=theme_text(size=20),
-	 legend.title=theme_text(size=20, hjust=0),
-	 legend.key.size=unit(2, "lines"),
-	 legend.background=theme_rect(col=0, fill=0),
-	 legend.key=theme_blank()
-   ), class="options")
-}
-
-r2 <- melt(res[[1]]$R2)
-colnames(r2) <- c("Replication", "Method", "R2")
-g <- ggplot(r2, aes(Method, R2))
-g <- g + geom_boxplot()
-g <- g + scale_y_continuous(expression(R^2))
-g <- g + theme_bw() + mytheme()
-
-pdf(sprintf("Expr%s_R2.pdf", idv), width=12)
-print(g)
-dev.off()
 

@@ -1,29 +1,42 @@
-makedata <- function(rep, dir=".", N=100, p=50, K=5, B, sigma=0.01)
+
+# Wrappers for running the different models on the simulation data
+
+makedata <- function(rep, dir=".", N=100, p=50, K=5, B, sigma=0.01,
+      save=TRUE)
 {
    cat("rep", rep, "\n")
 
    Xtrain <- matrix(rnorm(N * p), N, p)
    Xtest <- matrix(rnorm(N * p), N, p)
 
-   write.table(B, file=sprintf("%s/B_%s.txt", dir, rep),
-         col.names=FALSE, row.names=FALSE, quote=FALSE)
-   
    noiseTrain <- rnorm(N * K, 0, sigma)
    noiseTest <- rnorm(N * K, 0, sigma)
    Ytrain <- Xtrain %*% B + noiseTrain
    Ytest <- Xtest %*% B + noiseTest
-   ytrain <- as.numeric(Ytrain)
-   ytest <- as.numeric(Ytest)
 
-   write.table(Xtrain, file=sprintf("%s/Xtrain_%s.txt", dir, rep),
-         col.names=FALSE, row.names=FALSE, quote=FALSE)
-   write.table(Ytrain, file=sprintf("%s/Ytrain_%s.txt", dir, rep),
+   if(save) {
+      write.table(B, file=sprintf("%s/B_%s.txt", dir, rep),
          col.names=FALSE, row.names=FALSE, quote=FALSE)
 
-   write.table(Xtest, file=sprintf("%s/Xtest_%s.txt", dir, rep),
-         col.names=FALSE, row.names=FALSE, quote=FALSE)
-   write.table(Ytest, file=sprintf("%s/Ytest_%s.txt", dir, rep),
-         col.names=FALSE, row.names=FALSE, quote=FALSE)
+      write.table(Xtrain, file=sprintf("%s/Xtrain_%s.txt", dir, rep),
+            col.names=FALSE, row.names=FALSE, quote=FALSE)
+      write.table(Ytrain, file=sprintf("%s/Ytrain_%s.txt", dir, rep),
+            col.names=FALSE, row.names=FALSE, quote=FALSE)
+
+      write.table(Xtest, file=sprintf("%s/Xtest_%s.txt", dir, rep),
+            col.names=FALSE, row.names=FALSE, quote=FALSE)
+      write.table(Ytest, file=sprintf("%s/Ytest_%s.txt", dir, rep),
+            col.names=FALSE, row.names=FALSE, quote=FALSE)
+   } else {
+      list(
+	 Xtrain=Xtrain,
+	 Xtest=Xtest,
+	 Ytrain=Ytrain,
+	 Ytest=Ytest,
+	 noiseTrain=noiseTrain,
+	 noiseTest=noiseTest
+      )
+   }
 }
 
 run.spg <- function(rep, dir=".", nfolds=10, r=25)
@@ -79,12 +92,15 @@ run.lasso <- function(rep, dir=".", nfolds=10, r=25)
    ytest <- as.numeric(center(Ytest))
 
    l <- maxlambda1(XtrainB, ytrain)
-   r <- optim.lasso(X=XtrainB, Y=ytrain, nfolds=nfolds,
+   opt <- optim.lasso(X=XtrainB, Y=ytrain, nfolds=nfolds,
 	 L1=seq(l, l * 1e-3, length=r), verbose=FALSE)
-   g <- lasso3(X=XtrainB, y=ytrain, lambda1=r$opt[1])
+   g <- lasso3(X=XtrainB, y=ytrain, lambda1=opt$opt[1])
    P <- XtestB %*% g
    res <- R2(as.numeric(P), ytest)
    cat("rep", rep, "R2 lasso:", res, "\n")
+
+   #if(all(g == 0))
+    #  browser()
 
    setwd(oldwd)
 
@@ -116,7 +132,8 @@ run.ridge <- function(rep, dir=".", nfolds=10, r=25)
    ytrain <- as.numeric(center(Ytrain))
    ytest <- as.numeric(center(Ytest))
    
-   r <- optim.ridge(X=XtrainB, Y=ytrain, nfolds=nfolds, grid=r)
+   r <- optim.ridge(X=XtrainB, Y=ytrain, nfolds=nfolds,
+	 L2=10^seq(-3, 5, length=r))
    g <- ridge(XtrainB, ytrain, lambda2=r$opt[1])
    P <- XtestB %*% g
    res <- R2(as.numeric(P), ytest)
@@ -158,8 +175,10 @@ run.groupridge <- function(rep, dir=".", nfolds=10, r=25, Rthresh=0.5)
    r <- optim.groupridge(X=Xtrain, Y=Ytrain, G=G,
 	 nfolds=nfolds,
 	 L1=seq(l, l * 1e-3, length=r),
-	 L2=seq(0, 10, length=r),
-	 L3=seq(0, 10, length=r),
+	 #L2=seq(0, 10, length=r),
+	 #L3=seq(0, 10, length=r),
+	 L2=10^seq(-3, 5, length=r),
+	 L3=10^seq(-3, 5, length=r),
 	 maxiter=1e3)
    cat("optim.groupridge end\n")
    g <- groupridge4(X=Xtrain, Y=Ytrain,
@@ -208,7 +227,9 @@ run.elnet.fmpr <- function(rep, dir=".", nfolds=10, r=25, Rthresh=0.5)
    r <- optim.groupridge(X=Xtrain, Y=Ytrain, G=G0,
 	 nfolds=nfolds,
 	 L1=seq(l, l * 1e-3, length=r),
-	 L2=seq(0, 10, length=r), L3=0,
+	 #L2=seq(0, 10, length=r),
+	 L2=10^seq(-3, 5, length=r),
+	 L3=0,
 	 maxiter=1e3)
    cat("optim.elnet.fmpr end\n")
    g <- groupridge4(X=Xtrain, Y=Ytrain,
@@ -307,7 +328,7 @@ getB <- function(p, K, w, sparsity=0.8, type=NULL)
 }
 
 # Evaluate methods over each setup
-run <- function(setup, grid=3, nfolds=3, nreps=3)
+run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
 {
    dir <- setup$dir
 
@@ -320,14 +341,14 @@ run <- function(setup, grid=3, nfolds=3, nreps=3)
    cat("Simulation done\n")
    
    cat("Running inference\n")
-   r.elnet.glmnet <- lapply(1:nreps, run.elnet.glmnet, dir=dir, r=grid, nfolds=nfolds,
-   	 Rthresh=setup$Rthresh)
-   r.elnet.fmpr <- lapply(1:nreps, run.elnet.fmpr, dir=dir, r=grid, nfolds=nfolds,
-   	 Rthresh=setup$Rthresh)
    r.lasso <- lapply(1:nreps, run.lasso, dir=dir, r=grid, nfolds=nfolds)
+   r.ridge <- lapply(1:nreps, run.ridge, dir=dir, r=grid, nfolds=nfolds)
+   r.elnet.glmnet <- lapply(1:nreps, run.elnet.glmnet, dir=dir,
+	 r=grid, nfolds=nfolds, Rthresh=setup$Rthresh)
+   r.elnet.fmpr <- lapply(1:nreps, run.elnet.fmpr, dir=dir,
+	 r=grid, nfolds=nfolds, Rthresh=setup$Rthresh)
    r.gr <- lapply(1:nreps, run.groupridge, dir=dir, r=grid, nfolds=nfolds,
    	 Rthresh=setup$Rthresh)
-   r.ridge <- lapply(1:nreps, run.ridge, dir=dir, r=grid, nfolds=nfolds)
    #r.spg <- lapply(1:nreps, run.spg, dir=dir, r=grid, nfolds=nfolds)
    cat("Inference done\n")
 
@@ -348,6 +369,12 @@ run <- function(setup, grid=3, nfolds=3, nreps=3)
       roc <- performance(pred, "sens", "spec")
       prc <- performance(pred, "prec", "rec")
       auc <- performance(pred, "auc")
+
+      if(cleanROCR) {
+	 roc <- clean.rocr(roc)
+	 prc <- clean.rocr(prc)
+	 auc <- clean.rocr(auc)
+      }
       list(roc=roc, prc=prc, auc=auc)
    }
    
@@ -392,5 +419,17 @@ run <- function(setup, grid=3, nfolds=3, nreps=3)
       ),
       R2=R2.all
    )
+}
+
+# Remove ROC/PRC replications that had non-sensical results
+clean.rocr <- function(obj)
+{
+   n <- length(obj@x.values)
+   len <- sapply(obj@x.values, length)
+   w <- len > 2
+   obj@x.values <- obj@x.values[w]
+   obj@y.values <- obj@y.values[w]
+   obj@alpha.values <- obj@alpha.values[w]
+   obj
 }
 

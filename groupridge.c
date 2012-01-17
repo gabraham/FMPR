@@ -44,7 +44,9 @@ void maxlambda1(double *x, double *y, double *lambda,
 	    d1 += -xij * y[i + k * N];
 	    d2 += xij * xij;
 	 }
-	 s = fabs(d1 / d2);
+	 s = 0;
+	 if(d2 > ZERO_VAR_THRESH)
+	    s = fabs(d1 / d2);
 	 lambda[k] = (lambda[k] > s ? lambda[k] : s);
       }
       /* small fudge factor to ensure penalty is high enough

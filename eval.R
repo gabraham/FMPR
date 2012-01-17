@@ -25,16 +25,12 @@ crossval.ridge <- function(X, Y, nfolds=5, fun=R2, lambda2)
    Y <- cbind(Y)
    folds <- sample(1:nfolds, N, TRUE)
    s <- sapply(1:nfolds, function(fold) {
-      g <- try(ridge(scale(X[folds != fold, ]), center(Y[folds != fold, ]),
-	    lambda2=lambda2))
-      if(is(g, "try-error")) {
-	 -Inf
-      } else {
-	 p <- scale(X[folds == fold, ]) %*% g
+      g <- ridge(scale(X[folds != fold, ]), center(Y[folds != fold, ]),
+	    lambda2=lambda2)
+      p <- scale(X[folds == fold, ]) %*% g
 
-	 # one R^2 for each penalty
-	 apply(p, 2, fun, y=center(Y[folds == fold, ]))
-      }
+      # one R^2 for each penalty
+      apply(p, 2, fun, y=center(Y[folds == fold, ]))
    })
    rowMeans(s)
 }

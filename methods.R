@@ -1,5 +1,5 @@
-#library(glmnet)
-#library(gdata)
+
+# Wrappers for calling lasso and groupridge
 
 dyn.load("~/Code/L1L2/groupridge.so")
 
@@ -139,11 +139,18 @@ lasso3 <- function(X, y, lambda1=0,
 
 ridge <- function(X, Y, lambda2=0)
 {
+   Y <- cbind(Y)
    XX <- crossprod(X)
    XY <- crossprod(X, Y)
+   K <- ncol(Y)
    p <- ncol(X)
    sapply(lambda2, function(l) {
-      qr.solve(XX + diag(p) * l, XY)
+      b <- try(qr.solve(XX + diag(p) * l, XY), silent=TRUE)
+      if(is(b, "try-error")) {
+	 matrix(0, p, K)
+      } else {
+	 b
+      }
    })
 }
 
@@ -157,8 +164,8 @@ standardise <- function(x)
    s
 }
 
-#source("lasso.R")
-
+# Returns the maximal l1 penalty for each task, i.e., the smallest l1 penalty
+# that makes all the weights zero.
 maxlambda1 <- function(X, Y)
 {
    Y <- cbind(Y)
@@ -167,6 +174,7 @@ maxlambda1 <- function(X, Y)
    r[[3]]
 }
 
+# Converts an N by p matrix into a block-diagonal N*K by p*K matrix
 blockX <- function(X, p, C)
 {
    N <- nrow(X)
