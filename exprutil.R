@@ -2,19 +2,9 @@ makedata <- function(rep, dir=".", N=100, p=50, K=5, B, sigma=0.01)
 {
    cat("rep", rep, "\n")
 
-   #X0train <- matrix(sample(0:2, N * p, replace=TRUE), N, p)
-   #X0train <- matrix(sample(0:2, N * p, replace=TRUE), N, p)
-   X0train <- matrix(rnorm(N * p), N, p)
-   X0test <- matrix(rnorm(N * p), N, p)
-   Xtrain <- X0train
-   Xtest <- X0test
-   grp <- rep(1, K)
-   XtrainB <- blockX(Xtrain, p, K)
-   XtestB <- blockX(Xtest, p, K)
+   Xtrain <- matrix(rnorm(N * p), N, p)
+   Xtest <- matrix(rnorm(N * p), N, p)
 
-   XtrainBs <- scale(XtrainB)
-   XtestBs <- scale(XtestB)
-   
    write.table(B, file=sprintf("%s/B_%s.txt", dir, rep),
          col.names=FALSE, row.names=FALSE, quote=FALSE)
    
@@ -29,14 +19,10 @@ makedata <- function(rep, dir=".", N=100, p=50, K=5, B, sigma=0.01)
          col.names=FALSE, row.names=FALSE, quote=FALSE)
    write.table(Ytrain, file=sprintf("%s/Ytrain_%s.txt", dir, rep),
          col.names=FALSE, row.names=FALSE, quote=FALSE)
-   write.table(XtrainBs, file=sprintf("%s/XtrainB_%s.txt", dir, rep),
-         col.names=FALSE, row.names=FALSE, quote=FALSE)
 
    write.table(Xtest, file=sprintf("%s/Xtest_%s.txt", dir, rep),
          col.names=FALSE, row.names=FALSE, quote=FALSE)
    write.table(Ytest, file=sprintf("%s/Ytest_%s.txt", dir, rep),
-         col.names=FALSE, row.names=FALSE, quote=FALSE)
-   write.table(XtestBs, file=sprintf("%s/XtestB_%s.txt", dir, rep),
          col.names=FALSE, row.names=FALSE, quote=FALSE)
 }
 
@@ -81,20 +67,16 @@ run.lasso <- function(rep, dir=".", nfolds=10, r=25)
    Ytrain <- as.matrix(read.table(sprintf("Ytrain_%s.txt", rep),
 	    header=FALSE))
    Ytest <- as.matrix(read.table(sprintf("Ytest_%s.txt", rep), header=FALSE))
-   XtrainB <- as.matrix(read.table(sprintf("XtrainB_%s.txt", rep),
-	    header=FALSE))
-   XtestB <- as.matrix(read.table(sprintf("XtestB_%s.txt", rep),
-	    header=FALSE))
+
+   N <- nrow(Xtrain)
+   p <- ncol(Xtrain)
+   K <- ncol(Ytrain)
+
+   XtrainB <- scale(blockX(Xtrain, p, K))
+   XtestB <- scale(blockX(Xtest, p, K))
 
    ytrain <- as.numeric(center(Ytrain))
    ytest <- as.numeric(center(Ytest))
-
-   XtrainB <- scale(XtrainB)
-   XtestB <- scale(XtestB)
-
-   N <- nrow(Xtrain)
-   K <- ncol(Ytrain)
-   p <- ncol(Xtrain)
 
    l <- maxlambda1(XtrainB, ytrain)
    r <- optim.lasso(X=XtrainB, Y=ytrain, nfolds=nfolds,
@@ -123,21 +105,20 @@ run.ridge <- function(rep, dir=".", nfolds=10, r=25)
    Ytrain <- as.matrix(read.table(sprintf("Ytrain_%s.txt", rep),
 	    header=FALSE))
    Ytest <- as.matrix(read.table(sprintf("Ytest_%s.txt", rep), header=FALSE))
-   XtrainB <- as.matrix(read.table(sprintf("XtrainB_%s.txt", rep),
-	    header=FALSE))
-   XtestB <- as.matrix(read.table(sprintf("XtestB_%s.txt", rep),
-	    header=FALSE))
-
-   ytrain <- as.numeric(center(Ytrain))
-   ytest <- as.numeric(center(Ytest))
 
    N <- nrow(Xtrain)
    K <- ncol(Ytrain)
    p <- ncol(Xtrain)
+
+   XtrainB <- scale(blockX(Xtrain, p, K))
+   XtestB <- scale(blockX(Xtest, p, K)) 
+
+   ytrain <- as.numeric(center(Ytrain))
+   ytest <- as.numeric(center(Ytest))
    
    r <- optim.ridge(X=XtrainB, Y=ytrain, nfolds=nfolds, grid=r)
-   g <- ridge(scale(XtrainB), center(ytrain), lambda2=r$opt[1])
-   P <- scale(XtestB) %*% g
+   g <- ridge(XtrainB, ytrain, lambda2=r$opt[1])
+   P <- XtestB %*% g
    res <- R2(as.numeric(P), ytest)
    cat("rep", rep, "R2 ridge:", res, "\n")
 
@@ -173,7 +154,7 @@ run.groupridge <- function(rep, dir=".", nfolds=10, r=25, Rthresh=0.5)
    Ytrain <- center(Ytrain)
 
    cat("optim.groupridge start\n")
-   l <- maxlambda1(Xtrain, Ytrain)
+   l <- max(maxlambda1(Xtrain, Ytrain))
    r <- optim.groupridge(X=Xtrain, Y=Ytrain, G=G,
 	 nfolds=nfolds,
 	 L1=seq(l, l * 1e-3, length=r),
@@ -259,20 +240,18 @@ run.elnet.glmnet <- function(rep, dir=".", nfolds=10, r=25, Rthresh=0.5)
    Ytrain <- as.matrix(read.table(sprintf("Ytrain_%s.txt", rep), header=FALSE))
    Ytest <- as.matrix(read.table(sprintf("Ytest_%s.txt", rep), header=FALSE))
 
-   XtrainB <- as.matrix(read.table(sprintf("XtrainB_%s.txt", rep),
-	    header=FALSE))
-   XtestB <- as.matrix(read.table(sprintf("XtestB_%s.txt", rep),
-	    header=FALSE))
-
-   ytrain <- center(as.numeric(Ytrain))
-   ytest <- center(as.numeric(Ytest))
-
    N <- nrow(Xtrain)
    K <- ncol(Ytrain)
    p <- ncol(Xtrain)
 
+   XtrainB <- scale(blockX(Xtrain, p, K))
+   XtestB <- scale(blockX(Xtest, p, K))
+
+   ytrain <- center(as.numeric(Ytrain))
+   ytest <- center(as.numeric(Ytest))
+
    cat("optim.elnet.glmnet start\n")
-   l <- maxlambda1(scale(XtrainB), ytrain)
+   l <- maxlambda1(XtrainB, ytrain)
    r <- optim.elnet.glmnet(X=XtrainB, Y=ytrain, nfolds=nfolds,
 	 L1=seq(l, l * 1e-3, length=r),
 	 alpha=seq(0, 1, length=r))

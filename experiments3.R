@@ -84,12 +84,16 @@ setup <- list(
 	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
 
    # Different weights across tasks, same sparsity
-   Expr22=list(dir=c("Expr20"), N=200, p=50, K=10, sigma=1,
+   Expr22=list(dir=c("Expr22"), N=200, p=50, K=10, sigma=1,
 	 B=getB(p=50, K=10, w=0.5, type="sparsity"), Rthresh=0.3),
 
    # Unrelated tasks
-   Expr23=list(dir=c("Expr20"), N=200, p=50, K=10, sigma=1,
-	 B=getB(p=50, K=10, w=0.5, type="random"), Rthresh=0.3)
+   Expr23=list(dir=c("Expr23"), N=200, p=50, K=10, sigma=1,
+	 B=getB(p=50, K=10, w=0.5, type="random"), Rthresh=0.3),
+
+   # Small testing experiment
+   Expr24=list(dir=c("Expr24"), N=100, p=30, K=2, sigma=1,
+	 B=getB(p=30, K=2, w=0.5, type="same"), Rthresh=0.3)
 )
 
 res <- lapply(setup[idv], run, nreps=50, grid=20, nfolds=5)
@@ -101,15 +105,15 @@ pdf(sprintf("Expr%s.pdf", idv), width=12)
 
 par(mfrow=c(1, 2))
 
-plot(res[[1]]$recovery$gr$roc, avg="threshold", col=1, main="Partial ROC",
-      xlim=c(0.97, 1), ylim=c(0.97, 1))
+plot(res[[1]]$recovery$gr$roc, avg="threshold", col=1, main="Partial ROC")
 plot(res[[1]]$recovery$lasso$roc, avg="threshold", add=TRUE, col=2)
-plot(res[[1]]$recovery$ridge$roc, avg="threshold", add=TRUE, col=3, lwd=3)
-plot(res[[1]]$recovery$elnet.fmpr$roc, avg="threshold", add=TRUE, col=4, lwd=3)
-plot(res[[1]]$recovery$elnet.glmnet$roc, avg="threshold", add=TRUE, col=5, lwd=3)
+plot(res[[1]]$recovery$ridge$roc, avg="threshold", add=TRUE, col=3, lwd=1)
+plot(res[[1]]$recovery$elnet.fmpr$roc, avg="threshold", add=TRUE, col=4, lwd=1)
+plot(res[[1]]$recovery$elnet.glmnet$roc, avg="threshold", add=TRUE, col=5,
+      lwd=1)
 
 plot(res[[1]]$recovery$gr$prc, avg="threshold", col=1,
-      main="Partial Precision-Recall", xlim=c(0.95, 1), ylim=c(0.95, 1))
+      main="Partial Precision-Recall")
 plot(res[[1]]$recovery$lasso$prc, avg="threshold", col=2, add=TRUE)
 plot(res[[1]]$recovery$ridge$prc, avg="threshold", add=TRUE, col=3)
 plot(res[[1]]$recovery$elnet.fmpr$prc, avg="threshold", add=TRUE, col=4)
