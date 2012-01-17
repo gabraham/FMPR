@@ -368,7 +368,8 @@ run <- function(setup, grid=3, nfolds=3, nreps=3)
       )
       roc <- performance(pred, "sens", "spec")
       prc <- performance(pred, "prec", "rec")
-      list(roc=roc, prc=prc)
+      auc <- performance(pred, "auc")
+      list(roc=roc, prc=prc, auc=auc)
    }
    
    R2.gr <- sapply(r.gr, function(x) x$R2)
