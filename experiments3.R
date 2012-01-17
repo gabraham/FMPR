@@ -3,6 +3,8 @@
 # Gad Abraham, 2011 (c)
 #
 
+id <- 21
+
 v <- strsplit(commandArgs(TRUE), "=")
 for(m in v) {
    eval(parse(text=sprintf("%s=\"%s\"", m[1], m[2])))
@@ -28,36 +30,35 @@ makedata <- function(rep, dir=".", N=100, p=50, K=5, B, sigma=0.01)
 {
    cat("rep", rep, "\n")
 
-   Xtrain <- standardise(matrix(sample(0:2, N * p, replace=TRUE), N, p))
-   Xtest <- standardise(matrix(sample(0:2, N * p, replace=TRUE), N, p))
+   #X0train <- matrix(sample(0:2, N * p, replace=TRUE), N, p)
+   #X0train <- matrix(sample(0:2, N * p, replace=TRUE), N, p)
+   X0train <- matrix(rnorm(N * p), N, p)
+   X0test <- matrix(rnorm(N * p), N, p)
+   Xtrain <- X0train
+   Xtest <- X0test
    grp <- rep(1, K)
    XtrainB <- blockX(Xtrain, p, K)
    XtestB <- blockX(Xtest, p, K)
 
-   XtrainBs <- standardise(XtrainB)
-   XtestBs <- standardise(XtestB)
+   XtrainBs <- scale(XtrainB)
+   XtestBs <- scale(XtestB)
    
    write.table(B, file=sprintf("%s/B_%s.txt", dir, rep),
          col.names=FALSE, row.names=FALSE, quote=FALSE)
    
-   Ytrain <- scale(Xtrain %*% B + rnorm(N * K, 0, sigma), scale=FALSE)
-   Ytest <- scale(Xtest %*% B + rnorm(N * K, 0, sigma), scale=FALSE)
+   noiseTrain <- rnorm(N * K, 0, sigma)
+   noiseTest <- rnorm(N * K, 0, sigma)
+   Ytrain <- Xtrain %*% B + noiseTrain
+   Ytest <- Xtest %*% B + noiseTest
    ytrain <- as.numeric(Ytrain)
    ytest <- as.numeric(Ytest)
-   #Ynet <- outer(grp, grp, function(x, y) as.integer(x == y))
-   #lowerTriangle(Ynet) <- 0  
-   #diag(Ynet) <- 0
 
    write.table(Xtrain, file=sprintf("%s/Xtrain_%s.txt", dir, rep),
          col.names=FALSE, row.names=FALSE, quote=FALSE)
    write.table(Ytrain, file=sprintf("%s/Ytrain_%s.txt", dir, rep),
          col.names=FALSE, row.names=FALSE, quote=FALSE)
-   #write.table(Ynet, file=sprintf("%s/Ynetwork_%s.txt", dir, rep),
-   #      col.names=FALSE, row.names=FALSE, quote=FALSE)
    write.table(XtrainBs, file=sprintf("%s/XtrainB_%s.txt", dir, rep),
          col.names=FALSE, row.names=FALSE, quote=FALSE)
-   #write.table(cbind(grp), file=sprintf("%s/grp_%s.txt", dir, rep),
-   #	 col.names=FALSE, row.names=FALSE, quote=FALSE)
 
    write.table(Xtest, file=sprintf("%s/Xtest_%s.txt", dir, rep),
          col.names=FALSE, row.names=FALSE, quote=FALSE)
@@ -113,17 +114,22 @@ run.lasso <- function(rep, dir=".", nfolds=10, r=25)
    XtestB <- as.matrix(read.table(sprintf("XtestB_%s.txt", rep),
 	    header=FALSE))
 
-   ytrain <- as.numeric(Ytrain)
-   ytest <- as.numeric(Ytest)
+   ytrain <- as.numeric(center(Ytrain))
+   ytest <- as.numeric(center(Ytest))
+
+   XtrainB <- scale(XtrainB)
+   XtestB <- scale(XtestB)
 
    N <- nrow(Xtrain)
    K <- ncol(Ytrain)
    p <- ncol(Xtrain)
 
-   r <- optim.lasso(X=XtrainB, Y=ytrain, nfolds=10, grid=r, maxiter=1e5)
+   l <- maxlambda1(XtrainB, ytrain)
+   r <- optim.lasso(X=XtrainB, Y=ytrain, nfolds=nfolds,
+	 L1=seq(l, l * 1e-3, length=r), verbose=FALSE)
    g <- lasso3(X=XtrainB, y=ytrain, lambda1=r$opt[1])
    P <- XtestB %*% g
-   res <- R2(as.numeric(P), as.numeric(ytest))
+   res <- R2(as.numeric(P), ytest)
    cat("rep", rep, "R2 lasso:", res, "\n")
 
    setwd(oldwd)
@@ -150,17 +156,17 @@ run.ridge <- function(rep, dir=".", nfolds=10, r=25)
    XtestB <- as.matrix(read.table(sprintf("XtestB_%s.txt", rep),
 	    header=FALSE))
 
-   ytrain <- as.numeric(Ytrain)
-   ytest <- as.numeric(Ytest)
+   ytrain <- as.numeric(center(Ytrain))
+   ytest <- as.numeric(center(Ytest))
 
    N <- nrow(Xtrain)
    K <- ncol(Ytrain)
    p <- ncol(Xtrain)
    
-   r <- optim.ridge(X=Xtrain, Y=Ytrain, nfolds=10, grid=r)
-   g <- ridge(XtrainB, ytrain, lambda2=r$opt[1])
-   P <- XtestB %*% g
-   res <- R2(as.numeric(P), as.numeric(ytest))
+   r <- optim.ridge(X=XtrainB, Y=ytrain, nfolds=nfolds, grid=r)
+   g <- ridge(scale(XtrainB), center(ytrain), lambda2=r$opt[1])
+   P <- scale(XtestB) %*% g
+   res <- R2(as.numeric(P), ytest)
    cat("rep", rep, "R2 ridge:", res, "\n")
 
    setwd(oldwd)
@@ -191,11 +197,25 @@ run.groupridge <- function(rep, dir=".", nfolds=10, r=25, Rthresh=0.5)
    K <- ncol(Ytrain)
    p <- ncol(Xtrain)
 
-   r <- optim.groupridge(X=Xtrain, Y=Ytrain, G=G, nfolds=10, grid=r, maxiter=1e5)
+   Xtrain <- scale(Xtrain)
+   Ytrain <- center(Ytrain)
+
+   cat("optim.groupridge start\n")
+   l <- maxlambda1(Xtrain, Ytrain)
+   r <- optim.groupridge(X=Xtrain, Y=Ytrain, G=G,
+	 nfolds=nfolds,
+	 L1=seq(l, l * 1e-3, length=r),
+	 L2=seq(0, 10, length=r),
+	 L3=seq(0, 10, length=r),
+	 maxiter=1e3)
+   cat("optim.groupridge end\n")
    g <- groupridge4(X=Xtrain, Y=Ytrain,
-      lambda1=r$opt[1], lambda2=r$opt[2], lambda3=r$opt[3], maxiter=1e4, G=G)
-   P <- Xtest %*% g
-   res <- R2(as.numeric(P), as.numeric(Ytest))
+	 lambda1=r$opt[1], lambda2=r$opt[2], lambda3=r$opt[3],
+	 maxiter=1e4, G=G)
+   g <- g[[1]][[1]][[1]]
+
+   P <- scale(Xtest) %*% g
+   res <- R2(as.numeric(P), as.numeric(center(Ytest)))
 
    cat("rep", rep, "R2 groupridge:", res, "\n")
 
@@ -239,11 +259,11 @@ run <- function(setup, grid=3, nfolds=3, nreps=3)
    cat("Simulation done\n")
    
    cat("Running inference\n")
-   r.gr <- lapply(1:nreps, run.groupridge, dir=dir, r=grid, nfolds=nfolds,
-	 Rthresh=setup$Rthresh)
    r.lasso <- lapply(1:nreps, run.lasso, dir=dir, r=grid, nfolds=nfolds)
-   #r.spg <- lapply(1:nreps, run.spg, dir=dir, r=grid, nfolds=nfolds)
+   r.gr <- lapply(1:nreps, run.groupridge, dir=dir, r=grid, nfolds=nfolds,
+   	 Rthresh=setup$Rthresh)
    r.ridge <- lapply(1:nreps, run.ridge, dir=dir, r=grid, nfolds=nfolds)
+   #r.spg <- lapply(1:nreps, run.spg, dir=dir, r=grid, nfolds=nfolds)
    cat("Inference done\n")
 
    # Measure recovery of non-zeros
@@ -266,21 +286,24 @@ run <- function(setup, grid=3, nfolds=3, nreps=3)
    }
    
    R2.gr <- sapply(r.gr, function(x) x$R2)
-
    R2.lasso <- sapply(r.lasso, function(x) x$R2)
    R2.ridge <- sapply(r.ridge, function(x) x$R2)
    #R2.spg <- sapply(r.spg, function(x) x$R2[1])
    
-   R2.all <- cbind(GR=R2.gr, lasso=R2.lasso, ridge=R2.ridge)#, SPG=R2.spg)
-   
-   rec.gr <- recovery(r.gr, dir)
+   R2.all <- cbind(
+      GR=R2.gr,
+      lasso=R2.lasso,
+      ridge=R2.ridge
+      #SPG=R2.spg
+   )
 
+   rec.gr <- recovery(r.gr, dir)
    rec.lasso <- recovery(r.lasso, dir)
    rec.ridge <- recovery(r.ridge, dir)
    #rec.spg <- recovery(r.spg, dir)
 
    list(
-      res=list(
+      weights=list(
 	 gr=r.gr,
 	 lasso=r.lasso,
 	 ridge=r.ridge
@@ -341,19 +364,24 @@ setup <- list(
    Expr19=list(dir=c("Expr19"), N=200, p=50, K=10, sigma=0.5,
 	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.7),
    Expr20=list(dir=c("Expr20"), N=200, p=50, K=10, sigma=0.5,
-	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.9)
+	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.9),
+
+   Expr21=list(dir=c("Expr21"), N=200, p=50, K=5, sigma=1,
+	 B=getB(p=50, K=5, w=0.5, type="same"), Rthresh=0.3)
 )
 
-res <- lapply(setup[id], run, nreps=30, grid=20, nfolds=10)
+res <- lapply(setup[id], run, nreps=10, grid=20, nfolds=5)
 save(setup, res, id, file=sprintf("results_%s.RData", id))
 
 pdf(sprintf("Expr%s.pdf", id), width=12)
 par(mfrow=c(1, 2))
 plot(res[[1]]$recovery$gr$roc, avg="threshold", col=1, main="ROC")
 plot(res[[1]]$recovery$lasso$roc, avg="threshold", add=TRUE, col=2)
-plot(res[[1]]$recovery$ridge$roc, avg="threshold", add=TRUE, col=3)
+plot(res[[1]]$recovery$ridge$roc, avg="threshold", add=TRUE, col=3, lwd=3)
 plot(res[[1]]$recovery$gr$prc, avg="threshold", col=1, main="Precision-Recall")
-plot(res[[1]]$recovery$lasso$prc, avg="threshold", add=TRUE, col=2)
+plot(res[[1]]$recovery$lasso$prc, avg="threshold", col=2, add=TRUE)
 plot(res[[1]]$recovery$ridge$prc, avg="threshold", add=TRUE, col=3)
 dev.off()
+
+t.test(res[[1]]$R2[, 1], res[[1]]$R2[,2])
 

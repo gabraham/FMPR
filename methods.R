@@ -38,30 +38,55 @@ groupridge3 <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, grp=NULL,
 # lambda2: scalar or K-vector
 # lambda3: scalar 
 groupridge4 <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
-      maxiter=1e5, eps=1e-6, verbose=FALSE)
+      maxiter=1e5, eps=1e-6, verbose=FALSE, simplify=FALSE)
 {
    p <- ncol(X)
    Y <- cbind(Y)
    K <- ncol(Y)
 
-   if(length(lambda1) == 1)
-      lambda1 <- rep(lambda1, K)
+   #if(length(lambda1) == 1)
+   #   lambda1 <- rep(lambda1, K)
    
-   if(length(lambda2) == 1)
-      lambda2 <- rep(lambda2, K)
+   #if(length(lambda2) == 1)
+   #   lambda2 <- rep(lambda2, K)
 
    if(is.null(G))
       G <- matrix(0, K, K)
 
-   r <- .C("groupridge4", as.numeric(X), as.numeric(Y), 
-      numeric(p * K), nrow(X), ncol(X), K,
-      as.numeric(lambda1), as.numeric(lambda2), as.numeric(lambda3),
-      as.integer(G), as.integer(maxiter),
-      as.double(eps), as.integer(verbose), integer(1))
-   status <- r[[14]]
-   if(!status)
-      warning("groupridge failed to converge within ", maxiter, " iterations")
-   matrix(r[[3]], p, K)
+   r <- lapply(lambda1, function(l1) {
+	   lapply(lambda2, function(l2) {
+	      lapply(lambda3, function(l3) {
+		  # groupridge expects l1/l2/l3 to be a vector of length K,
+		  # allowing for a different penalty for each task
+		  r <- .C("groupridge4", as.numeric(X), as.numeric(Y), 
+		     numeric(p * K), nrow(X), ncol(X), K,
+      	       	     as.numeric(rep(l1, K)), as.numeric(rep(l2, K)),
+		     as.numeric(rep(l3, K)),
+      	       	     as.integer(G), as.integer(maxiter),
+      	       	     as.double(eps), as.integer(verbose), integer(1),
+		     integer(1))
+		  status <- r[[14]]
+		  if(!status) {
+		  warning("groupridge failed to converge within ",
+		     maxiter, " iterations")
+		  } else if(verbose) {
+		     cat("converged in", r[[15]], "iterations\n")
+		  }
+		     
+		  m <- matrix(r[[3]], p, K)
+		  if(any(is.na(m))) browser()
+		  m
+	      })
+	   })
+   })
+
+   if(simplify && length(lambda1) == 1 
+      && length(lambda2) == 1 
+      && length(lambda3) == 1) {
+      r[[1]][[1]][[1]]
+   } else {
+      r
+   }
 }
 
 # warm restarts
@@ -72,45 +97,75 @@ groupridge5 <- function(X, Y, B=NULL, lambda1=0, lambda2=0, lambda3=0, G=NULL,
    Y <- cbind(Y)
    K <- ncol(Y)
 
-   if(length(lambda1) == 1)
-      lambda1 <- rep(lambda1, K)
+   #if(length(lambda1) == 1)
+   #   lambda1 <- rep(lambda1, K)
    
-   if(length(lambda2) == 1)
-      lambda2 <- rep(lambda2, K)
+   #if(length(lambda2) == 1)
+   #   lambda2 <- rep(lambda2, K)
 
    if(is.null(G))
       G <- matrix(0, K, K)
 
-   if(is.null(B)) {
-      LP <- numeric(N * K)
-   } else {
-      LP <- as.numeric(X %*% B)
-   }
+   #if(is.null(B)) {
+   #   LP <- numeric(N * K)
+   #} else {
+   #   LP <- as.numeric(X %*% B)
+   #}
 
-   r <- .C("groupridge5", as.numeric(X), as.numeric(Y), 
-      numeric(p * K), as.numeric(LP), nrow(X), ncol(X), K,
-      as.numeric(lambda1), as.numeric(lambda2), as.numeric(lambda3),
-      as.integer(G), as.integer(maxiter),
-      as.double(eps), as.integer(verbose), integer(1))
-   status <- r[[15]]
-   if(!status)
-      warning("groupridge failed to converge within ", maxiter, " iterations")
-   m <- matrix(r[[3]], p, K)
-   attr(m, "LP") <- r[[4]]
-   m
+   len1 <- length(lambda1)
+   len2 <- length(lambda2)
+   len3 <- length(lambda3)
+
+   B <- array(0, c(len1, len2, len3, p, K))
+   LP <- array(0, c(len1, len2, len3, N, K))
+   
+   for(i in 1:len1)
+   {
+      L <- if(i == 1) {
+	 numeric(N * K) 
+      } else {
+	 LP[i - 1, j, k , ,]
+      }
+      for(j in 1:len2)
+      {
+	 for(k in 1:len3)
+	 {
+	    r <- .C("groupridge5", as.numeric(X), as.numeric(Y), 
+	       as.numeric(B[i, j, k, , ]), as.numeric(L),
+	       nrow(X), ncol(X), K,
+	       as.numeric(rep(lambda1[i], K)), as.numeric(rep(lambda2[j], K)),
+	       as.numeric(rep(lambda3[k], K)),
+	       as.integer(G), as.integer(maxiter),
+	       as.double(eps), as.integer(verbose), integer(1),
+	       integer(1))
+	    status <- r[[15]]
+	    if(!status) {
+	       warning("groupridge failed to converge within ",
+		  maxiter, " iterations")
+	    } else if(verbose) {
+	       cat("converged in", r[[16]], "iterations\n")
+	    }
+	    B[i, j, k, , ] <- matrix(r[[3]], p, K)
+	    LP[i, j, k, , ] <- matrix(r[[4]], N, K)
+	 }
+      }
+   }
+   B
 }
 
 lasso3 <- function(X, y, lambda1=0,
-      maxiter=1e5, eps=1e-6, verbose=FALSE)
+      maxiter=1e5, eps=1e-8, verbose=FALSE)
 {
    p <- ncol(X)
 
-   r <- .C("lasso3", as.numeric(X), as.numeric(y), numeric(p), 
-      nrow(X), ncol(X), as.numeric(lambda1),
-      as.integer(maxiter), as.double(eps),
-      as.integer(verbose)
-   )
-   matrix(r[[3]], p)
+   sapply(lambda1, function(l) {
+      r <- .C("lasso3", as.numeric(X), as.numeric(y), numeric(p), 
+         nrow(X), ncol(X), as.numeric(l),
+         as.integer(maxiter), as.double(eps),
+         as.integer(verbose)
+      )
+      matrix(r[[3]], p)
+   })
 }
 
 ridge <- function(X, Y, lambda2=0)
@@ -118,7 +173,9 @@ ridge <- function(X, Y, lambda2=0)
    XX <- crossprod(X)
    XY <- crossprod(X, Y)
    p <- ncol(X)
-   qr.solve(XX + diag(p) * lambda2, XY)
+   sapply(lambda2, function(l) {
+      qr.solve(XX + diag(p) * l, XY)
+   })
 }
 
 # zero mean, unit norm (not unit variance)
@@ -126,7 +183,9 @@ standardise <- function(x)
 {
    x1 <- sweep(x, 2, colMeans(x))
    v <- apply(x1, 2, function(z) sqrt(sum(z^2)))
-   sweep(x1, 2, v, FUN="/")
+   s <- sweep(x1, 2, v, FUN="/")
+   s[is.na(s)] <- 0
+   s
 }
 
 #source("lasso.R")

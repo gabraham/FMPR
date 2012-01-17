@@ -1,10 +1,10 @@
 # Test groupridge
 
-#library(MASS)
+library(MASS)
 library(glmnet)
-library(gdata)
-library(ROCR)
-library(ggplot2)
+#library(gdata)
+#library(ROCR)
+#library(ggplot2)
 
 #dyn.load("groupridge.so")
 
@@ -231,17 +231,113 @@ source("methods.R")
 #################################################################################
 ## Test groupridge in standard lasso setting, single task
 #
-#N <- 100
-#p <- 500
-#K <- 1
-#grp <- 1
+N <- 5000
+p <- 20
+K <- 5
+#G <- diag(K)
+#G[1, 1] <- 1
 #
 ## scale to zero mean and unit norm (not unit variance)
-#X0 <- matrix(rnorm(N * p), N, p)
-#X <- standardise(X0)
-#B <- matrix(rnorm(p * K), p, K)
-#B[sample(p, p - 10),] <- 0
-#Y <- X %*% B
+X0 <- matrix(rnorm(N * p), N, p)
+B <- matrix(rnorm(p * K, 0, 1), p, K)
+B[sample(p, p - 10), ] <- 0
+X <- standardise(X0)
+Y <- center(X0 %*% B + rnorm(N * K, 0, 1))
+
+X2 <- standardise(matrix(rnorm(N * p), N, p))
+Y2 <- center(X2 %*% B + rnorm(N * K, 0, 1))
+
+#X[,1:2] <- 0
+l1 <- 0
+g1 <- groupridge4(X, Y, lambda1=l1, eps=1e-10, simplify=TRUE)
+g2 <- sapply(1:K, function(k) {
+   lasso3(X, Y[,k], lambda1=l1, eps=1e-10)
+})
+summary(diag(cor(cbind(g1, g2))))
+mean((g1 - g2)^2)
+
+l1 <- 0.1
+g1 <- groupridge4(X, Y, lambda1=l1, eps=1e-8, simplify=TRUE)
+g2 <- sapply(1:K, function(k) {
+   lasso3(X, Y[,k], lambda1=l1, eps=1e-8)
+})
+summary(diag(cor(cbind(g1, g2))))
+mean((g1 - g2)^2)
+
+Xb <- standardise(blockX(X, p, K))
+g3 <- lasso3(Xb, as.numeric(Y), lambda1=l1, eps=1e-8)
+g3 <- matrix(g3, p, K)
+
+summary(diag(cor(cbind(g1, g3))))
+mean((g1 - g3)^2)
+
+#l1 <- 1
+#s <- sample(0:1, N, TRUE, prob=c(0.2, 0.8))
+#g1 <- groupridge4(scale(X[s == 1, ]), center(Y[s == 1, ]), lambda1=l1, simplify=TRUE)
+#g2 <- groupridge4(scale(X[s == 0, ]), center(Y[s == 0, ]), lambda1=l1, simplify=TRUE)
+#
+#p1 <- scale(X[s != 1, ]) %*% g1
+#p2 <- scale(X[s != 0, ]) %*% g2
+#
+#R2(as.numeric(p1), as.numeric(Y[s != 1]))
+#R2(as.numeric(p2), as.numeric(Y[s != 0]))
+#
+#stop()
+
+L1 <- max(maxlambda1(X, Y)) * seq(1, 1e-3, length=20)
+r1 <- crossval.groupridge(X, Y, lambda1=L1, lambda2=0, lambda3=0, nfolds=2) 
+r2 <- crossval.groupridge(X, Y, lambda1=L1, lambda2=0, lambda3=0, nfolds=3) 
+r3 <- crossval.groupridge(X, Y, lambda1=L1, lambda2=0, lambda3=0, nfolds=5) 
+r4 <- crossval.groupridge(X, Y, lambda1=L1, lambda2=0, lambda3=0, nfolds=10) 
+r5 <- crossval.groupridge(X, Y, lambda1=L1, lambda2=0, lambda3=0, nfolds=20) 
+
+l1 <- crossval.lasso(Xb, as.numeric(Y), lambda1=L1, nfolds=2) 
+l2 <- crossval.lasso(Xb, as.numeric(Y), lambda1=L1, nfolds=3) 
+l3 <- crossval.lasso(Xb, as.numeric(Y), lambda1=L1, nfolds=5) 
+l4 <- crossval.lasso(Xb, as.numeric(Y), lambda1=L1, nfolds=10) 
+l5 <- crossval.lasso(Xb, as.numeric(Y), lambda1=L1, nfolds=20) 
+
+s1 <- crossval.groupridge(Xb, as.numeric(Y), lambda1=L1, lambda2=0, lambda3=0, nfolds=2) 
+s2 <- crossval.groupridge(Xb, as.numeric(Y), lambda1=L1, lambda2=0, lambda3=0, nfolds=3) 
+s3 <- crossval.groupridge(Xb, as.numeric(Y), lambda1=L1, lambda2=0, lambda3=0, nfolds=5) 
+s4 <- crossval.groupridge(Xb, as.numeric(Y), lambda1=L1, lambda2=0, lambda3=0, nfolds=10) 
+s5 <- crossval.groupridge(Xb, as.numeric(Y), lambda1=L1, lambda2=0, lambda3=0, nfolds=20) 
+
+par(mfrow=c(1, 3))
+matplot(L1, cbind(r1, r2, r3, r4, r5))
+matplot(L1, cbind(l1, l2, l3, l4, l5))
+matplot(L1, cbind(s1, s2, s3, s4, s5))
+
+stop()
+#g3 <- drop(coef(glmnet(standardise(X), center(Y), lambda=l1,
+#	    standardize=TRUE)))[-1]
+#r <- cbind(B, g1, g2, g3, g4)
+#cor(r)
+#pairs(r)
+#stop()
+
+#
+#L <- 10^(0:9)
+#system.time({
+#   g1 <- groupridge4(standardise(X), center(Y), lambda1=L, eps=1e-8)
+#})
+#system.time({
+#   g4 <- groupridge5(standardise(X), center(Y), lambda1=L, eps=1e-8)
+#})
+#cor(g1[[1]][[1]][[1]], g4[1,1,1,,])
+#stop()
+#
+#g <- glmnet(X, y)
+#b <- as.matrix(coef(g))[-1,]
+#l <- sapply(g$lambda, function(k) {
+#   lasso3(scale(X), y, lambda1=k)
+#})
+#summary(diag(cor(b[, -1], l[, -1])))
+##cor(cbind(B, b, l))
+##cor(cbind(sign(B), sign(b), sign(l)))
+##cbind(l[b != 0], b[b != 0])
+#
+#stop()
 #
 #maxL1 <- maxlambda1(X, Y)
 #
@@ -334,9 +430,9 @@ source("methods.R")
 
 ##################################################################################
 ### Test groupridge in multi-task setting, lasso only
-N <- 100
+N <- 50
 p <- 10
-K <- 5
+K <- 10
 ##
 ### scale to zero mean and unit norm (not unit variance)
 ##X0 <- matrix(rnorm(N * p), N, p)
@@ -349,11 +445,30 @@ K <- 5
 ##
 ##Y <- X %*% B
 ##
+
 X <- standardise(matrix(rnorm(N * p), N, p))
-Y <- scale(matrix(rnorm(N * K), N, K))
-g4 <- groupridge4(X, Y, lambda1=1e-1, maxiter=1e6, verbose=FALSE)
-g5 <- groupridge5(X, Y, lambda1=1e-1, maxiter=1e6, verbose=FALSE)
-diag(cor(g4, g5))
+#Xb <- standardise(blockX(X, p, K))
+b <- rnorm(p) * sample(0:1, p, TRUE)
+B <- sapply(1:K, function(k) b)
+Y <- scale(X %*% B + rnorm(N * K, 0, 1))
+#y <- scale(as.numeric(Y))
+
+#l <- matrix(lasso3(Xb, y, lambda1=1e-1, maxiter=1e6, verbose=TRUE), p, K)
+#g4 <- groupridge4(X, Y, lambda1=1e-1, maxiter=1e6, verbose=TRUE)
+#g5 <- groupridge5(X, Y, lambda1=1e-1, maxiter=1e6, verbose=TRUE)
+#cor(cbind(as.numeric(l), as.numeric(g4), as.numeric(g5)))
+#mean((g4-g5)^2)
+#mean((l-g5)^2)
+
+R <- cor(Y)
+diag(R) <- 0
+G <- sign(R) * (abs(R) > 0.2)
+#g1 <- optim.groupridge(X, Y, nfolds=10, G=G, maxiter=1e5, verbose=TRUE)
+g2 <- groupridge4(X, Y, G=G, lambda1=1e-3, lambda2=1e-3, lambda3=1e-3,
+      maxiter=1e3)
+class(g2)
+summary(as.numeric(g2))
+
 stop()
 #stop()
 ##g3 <- groupridge3(X, Y, lambda1=1e-2, maxiter=1e6)
@@ -408,86 +523,86 @@ stop()
 #diag(cor(cbind(g2, g3, g4)))
 #
 
-################################################################################
-# Test groupridge in multi-task setting, lasso + ridge + group ridge
-# B weights differ between tasks, to see effect of group ridge
-run <- function()
-{
-   N <- 50
-   p <- 50
-   K <- 10
-   
-   # scale to zero mean and unit norm (not unit variance)
-   X0 <- matrix(rnorm(N * p), N, p)
-   X <- standardise(X0)
-   B <- 0
-   while(all(B == 0)) {
-      b <- rnorm(p) * sample(0:1, p, TRUE, prob=c(0.7, 0.3))
-      B <- sapply(1:K, function(k) {
-         if(k < 5) {
-            b
-         } else {
-            rev(b)
-         }
-      })
-   }
-   Y <- scale(X %*% B + rnorm(N * K, 0, 0.1))
-   grp <- rep(1, K)
-   
-   Xb <- blockX(X, p, K)
-   
-   G1 <- matrix(1, K, K)
-   
-   Rc2 <- cor(Y)
-   G2 <- sign(Rc2) * (abs(Rc2) > 0.3)
-   
-   r1 <- optim.groupridge(X=X, Y=Y, G=G2, nfolds=10, maxiter=1e5)
-   r2 <- optim.lasso(X=Xb, Y=as.numeric(Y), nfolds=10, maxiter=1e5)
-   
-   g1 <- groupridge4(X=X, Y=Y, lambda1=r1$opt[1] * 0.1, lambda2=r1$opt[2],
-         lambda3=r1$opt[3], maxiter=1e4, G=G2)
-   g2 <- matrix(lasso3(X=Xb, y=as.numeric(Y), lambda1=r2$opt[1]), p, K)
-   
-   auc(as.numeric(B != 0), as.numeric(abs(g1)))
-   auc(as.numeric(B != 0), as.numeric(abs(g2)))
-   
-   pred <- prediction(
-      predictions=cbind(as.numeric(abs(g1)), as.numeric(abs(g2))),
-      labels=cbind(as.numeric(B != 0), as.numeric(B != 0))
-   )
-   perf.roc <- performance(pred, "sens", "spec")
-   perf.prc <- performance(pred, "prec", "rec")
-   
-   list(roc=perf.roc, prc=perf.roc)
-}
-
-res <- lapply(1:10, function(i) run())
-
-meth <- c("groupridge", "lasso")
-
-resd <- lapply(res, function(r) {
-   spec <- do.call(cbind, r$roc@x.values)
-   sens <- do.call(cbind, r$roc@y.values)
-   prec <- do.call(cbind, r$prc@x.values)
-   rec <- do.call(cbind, r$prc@y.values)
-   data.frame(
-      Specificity=as.numeric(spec),
-      Sensitivity=as.numeric(sens),
-      Precision=as.numeric(prec),
-      Recall=as.numeric(rec),
-      Method=rep(meth, each=nrow(spec))
-   )
-})
-resd2 <- do.call(rbind, resd)
-
-gg1 <- ggplot(resd2, aes(x=Specificity, y=Sensitivity, colour=Method))
-gg1 <- gg1 + geom_line(size=2)
-
-gg2 <- ggplot(resd2, aes(x=Recall, y=Precision, colour=Method))
-gg2 <- gg2 + geom_line(size=2)
-
-pdf("groupridge_block.pdf", width=12)
-print(gg1)
-print(gg2)
-dev.off()
-
+#################################################################################
+## Test groupridge in multi-task setting, lasso + ridge + group ridge
+## B weights differ between tasks, to see effect of group ridge
+#run <- function()
+#{
+#   N <- 50
+#   p <- 50
+#   K <- 10
+#   
+#   # scale to zero mean and unit norm (not unit variance)
+#   X0 <- matrix(rnorm(N * p), N, p)
+#   X <- standardise(X0)
+#   B <- 0
+#   while(all(B == 0)) {
+#      b <- rnorm(p) * sample(0:1, p, TRUE, prob=c(0.7, 0.3))
+#      B <- sapply(1:K, function(k) {
+#         if(k < 5) {
+#            b
+#         } else {
+#            rev(b)
+#         }
+#      })
+#   }
+#   Y <- scale(X %*% B + rnorm(N * K, 0, 0.1))
+#   grp <- rep(1, K)
+#   
+#   Xb <- blockX(X, p, K)
+#   
+#   G1 <- matrix(1, K, K)
+#   
+#   Rc2 <- cor(Y)
+#   G2 <- sign(Rc2) * (abs(Rc2) > 0.3)
+#   
+#   r1 <- optim.groupridge(X=X, Y=Y, G=G2, nfolds=10, maxiter=1e5)
+#   r2 <- optim.lasso(X=Xb, Y=as.numeric(Y), nfolds=10, maxiter=1e5)
+#   
+#   g1 <- groupridge4(X=X, Y=Y, lambda1=r1$opt[1] * 0.1, lambda2=r1$opt[2],
+#         lambda3=r1$opt[3], maxiter=1e4, G=G2)
+#   g2 <- matrix(lasso3(X=Xb, y=as.numeric(Y), lambda1=r2$opt[1]), p, K)
+#   
+#   auc(as.numeric(B != 0), as.numeric(abs(g1)))
+#   auc(as.numeric(B != 0), as.numeric(abs(g2)))
+#   
+#   pred <- prediction(
+#      predictions=cbind(as.numeric(abs(g1)), as.numeric(abs(g2))),
+#      labels=cbind(as.numeric(B != 0), as.numeric(B != 0))
+#   )
+#   perf.roc <- performance(pred, "sens", "spec")
+#   perf.prc <- performance(pred, "prec", "rec")
+#   
+#   list(roc=perf.roc, prc=perf.roc)
+#}
+#
+#res <- lapply(1:10, function(i) run())
+#
+#meth <- c("groupridge", "lasso")
+#
+#resd <- lapply(res, function(r) {
+#   spec <- do.call(cbind, r$roc@x.values)
+#   sens <- do.call(cbind, r$roc@y.values)
+#   prec <- do.call(cbind, r$prc@x.values)
+#   rec <- do.call(cbind, r$prc@y.values)
+#   data.frame(
+#      Specificity=as.numeric(spec),
+#      Sensitivity=as.numeric(sens),
+#      Precision=as.numeric(prec),
+#      Recall=as.numeric(rec),
+#      Method=rep(meth, each=nrow(spec))
+#   )
+#})
+#resd2 <- do.call(rbind, resd)
+#
+#gg1 <- ggplot(resd2, aes(x=Specificity, y=Sensitivity, colour=Method))
+#gg1 <- gg1 + geom_line(size=2)
+#
+#gg2 <- ggplot(resd2, aes(x=Recall, y=Precision, colour=Method))
+#gg2 <- gg2 + geom_line(size=2)
+#
+#pdf("groupridge_block.pdf", width=12)
+#print(gg1)
+#print(gg2)
+#dev.off()
+#
