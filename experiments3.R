@@ -92,7 +92,7 @@ setup <- list(
 	 B=getB(p=50, K=10, w=0.5, type="random"), Rthresh=0.3)
 )
 
-res <- lapply(setup[idv], run, nreps=10, grid=20, nfolds=5)
+res <- lapply(setup[idv], run, nreps=50, grid=20, nfolds=5)
 save(setup, res, idv, file=sprintf("results_%s.RData", idv))
 
 ################################################################################
