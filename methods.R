@@ -137,7 +137,7 @@ lasso <- function(X, y, lambda1=0,
    p <- ncol(X)
 
    sapply(lambda1, function(l) {
-      r <- .C("lasso3", as.numeric(X), as.numeric(y), numeric(p), 
+      r <- .C("lasso", as.numeric(X), as.numeric(y), numeric(p), 
          nrow(X), ncol(X), as.numeric(l),
          as.integer(maxiter), as.double(eps),
          as.integer(verbose)
