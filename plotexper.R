@@ -6,7 +6,7 @@ pdf(sprintf("Expr%s.pdf", idv), width=12)
 
 par(mfrow=c(1, 2))
 
-plot(clean.rocr(res[[1]]$recovery$gr$roc), avg="threshold", col=1, main="Partial ROC")
+plot(clean.rocr(res[[1]]$recovery$gr$roc), avg="threshold", col=1, main="ROC")
 plot(clean.rocr(res[[1]]$recovery$lasso$roc), avg="threshold", add=TRUE, col=2)
 plot(clean.rocr(res[[1]]$recovery$ridge$roc), avg="threshold", add=TRUE, col=3, lwd=1)
 plot(clean.rocr(res[[1]]$recovery$elnet.fmpr$roc), avg="threshold", add=TRUE, col=4, lwd=1)
@@ -14,7 +14,7 @@ plot(clean.rocr(res[[1]]$recovery$elnet.glmnet$roc), avg="threshold", add=TRUE, 
       lwd=1)
 
 plot(clean.rocr(res[[1]]$recovery$gr$prc), avg="threshold", col=1,
-      main="Partial Precision-Recall")
+      main="Precision-Recall")
 plot(clean.rocr(res[[1]]$recovery$lasso$prc), avg="threshold", col=2, add=TRUE)
 plot(clean.rocr(res[[1]]$recovery$ridge$prc), avg="threshold", add=TRUE, col=3)
 plot(clean.rocr(res[[1]]$recovery$elnet.fmpr$prc), avg="threshold", add=TRUE, col=4)
