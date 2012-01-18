@@ -10,7 +10,7 @@ crossval.lasso <- function(X, Y, nfolds=5, fun=R2, ...)
    Y <- cbind(Y)
    folds <- sample(1:nfolds, N, TRUE)
    s <- sapply(1:nfolds, function(fold) {
-      g <- lasso3(scale(X[folds != fold, ]), center(Y[folds != fold, ]), ...)
+      g <- lasso(scale(X[folds != fold, ]), center(Y[folds != fold, ]), ...)
       p <- scale(X[folds == fold, ]) %*% g
 
       # one R^2 for each penalty

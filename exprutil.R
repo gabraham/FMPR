@@ -94,7 +94,7 @@ run.lasso <- function(rep, dir=".", nfolds=10, r=25)
    l <- maxlambda1(XtrainB, ytrain)
    opt <- optim.lasso(X=XtrainB, Y=ytrain, nfolds=nfolds,
 	 L1=seq(l, l * 1e-3, length=r), verbose=FALSE)
-   g <- lasso3(X=XtrainB, y=ytrain, lambda1=opt$opt[1])
+   g <- lasso(X=XtrainB, y=ytrain, lambda1=opt$opt[1])
    P <- XtestB %*% g
    res <- R2(as.numeric(P), ytest)
    cat("rep", rep, "R2 lasso:", res, "\n")
@@ -351,13 +351,13 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
    cat("Simulation done\n")
    
    cat("Running inference\n")
+   r.lasso <- lapply(1:nreps, run.lasso, dir=dir, r=grid, nfolds=nfolds)
    r.gr.t <- lapply(1:nreps, run.groupridge, dir=dir, r=grid, nfolds=nfolds,
    	 Rthresh=setup$Rthresh, type="threshold")
    r.gr.w1 <- lapply(1:nreps, run.groupridge, dir=dir, r=grid, nfolds=nfolds,
    	 Rthresh=setup$Rthresh, type="weighted", weight.fun=abs)
    r.gr.w2 <- lapply(1:nreps, run.groupridge, dir=dir, r=grid, nfolds=nfolds,
    	 Rthresh=setup$Rthresh, type="weighted", weight.fun=sqr)
-   r.lasso <- lapply(1:nreps, run.lasso, dir=dir, r=grid, nfolds=nfolds)
    r.ridge <- lapply(1:nreps, run.ridge, dir=dir, r=grid, nfolds=nfolds)
    r.elnet.glmnet <- lapply(1:nreps, run.elnet.glmnet, dir=dir,
 	 r=grid, nfolds=nfolds, Rthresh=setup$Rthresh)

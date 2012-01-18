@@ -602,9 +602,9 @@ source("exprutil.R")
 
 N <- 100
 p <- 50
-K <- 10 
+K <- 1000
 B <- getB(p=p, K=K, w=0.5, type="same")
-d <- makedata(N=N, K=K, B=B, p=p, save=FALSE, sigma=1, rep=1)
+d <- makedata(N=N, K=K, B=B, p=p, save=FALSE, sigma=2, rep=1)
 
 nfolds <- 5
 ngrid <- 20
@@ -628,24 +628,33 @@ g <- vector("list", 3)
 G <- list(Gt, Gw1, Gw2)
 types <- c("threshold", "weighted", "weighted")
 
-for(i in 1:3)
-{
-   r <- optim.groupridge(X=Xtrain, Y=Ytrain, G=G[[i]],
-         nfolds=nfolds,
-         L1=seq(l, l * 1e-3, length=ngrid),
-         L2=10^seq(-3, 5, length=ngrid),
-         L3=10^seq(-3, 5, length=ngrid),
-         maxiter=1e3, type=types[i])
-   cat("optim.groupridge", types[i], "end\n")
-   g[[i]] <- groupridge(X=Xtrain, Y=Ytrain,
-         lambda1=r$opt[1], lambda2=r$opt[2], lambda3=r$opt[3],
-         maxiter=1e4, G=G[[i]], type=types[i])
-   b <- g[[i]][[1]][[1]][[1]]
-   P <- scale(d$Xtest) %*% b
-   res[i] <- R2(as.numeric(P), as.numeric(center(d$Ytest)))
-   cat(res[i], "\n")
-}
+#for(i in 1:3)
+#{
+#   system.time({
+#   r <- optim.groupridge(X=Xtrain, Y=Ytrain, G=G[[i]],
+#         nfolds=nfolds,
+#         L1=seq(l, l * 1e-3, length=ngrid),
+#         L2=10^seq(-3, 5, length=ngrid),
+#         L3=10^seq(-3, 5, length=ngrid),
+#         maxiter=1e3, type=types[i])
+#   })
+#   cat("optim.groupridge", types[i], "end\n")
+#   system.time({
+#   g[[i]] <- groupridge(X=Xtrain, Y=Ytrain,
+#         lambda1=r$opt[1], lambda2=r$opt[2], lambda3=r$opt[3],
+#         maxiter=1e4, G=G[[i]], type=types[i])
+#   })
+#   b <- g[[i]][[1]][[1]][[1]]
+#   P <- scale(d$Xtest) %*% b
+#   res[i] <- R2(as.numeric(P), as.numeric(center(d$Ytest)))
+#   cat(res[i], "\n")
+#}
+#
 
 
-
+system.time({
+   g <- groupridge(X=Xtrain, Y=Ytrain,
+      lambda1=1e-3, lambda2=1e-3, lambda3=1e-3,
+      maxiter=1e4, G=Gt, type="threshold")
+})
 
