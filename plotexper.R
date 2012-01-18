@@ -13,12 +13,20 @@ plot(clean.rocr(res[[1]]$recovery$elnet.fmpr$roc), avg="threshold", add=TRUE, co
 plot(clean.rocr(res[[1]]$recovery$elnet.glmnet$roc), avg="threshold", add=TRUE, col=5,
       lwd=1)
 
+legend(0, 0,
+   c("FMPR", "Lasso", "Ridge", "ElasticNet-FMPR", "ElasticNet-glmnet"),
+   col=1:5, lwd=3)
+
 plot(clean.rocr(res[[1]]$recovery$gr$prc), avg="threshold", col=1,
       main="Precision-Recall")
 plot(clean.rocr(res[[1]]$recovery$lasso$prc), avg="threshold", col=2, add=TRUE)
 plot(clean.rocr(res[[1]]$recovery$ridge$prc), avg="threshold", add=TRUE, col=3)
 plot(clean.rocr(res[[1]]$recovery$elnet.fmpr$prc), avg="threshold", add=TRUE, col=4)
 plot(clean.rocr(res[[1]]$recovery$elnet.glmnet$prc), avg="threshold", add=TRUE, col=5)
+
+legend(0, 0,
+   c("FMPR", "Lasso", "Ridge", "ElasticNet-FMPR", "ElasticNet-glmnet"),
+   col=1:5, lwd=3)
 
 dev.off()
 
