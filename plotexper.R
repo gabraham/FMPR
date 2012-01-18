@@ -1,32 +1,49 @@
 
+# Plot the experiment results
+
 library(ROCR)
 library(ggplot2)
 
 pdf(sprintf("Expr%s.pdf", idv), width=12)
 
+ymin <- 0
+ymax <- 1
+xmin <- 0
+xmax <- 1
+
 par(mfrow=c(1, 2))
 
-plot(clean.rocr(res[[1]]$recovery$gr$roc), avg="threshold", col=1, main="ROC")
-plot(clean.rocr(res[[1]]$recovery$lasso$roc), avg="threshold", add=TRUE, col=2)
-plot(clean.rocr(res[[1]]$recovery$ridge$roc), avg="threshold", add=TRUE, col=3, lwd=1)
-plot(clean.rocr(res[[1]]$recovery$elnet.fmpr$roc), avg="threshold", add=TRUE, col=4, lwd=1)
+plot(clean.rocr(res[[1]]$recovery$gr$roc), avg="threshold", col=1, main="ROC",
+      xlim=c(xmin, xmax), ylim=c(ymin, ymax), lwd=3, cex=1.5, cex.axis=1.5,
+      cex.lab=1.5)
+plot(clean.rocr(res[[1]]$recovery$lasso$roc), avg="threshold", add=TRUE,
+      col=2, lwd=3, lty=2)
+plot(clean.rocr(res[[1]]$recovery$ridge$roc), avg="threshold", add=TRUE,
+      col=3, lwd=3, lty=3)
+plot(clean.rocr(res[[1]]$recovery$elnet.fmpr$roc), avg="threshold", add=TRUE,
+      col=4, lwd=3, lty=4)
 plot(clean.rocr(res[[1]]$recovery$elnet.glmnet$roc), avg="threshold", add=TRUE, col=5,
-      lwd=1)
+      lwd=3, lty=5)
 
-legend(0, 0,
+legend(xmin, ymin + 0.25,
    c("FMPR", "Lasso", "Ridge", "ElasticNet-FMPR", "ElasticNet-glmnet"),
-   col=1:5, lwd=3)
+   col=1:5, lwd=3, lty=1:5)
 
 plot(clean.rocr(res[[1]]$recovery$gr$prc), avg="threshold", col=1,
-      main="Precision-Recall")
-plot(clean.rocr(res[[1]]$recovery$lasso$prc), avg="threshold", col=2, add=TRUE)
-plot(clean.rocr(res[[1]]$recovery$ridge$prc), avg="threshold", add=TRUE, col=3)
-plot(clean.rocr(res[[1]]$recovery$elnet.fmpr$prc), avg="threshold", add=TRUE, col=4)
-plot(clean.rocr(res[[1]]$recovery$elnet.glmnet$prc), avg="threshold", add=TRUE, col=5)
+      main="Precision-Recall", ylim=c(ymin, ymax), xlim=c(xmin, xmax), lwd=3,
+      cex=1.5, cex.axis=1.5, cex.lab=1.5)
+plot(clean.rocr(res[[1]]$recovery$lasso$prc), avg="threshold", col=2,
+      add=TRUE, lwd=3, lty=2)
+plot(clean.rocr(res[[1]]$recovery$ridge$prc), avg="threshold", add=TRUE,
+      col=3, lwd=3, lty=3)
+plot(clean.rocr(res[[1]]$recovery$elnet.fmpr$prc), avg="threshold", add=TRUE,
+      col=4, lwd=3, lty=4)
+plot(clean.rocr(res[[1]]$recovery$elnet.glmnet$prc), avg="threshold",
+      add=TRUE, col=5, lwd=3, lty=5)
 
-legend(0, 0,
+legend(xmin, ymin + 0.25,
    c("FMPR", "Lasso", "Ridge", "ElasticNet-FMPR", "ElasticNet-glmnet"),
-   col=1:5, lwd=3)
+   col=1:5, lwd=3, lty=1:5)
 
 dev.off()
 

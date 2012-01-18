@@ -6,12 +6,13 @@ dyn.load("~/Code/L1L2/groupridge.so")
 # lambda1: scalar or K-vector
 # lambda2: scalar or K-vector
 # lambda3: scalar 
-groupridge4 <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
-      maxiter=1e5, eps=1e-8, verbose=FALSE, simplify=FALSE)
+groupridge <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
+      maxiter=1e5, eps=1e-8, type="threshold", verbose=FALSE, simplify=FALSE)
 {
    p <- ncol(X)
    Y <- cbind(Y)
    K <- ncol(Y)
+
 
    #if(length(lambda1) == 1)
    #   lambda1 <- rep(lambda1, K)
@@ -22,16 +23,24 @@ groupridge4 <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
    if(is.null(G))
       G <- matrix(0, K, K)
 
+   if(type == "threshold") {
+      fn <- "groupridge_threshold"
+      g <- as.integer(G)
+   } else {
+      fn <- "groupridge_weighted"
+      g <- as.numeric(G)
+   }
+
    r <- lapply(lambda1, function(l1) {
 	   lapply(lambda2, function(l2) {
 	      lapply(lambda3, function(l3) {
 		  # groupridge expects l1/l2/l3 to be a vector of length K,
 		  # allowing for a different penalty for each task
-		  r <- .C("groupridge4", as.numeric(X), as.numeric(Y), 
+		  r <- .C(fn, as.numeric(X), as.numeric(Y), 
 		     numeric(p * K), nrow(X), ncol(X), K,
       	       	     as.numeric(rep(l1, K)), as.numeric(rep(l2, K)),
 		     as.numeric(rep(l3, K)),
-      	       	     as.integer(G), as.integer(maxiter),
+      	       	     g, as.integer(maxiter),
       	       	     as.double(eps), as.integer(verbose), integer(1),
 		     integer(1))
 		  status <- r[[14]]
@@ -59,7 +68,7 @@ groupridge4 <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
 }
 
 # warm restarts
-groupridge5 <- function(X, Y, B=NULL, lambda1=0, lambda2=0, lambda3=0, G=NULL,
+groupridge.warm <- function(X, Y, B=NULL, lambda1=0, lambda2=0, lambda3=0, G=NULL,
       maxiter=1e5, eps=1e-8, verbose=FALSE)
 {
    p <- ncol(X)
@@ -122,7 +131,7 @@ groupridge5 <- function(X, Y, B=NULL, lambda1=0, lambda2=0, lambda3=0, G=NULL,
    B
 }
 
-lasso3 <- function(X, y, lambda1=0,
+lasso <- function(X, y, lambda1=0,
       maxiter=1e5, eps=1e-8, verbose=FALSE)
 {
    p <- ncol(X)

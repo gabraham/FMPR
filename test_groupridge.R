@@ -10,11 +10,12 @@ library(glmnet)
 
 options(error=dump.frames)
 
-s <- sample(1e6L, 1)
-set.seed(s)
+seed <- sample(1e6L, 1)
+set.seed(seed)
 
-source("eval.R")
 source("methods.R")
+source("eval.R")
+source("exprutil.R")
 
 #groupridge <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, g,
 #      maxiter=1e5, eps=1e-6, verbose=FALSE)
@@ -224,92 +225,95 @@ source("methods.R")
 #   }
 #
 #   Xblock
-#}
+##}
+##
+##R2 <- function(pr, y) 1 - sum((pr - y)^2) / sum((y - mean(y))^2)
 #
-#R2 <- function(pr, y) 1 - sum((pr - y)^2) / sum((y - mean(y))^2)
-
-#################################################################################
-## Test groupridge in standard lasso setting, single task
+##################################################################################
+### Test groupridge in standard lasso setting, single task
+##
+#N <- 5000
+#p <- 20
+#K <- 5
+##G <- diag(K)
+##G[1, 1] <- 1
+##
+### scale to zero mean and unit norm (not unit variance)
+#X0 <- matrix(rnorm(N * p), N, p)
+#B <- matrix(rnorm(p * K, 0, 1), p, K)
+#B[sample(p, p - 10), ] <- 0
+#X <- standardise(X0)
+#Y <- center(X0 %*% B + rnorm(N * K, 0, 1))
 #
-N <- 5000
-p <- 20
-K <- 5
-#G <- diag(K)
-#G[1, 1] <- 1
+#X2 <- standardise(matrix(rnorm(N * p), N, p))
+#Y2 <- center(X2 %*% B + rnorm(N * K, 0, 1))
 #
-## scale to zero mean and unit norm (not unit variance)
-X0 <- matrix(rnorm(N * p), N, p)
-B <- matrix(rnorm(p * K, 0, 1), p, K)
-B[sample(p, p - 10), ] <- 0
-X <- standardise(X0)
-Y <- center(X0 %*% B + rnorm(N * K, 0, 1))
-
-X2 <- standardise(matrix(rnorm(N * p), N, p))
-Y2 <- center(X2 %*% B + rnorm(N * K, 0, 1))
-
-#X[,1:2] <- 0
-l1 <- 0
-g1 <- groupridge4(X, Y, lambda1=l1, eps=1e-10, simplify=TRUE)
-g2 <- sapply(1:K, function(k) {
-   lasso3(X, Y[,k], lambda1=l1, eps=1e-10)
-})
-summary(diag(cor(cbind(g1, g2))))
-mean((g1 - g2)^2)
-
-l1 <- 0.1
-g1 <- groupridge4(X, Y, lambda1=l1, eps=1e-8, simplify=TRUE)
-g2 <- sapply(1:K, function(k) {
-   lasso3(X, Y[,k], lambda1=l1, eps=1e-8)
-})
-summary(diag(cor(cbind(g1, g2))))
-mean((g1 - g2)^2)
-
-Xb <- standardise(blockX(X, p, K))
-g3 <- lasso3(Xb, as.numeric(Y), lambda1=l1, eps=1e-8)
-g3 <- matrix(g3, p, K)
-
-summary(diag(cor(cbind(g1, g3))))
-mean((g1 - g3)^2)
-
-#l1 <- 1
-#s <- sample(0:1, N, TRUE, prob=c(0.2, 0.8))
-#g1 <- groupridge4(scale(X[s == 1, ]), center(Y[s == 1, ]), lambda1=l1, simplify=TRUE)
-#g2 <- groupridge4(scale(X[s == 0, ]), center(Y[s == 0, ]), lambda1=l1, simplify=TRUE)
-#
-#p1 <- scale(X[s != 1, ]) %*% g1
-#p2 <- scale(X[s != 0, ]) %*% g2
-#
-#R2(as.numeric(p1), as.numeric(Y[s != 1]))
-#R2(as.numeric(p2), as.numeric(Y[s != 0]))
+##X[,1:2] <- 0
+#l1 <- 0
+#g1 <- groupridge4(X, Y, lambda1=l1, eps=1e-10, simplify=TRUE)
+#g2 <- sapply(1:K, function(k) {
+#   lasso3(X, Y[,k], lambda1=l1, eps=1e-10)
+#})
+#g3 <- groupridge6(X, Y, lambda1=l1, eps=1e-10, simplify=TRUE)
+#summary(diag(cor(cbind(g1, g2, g3))))
+#mean((g1 - g2)^2)
 #
 #stop()
-
-L1 <- max(maxlambda1(X, Y)) * seq(1, 1e-3, length=20)
-r1 <- crossval.groupridge(X, Y, lambda1=L1, lambda2=0, lambda3=0, nfolds=2) 
-r2 <- crossval.groupridge(X, Y, lambda1=L1, lambda2=0, lambda3=0, nfolds=3) 
-r3 <- crossval.groupridge(X, Y, lambda1=L1, lambda2=0, lambda3=0, nfolds=5) 
-r4 <- crossval.groupridge(X, Y, lambda1=L1, lambda2=0, lambda3=0, nfolds=10) 
-r5 <- crossval.groupridge(X, Y, lambda1=L1, lambda2=0, lambda3=0, nfolds=20) 
-
-l1 <- crossval.lasso(Xb, as.numeric(Y), lambda1=L1, nfolds=2) 
-l2 <- crossval.lasso(Xb, as.numeric(Y), lambda1=L1, nfolds=3) 
-l3 <- crossval.lasso(Xb, as.numeric(Y), lambda1=L1, nfolds=5) 
-l4 <- crossval.lasso(Xb, as.numeric(Y), lambda1=L1, nfolds=10) 
-l5 <- crossval.lasso(Xb, as.numeric(Y), lambda1=L1, nfolds=20) 
-
-s1 <- crossval.groupridge(Xb, as.numeric(Y), lambda1=L1, lambda2=0, lambda3=0, nfolds=2) 
-s2 <- crossval.groupridge(Xb, as.numeric(Y), lambda1=L1, lambda2=0, lambda3=0, nfolds=3) 
-s3 <- crossval.groupridge(Xb, as.numeric(Y), lambda1=L1, lambda2=0, lambda3=0, nfolds=5) 
-s4 <- crossval.groupridge(Xb, as.numeric(Y), lambda1=L1, lambda2=0, lambda3=0, nfolds=10) 
-s5 <- crossval.groupridge(Xb, as.numeric(Y), lambda1=L1, lambda2=0, lambda3=0, nfolds=20) 
-
-par(mfrow=c(1, 3))
-matplot(L1, cbind(r1, r2, r3, r4, r5))
-matplot(L1, cbind(l1, l2, l3, l4, l5))
-matplot(L1, cbind(s1, s2, s3, s4, s5))
-
-stop()
-#g3 <- drop(coef(glmnet(standardise(X), center(Y), lambda=l1,
+#
+#l1 <- 0.1
+#g1 <- groupridge4(X, Y, lambda1=l1, eps=1e-8, simplify=TRUE)
+#g2 <- sapply(1:K, function(k) {
+#   lasso3(X, Y[,k], lambda1=l1, eps=1e-8)
+#})
+#summary(diag(cor(cbind(g1, g2))))
+#mean((g1 - g2)^2)
+#
+#Xb <- standardise(blockX(X, p, K))
+#g3 <- lasso3(Xb, as.numeric(Y), lambda1=l1, eps=1e-8)
+#g3 <- matrix(g3, p, K)
+#
+#summary(diag(cor(cbind(g1, g3))))
+#mean((g1 - g3)^2)
+#
+##l1 <- 1
+##s <- sample(0:1, N, TRUE, prob=c(0.2, 0.8))
+##g1 <- groupridge4(scale(X[s == 1, ]), center(Y[s == 1, ]), lambda1=l1, simplify=TRUE)
+##g2 <- groupridge4(scale(X[s == 0, ]), center(Y[s == 0, ]), lambda1=l1, simplify=TRUE)
+##
+##p1 <- scale(X[s != 1, ]) %*% g1
+##p2 <- scale(X[s != 0, ]) %*% g2
+##
+##R2(as.numeric(p1), as.numeric(Y[s != 1]))
+##R2(as.numeric(p2), as.numeric(Y[s != 0]))
+##
+##stop()
+#
+#L1 <- max(maxlambda1(X, Y)) * seq(1, 1e-3, length=20)
+#r1 <- crossval.groupridge(X, Y, lambda1=L1, lambda2=0, lambda3=0, nfolds=2) 
+#r2 <- crossval.groupridge(X, Y, lambda1=L1, lambda2=0, lambda3=0, nfolds=3) 
+#r3 <- crossval.groupridge(X, Y, lambda1=L1, lambda2=0, lambda3=0, nfolds=5) 
+#r4 <- crossval.groupridge(X, Y, lambda1=L1, lambda2=0, lambda3=0, nfolds=10) 
+#r5 <- crossval.groupridge(X, Y, lambda1=L1, lambda2=0, lambda3=0, nfolds=20) 
+#
+#l1 <- crossval.lasso(Xb, as.numeric(Y), lambda1=L1, nfolds=2) 
+#l2 <- crossval.lasso(Xb, as.numeric(Y), lambda1=L1, nfolds=3) 
+#l3 <- crossval.lasso(Xb, as.numeric(Y), lambda1=L1, nfolds=5) 
+#l4 <- crossval.lasso(Xb, as.numeric(Y), lambda1=L1, nfolds=10) 
+#l5 <- crossval.lasso(Xb, as.numeric(Y), lambda1=L1, nfolds=20) 
+#
+#s1 <- crossval.groupridge(Xb, as.numeric(Y), lambda1=L1, lambda2=0, lambda3=0, nfolds=2) 
+#s2 <- crossval.groupridge(Xb, as.numeric(Y), lambda1=L1, lambda2=0, lambda3=0, nfolds=3) 
+#s3 <- crossval.groupridge(Xb, as.numeric(Y), lambda1=L1, lambda2=0, lambda3=0, nfolds=5) 
+#s4 <- crossval.groupridge(Xb, as.numeric(Y), lambda1=L1, lambda2=0, lambda3=0, nfolds=10) 
+#s5 <- crossval.groupridge(Xb, as.numeric(Y), lambda1=L1, lambda2=0, lambda3=0, nfolds=20) 
+#
+#par(mfrow=c(1, 3))
+#matplot(L1, cbind(r1, r2, r3, r4, r5))
+#matplot(L1, cbind(l1, l2, l3, l4, l5))
+#matplot(L1, cbind(s1, s2, s3, s4, s5))
+#
+#stop()
+##g3 <- drop(coef(glmnet(standardise(X), center(Y), lambda=l1,
 #	    standardize=TRUE)))[-1]
 #r <- cbind(B, g1, g2, g3, g4)
 #cor(r)
@@ -429,48 +433,37 @@ stop()
 
 
 ##################################################################################
-### Test groupridge in multi-task setting, lasso only
-N <- 50
-p <- 10
-K <- 10
-##
-### scale to zero mean and unit norm (not unit variance)
-##X0 <- matrix(rnorm(N * p), N, p)
-##X1 <- sweep(X0, 2, colMeans(X0))
-##X <- sweep(X1, 2, sqrt(diag(crossprod(X1))), FUN="/")
-###B <- matrix(rnorm(p * K), p, K)
-###B[sample(p, p - 10),] <- 0
-##b <- rnorm(p) * sample(0:1, p, TRUE, prob=c(0.9, 0.1))
-##B <- sapply(1:K, function(k) b)
-##
-##Y <- X %*% B
-##
-
-X <- standardise(matrix(rnorm(N * p), N, p))
-#Xb <- standardise(blockX(X, p, K))
-b <- rnorm(p) * sample(0:1, p, TRUE)
-B <- sapply(1:K, function(k) b)
-Y <- scale(X %*% B + rnorm(N * K, 0, 1))
-#y <- scale(as.numeric(Y))
-
-#l <- matrix(lasso3(Xb, y, lambda1=1e-1, maxiter=1e6, verbose=TRUE), p, K)
-#g4 <- groupridge4(X, Y, lambda1=1e-1, maxiter=1e6, verbose=TRUE)
-#g5 <- groupridge5(X, Y, lambda1=1e-1, maxiter=1e6, verbose=TRUE)
-#cor(cbind(as.numeric(l), as.numeric(g4), as.numeric(g5)))
-#mean((g4-g5)^2)
-#mean((l-g5)^2)
-
-R <- cor(Y)
-diag(R) <- 0
-G <- sign(R) * (abs(R) > 0.2)
-#g1 <- optim.groupridge(X, Y, nfolds=10, G=G, maxiter=1e5, verbose=TRUE)
-g2 <- groupridge4(X, Y, G=G, lambda1=1e-3, lambda2=1e-3, lambda3=1e-3,
-      maxiter=1e3)
-class(g2)
-summary(as.numeric(g2))
-
-stop()
+#### Test groupridge in multi-task setting, lasso only
+#N <- 50
+#p <- 10
+#K <- 10
+###
+#### scale to zero mean and unit norm (not unit variance)
+###X0 <- matrix(rnorm(N * p), N, p)
+###X1 <- sweep(X0, 2, colMeans(X0))
+###X <- sweep(X1, 2, sqrt(diag(crossprod(X1))), FUN="/")
+####B <- matrix(rnorm(p * K), p, K)
+####B[sample(p, p - 10),] <- 0
+###b <- rnorm(p) * sample(0:1, p, TRUE, prob=c(0.9, 0.1))
+###B <- sapply(1:K, function(k) b)
+###
+###Y <- X %*% B
+###
+#
+#X <- scale(matrix(rnorm(N * p), N, p))
+#b <- rnorm(p) * sample(0:1, p, TRUE)
+#B <- sapply(1:K, function(k) b)
+#Y <- center(X %*% B + rnorm(N * K, 0, 1))
+#
+#R <- cor(Y)
+#diag(R) <- 0
+#G <- sign(R) * (abs(R) > 0.2)
+#
+#g1 <- groupridge4(X, Y, G=G, lambda1=1e-3, lambda2=1e-3, lambda3=1e-3)
+#g2 <- groupridge4(X, Y, G=abs(R), lambda1=1e-3, lambda2=1e-3, lambda3=1e-3)
+#
 #stop()
+##stop()
 ##g3 <- groupridge3(X, Y, lambda1=1e-2, maxiter=1e6)
 ##l3 <- lasso3(X, Y[,1], lambda1=1e-2, maxiter=1e6)
 ##cor(cbind(g2, g3[,1], l3))
@@ -606,3 +599,53 @@ stop()
 #print(gg2)
 #dev.off()
 #
+
+N <- 100
+p <- 50
+K <- 10 
+B <- getB(p=p, K=K, w=0.5, type="same")
+d <- makedata(N=N, K=K, B=B, p=p, save=FALSE, sigma=1, rep=1)
+
+nfolds <- 5
+ngrid <- 20
+
+R <- cor(d$Ytrain)
+diag(R) <- 0
+Rthresh <- 0.3
+
+Gt <- sign(R) * (abs(R) > Rthresh)
+Gw1 <- abs(R)
+Gw2 <- R^2
+#Gw3 <- cov2cor(ginv(cor(d$Ytrain)))
+
+Xtrain <- scale(d$Xtrain)
+Ytrain <- center(d$Ytrain)
+
+l <- max(maxlambda1(Xtrain, Ytrain))
+
+res <- numeric(3)
+g <- vector("list", 3)
+G <- list(Gt, Gw1, Gw2)
+types <- c("threshold", "weighted", "weighted")
+
+for(i in 1:3)
+{
+   r <- optim.groupridge(X=Xtrain, Y=Ytrain, G=G[[i]],
+         nfolds=nfolds,
+         L1=seq(l, l * 1e-3, length=ngrid),
+         L2=10^seq(-3, 5, length=ngrid),
+         L3=10^seq(-3, 5, length=ngrid),
+         maxiter=1e3, type=types[i])
+   cat("optim.groupridge", types[i], "end\n")
+   g[[i]] <- groupridge(X=Xtrain, Y=Ytrain,
+         lambda1=r$opt[1], lambda2=r$opt[2], lambda3=r$opt[3],
+         maxiter=1e4, G=G[[i]], type=types[i])
+   b <- g[[i]][[1]][[1]][[1]]
+   P <- scale(d$Xtest) %*% b
+   res[i] <- R2(as.numeric(P), as.numeric(center(d$Ytest)))
+   cat(res[i], "\n")
+}
+
+
+
+

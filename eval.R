@@ -36,7 +36,7 @@ crossval.ridge <- function(X, Y, nfolds=5, fun=R2, lambda2)
 }
 
 crossval.groupridge <- function(X, Y, nfolds=5, G=NULL,
-      lambda1, lambda2, lambda3, maxiter=1e5)
+      lambda1, lambda2, lambda3, type, maxiter=1e5)
 {
    N <- nrow(X)
    Y <- cbind(Y)
@@ -47,9 +47,10 @@ crossval.groupridge <- function(X, Y, nfolds=5, G=NULL,
 
    g <- lapply(1:nfolds, function(fold) {
       cat("fold", fold, " ")
-      groupridge4(scale(X[folds != fold, ]),
+      groupridge(scale(X[folds != fold, ]),
 	    center(Y[folds != fold, ]), G=G, maxiter=maxiter,
-	    lambda1=lambda1, lambda2=lambda2, lambda3=lambda3)
+	    lambda1=lambda1, lambda2=lambda2, lambda3=lambda3,
+	    type=type)
    })
    cat("\n")
 
@@ -98,14 +99,15 @@ crossval.elnet.glmnet <- function(X, Y, nfolds=5, fun=R2, lambda1, alpha, ...)
 optim.groupridge <- function(X, Y, nfolds, G=NULL, grid=20,
    L1=seq(0, 10, length=grid),
    L2=seq(0, 10, length=grid),
-   L3=seq(0, 10, length=grid), maxiter=1e5, verbose=FALSE)
+   L3=seq(0, 10, length=grid),
+   type, maxiter=1e5, verbose=FALSE)
 {
    if(is.null(G) || nrow(G) == 1)
       L3 <- 0
 
    r <- crossval.groupridge(X=X, Y=Y, nfolds=nfolds,
       lambda1=L1, lambda2=L2, lambda3=L3,
-      G=G, maxiter=maxiter)
+      G=G, maxiter=maxiter, type=type)
 
    w <- which(r == max(r, na.rm=TRUE), arr.ind=TRUE)
    list(
