@@ -87,5 +87,5 @@ quit;
 
 EOF
 
-matlab -nodisplay -r 'spg'
+matlab -nodisplay -nojvm -nosplash -r 'spg'
 
