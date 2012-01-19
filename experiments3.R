@@ -93,8 +93,8 @@ setup <- list(
 	 B=getB(p=50, K=10, w=0.5, type="random"), Rthresh=0.3),
 
    # Small testing experiment
-   Expr24=list(dir=c("Expr24"), N=100, p=30, K=2, sigma=1,
-	 B=getB(p=30, K=2, w=0.5, type="same"), Rthresh=0.3),
+   Expr24=list(dir=c("Expr24"), N=100, p=20, K=2, sigma=1,
+	 B=getB(p=20, K=2, w=0.5, type="same", sparsity=0.5), Rthresh=0.3),
 
    # High dimensions, increasing p
    Expr25=list(dir=c("Expr25"), N=100, p=100, K=10, sigma=1,
@@ -107,7 +107,7 @@ setup <- list(
 	 B=getB(p=1000, K=10, w=0.5, type="same"), Rthresh=0.3)
 )
 
-res <- lapply(setup[idv], run, nreps=50, grid=20, nfolds=5)
+res <- lapply(setup[idv], run, nreps=5, grid=20, nfolds=5)
 save(setup, res, idv, file=sprintf("results_%s.RData", idv))
 
 ################################################################################

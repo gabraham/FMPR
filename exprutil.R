@@ -6,13 +6,13 @@ makedata <- function(rep, dir=".", N=100, p=50, K=5, B, sigma=0.01,
 {
    cat("rep", rep, "\n")
 
-   Xtrain <- matrix(rnorm(N * p), N, p)
-   Xtest <- matrix(rnorm(N * p), N, p)
+   Xtrain <- scale(matrix(rnorm(N * p), N, p))
+   Xtest <- scale(matrix(rnorm(N * p), N, p))
 
    noiseTrain <- rnorm(N * K, 0, sigma)
    noiseTest <- rnorm(N * K, 0, sigma)
-   Ytrain <- Xtrain %*% B + noiseTrain
-   Ytest <- Xtest %*% B + noiseTest
+   Ytrain <- center(Xtrain %*% B + noiseTrain)
+   Ytest <- center(Xtest %*% B + noiseTest)
 
    if(save) {
       write.table(B, file=sprintf("%s/B_%s.txt", dir, rep),
@@ -39,7 +39,8 @@ makedata <- function(rep, dir=".", N=100, p=50, K=5, B, sigma=0.01,
    }
 }
 
-run.spg <- function(rep, dir=".", nfolds=10, r=25)
+# cortype: 1: |R|, 2: R^2
+run.spg <- function(rep, dir=".", nfolds=10, r=25, Rthresh, cortype)
 {
    oldwd <- getwd()
    setwd(dir)
@@ -47,7 +48,8 @@ run.spg <- function(rep, dir=".", nfolds=10, r=25)
    Xtest <- as.matrix(read.table(sprintf("Xtest_%s.txt", rep), header=FALSE))
    Ytest <- as.matrix(read.table(sprintf("Ytest_%s.txt", rep), header=FALSE))
 
-   system(sprintf("%s/spg.sh %d %d %d", oldwd, rep, nfolds, r))
+   system(sprintf("%s/spg.sh %s %s %s %s %s %s",
+	 oldwd, rep, nfolds, r, ".", Rthresh, cortype))
    B.spg <- as.matrix(read.table(sprintf("spg_beta_%s.txt", rep), header=FALSE))
    P.spg <- Xtest %*% B.spg
    R2.spg <- R2(as.numeric(P.spg), as.numeric(Ytest))
@@ -57,7 +59,7 @@ run.spg <- function(rep, dir=".", nfolds=10, r=25)
 	 header=FALSE))
    P.spg.l <- Xtest %*% B.spg.l
    R2.spg.l <- R2(as.numeric(P.spg.l), as.numeric(Ytest))
-   cat("R2.spg.l:", R2.spg.l, "\n")
+   cat("rep", rep, "R2.spg.l:", R2.spg.l, "\n")
 
    setwd(oldwd)
 
@@ -240,7 +242,7 @@ run.elnet.fmpr <- function(rep, dir=".", nfolds=10, r=25, Rthresh=0.5)
 	 #L2=seq(0, 10, length=r),
 	 L2=10^seq(-3, 5, length=r),
 	 L3=0,
-	 maxiter=1e3)
+	 maxiter=1e3, type="threshold")
    cat("optim.elnet.fmpr end\n")
    g <- groupridge(X=Xtrain, Y=Ytrain,
 	 lambda1=r$opt[1], lambda2=r$opt[2], lambda3=0,
@@ -351,6 +353,14 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
    cat("Simulation done\n")
    
    cat("Running inference\n")
+   r.spg.t <- lapply(1:nreps, run.spg, dir=dir, r=grid, nfolds=nfolds,
+	 Rthresh=setup$Rthresh, cortype=1)
+   r.spg.w1 <- lapply(1:nreps, run.spg, dir=dir, r=grid, nfolds=nfolds,
+	 Rthresh=0, cortype=1)
+   r.spg.w2 <- lapply(1:nreps, run.spg, dir=dir, r=grid, nfolds=nfolds,
+	 Rthresh=0, cortype=2)
+   r.elnet.fmpr <- lapply(1:nreps, run.elnet.fmpr, dir=dir,
+	 r=grid, nfolds=nfolds, Rthresh=setup$Rthresh)
    r.lasso <- lapply(1:nreps, run.lasso, dir=dir, r=grid, nfolds=nfolds)
    r.gr.t <- lapply(1:nreps, run.groupridge, dir=dir, r=grid, nfolds=nfolds,
    	 Rthresh=setup$Rthresh, type="threshold")
@@ -361,9 +371,6 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
    r.ridge <- lapply(1:nreps, run.ridge, dir=dir, r=grid, nfolds=nfolds)
    r.elnet.glmnet <- lapply(1:nreps, run.elnet.glmnet, dir=dir,
 	 r=grid, nfolds=nfolds, Rthresh=setup$Rthresh)
-   r.elnet.fmpr <- lapply(1:nreps, run.elnet.fmpr, dir=dir,
-	 r=grid, nfolds=nfolds, Rthresh=setup$Rthresh)
-   #r.spg <- lapply(1:nreps, run.spg, dir=dir, r=grid, nfolds=nfolds)
    cat("Inference done\n")
 
    # Measure recovery of non-zeros
@@ -399,7 +406,9 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
    R2.ridge <- sapply(r.ridge, function(x) x$R2)
    R2.elnet.fmpr <- sapply(r.elnet.fmpr, function(x) x$R2)
    R2.elnet.glmnet <- sapply(r.elnet.glmnet, function(x) x$R2)
-   #R2.spg <- sapply(r.spg, function(x) x$R2[1])
+   R2.spg.t <- sapply(r.spg.t, function(x) x$R2[1])
+   R2.spg.w1 <- sapply(r.spg.w1, function(x) x$R2[1])
+   R2.spg.w2 <- sapply(r.spg.w2, function(x) x$R2[1])
    
    R2.all <- cbind(
       GRt=R2.gr.t,
@@ -408,8 +417,10 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
       lasso=R2.lasso,
       ridge=R2.ridge,
       ElNetFMPR=R2.elnet.fmpr,
-      ElNetGlmnet=R2.elnet.glmnet
-      #SPG=R2.spg
+      ElNetGlmnet=R2.elnet.glmnet,
+      SPGt=R2.spg.t,
+      SPGw1=R2.spg.w1,
+      SPGw2=R2.spg.w2
    )
 
    rec.gr.t <- recovery(r.gr.t, dir)
@@ -419,7 +430,9 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
    rec.ridge <- recovery(r.ridge, dir)
    rec.elnet.fmpr <- recovery(r.elnet.fmpr, dir)
    rec.elnet.glmnet <- recovery(r.elnet.glmnet, dir)
-   #rec.spg <- recovery(r.spg, dir)
+   rec.spg.t <- recovery(r.spg.t, dir)
+   rec.spg.w1 <- recovery(r.spg.w1, dir)
+   rec.spg.w2 <- recovery(r.spg.w2, dir)
 
    list(
       weights=list(
@@ -429,7 +442,10 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
 	 lasso=r.lasso,
 	 ridge=r.ridge,
 	 elnet.fmpr=r.elnet.fmpr,
-	 elnet.glmnet=r.elnet.glmnet
+	 elnet.glmnet=r.elnet.glmnet,
+	 spg.t=r.spg.t,
+	 spg.w1=r.spg.w1,
+	 spg.w2=r.spg.w2
       ),
       recovery=list(
 	 gr.t=rec.gr.t,
@@ -438,8 +454,10 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
 	 lasso=rec.lasso,
 	 ridge=rec.ridge,
 	 elnet.fmpr=rec.elnet.fmpr,
-	 elnet.glmnet=rec.elnet.glmnet
-	 #, spg=rec.spg),
+	 elnet.glmnet=rec.elnet.glmnet,
+	 spg.t=rec.spg.t,
+	 spg.w1=rec.spg.w1,
+	 spg.w2=rec.spg.w2
       ),
       R2=R2.all
    )
