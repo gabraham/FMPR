@@ -48,8 +48,14 @@ run.spg <- function(rep, dir=".", nfolds=10, r=25, Rthresh, cortype)
    Xtest <- as.matrix(read.table(sprintf("Xtest_%s.txt", rep), header=FALSE))
    Ytest <- as.matrix(read.table(sprintf("Ytest_%s.txt", rep), header=FALSE))
 
-   system(sprintf("%s/spg.sh %s %s %s %s %s %s",
+   fb <- sprintf("spg_beta_%d.txt", rep)
+   if(file.exists(fb)) {
+      warning("in run.spg, file", fb, "already exists, not running SPG again")
+   } else {
+      system(sprintf("%s/spg.sh %s %s %s %s %s %s",
 	 oldwd, rep, nfolds, r, ".", Rthresh, cortype))
+   }
+
    B.spg <- as.matrix(read.table(sprintf("spg_beta_%s.txt", rep), header=FALSE))
    P.spg <- Xtest %*% B.spg
    R2.spg <- R2(as.numeric(P.spg), as.numeric(Ytest))
@@ -339,6 +345,58 @@ getB <- function(p, K, w, sparsity=0.8, type=NULL)
    B
 }
 
+# Remove ROC/PRC replications that had non-sensical results
+clean.rocr <- function(obj)
+{
+   n <- length(obj@x.values)
+   len <- sapply(obj@x.values, length)
+   w <- len > 2
+   obj@x.values <- obj@x.values[w]
+   obj@y.values <- obj@y.values[w]
+   obj@alpha.values <- obj@alpha.values[w]
+   obj
+}
+
+# Measure recovery of non-zeros
+recovery <- function(obj, rep, dir)
+{
+   beta <- sapply(seq(along=obj), function(rep) {
+      m <- as.matrix(read.table(sprintf("%s/B_%s.txt", dir, rep)))
+      as.numeric(m)
+   })
+
+   betahat <- sapply(obj, function(r) as.numeric(abs(r$beta)))
+
+   pred <- prediction(
+         predictions=betahat,
+         labels=beta != 0
+   )
+   roc <- performance(pred, "sens", "spec")
+   prc <- performance(pred, "prec", "rec")
+   auc <- performance(pred, "auc")
+
+   if(cleanROCR) {
+      roc <- clean.rocr(roc)
+      prc <- clean.rocr(prc)
+      auc <- clean.rocr(auc)
+   }
+   list(roc=roc, prc=prc, auc=auc)
+}
+
+#run.reps <- function(fun, setup)
+#{
+#   r <- lapply(1:nreps, function(rep) do.call(fun, list(rep=rep, setup=setup)))
+#   r2 <- sapply(r, function(x) x$R2)
+#   rec <- lapply(1:nreps, function(rep) recovery(r, rep, setup$dir))
+#   
+#   list(
+#      weights=r,
+#      recovery=rec,
+#      R2=r2
+#   )
+#}
+
+
 # Evaluate methods over each setup
 run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
 {
@@ -373,32 +431,7 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
 	 r=grid, nfolds=nfolds, Rthresh=setup$Rthresh)
    cat("Inference done\n")
 
-   # Measure recovery of non-zeros
-   recovery <- function(obj, dir)
-   {
-      beta <- sapply(seq(along=obj), function(rep) {
-         m <- as.matrix(read.table(sprintf("%s/B_%s.txt", dir, rep)))
-	 as.numeric(m)
-      })
-
-      betahat <- sapply(obj, function(r) as.numeric(abs(r$beta)))
-
-      pred <- prediction(
-	    predictions=betahat,
-	    labels=beta != 0
-      )
-      roc <- performance(pred, "sens", "spec")
-      prc <- performance(pred, "prec", "rec")
-      auc <- performance(pred, "auc")
-
-      if(cleanROCR) {
-	 roc <- clean.rocr(roc)
-	 prc <- clean.rocr(prc)
-	 auc <- clean.rocr(auc)
-      }
-      list(roc=roc, prc=prc, auc=auc)
-   }
-   
+     
    R2.gr.t <- sapply(r.gr.t, function(x) x$R2)
    R2.gr.w1 <- sapply(r.gr.w1, function(x) x$R2)
    R2.gr.w2 <- sapply(r.gr.w2, function(x) x$R2)
@@ -423,16 +456,16 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
       SPGw2=R2.spg.w2
    )
 
-   rec.gr.t <- recovery(r.gr.t, dir)
-   rec.gr.w1 <- recovery(r.gr.w1, dir)
-   rec.gr.w2 <- recovery(r.gr.w2, dir)
-   rec.lasso <- recovery(r.lasso, dir)
-   rec.ridge <- recovery(r.ridge, dir)
-   rec.elnet.fmpr <- recovery(r.elnet.fmpr, dir)
-   rec.elnet.glmnet <- recovery(r.elnet.glmnet, dir)
-   rec.spg.t <- recovery(r.spg.t, dir)
-   rec.spg.w1 <- recovery(r.spg.w1, dir)
-   rec.spg.w2 <- recovery(r.spg.w2, dir)
+   rec.gr.t <- recovery(r.gr.t, rep, dir)
+   rec.gr.w1 <- recovery(r.gr.w1, rep, dir)
+   rec.gr.w2 <- recovery(r.gr.w2, rep, dir)
+   rec.lasso <- recovery(r.lasso, rep, dir)
+   rec.ridge <- recovery(r.ridge, rep, dir)
+   rec.elnet.fmpr <- recovery(r.elnet.fmpr, rep, dir)
+   rec.elnet.glmnet <- recovery(r.elnet.glmnet, rep, dir)
+   rec.spg.t <- recovery(r.spg.t, rep, dir)
+   rec.spg.w1 <- recovery(r.spg.w1, rep, dir)
+   rec.spg.w2 <- recovery(r.spg.w2, rep, dir)
 
    list(
       weights=list(
@@ -461,17 +494,5 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
       ),
       R2=R2.all
    )
-}
-
-# Remove ROC/PRC replications that had non-sensical results
-clean.rocr <- function(obj)
-{
-   n <- length(obj@x.values)
-   len <- sapply(obj@x.values, length)
-   w <- len > 2
-   obj@x.values <- obj@x.values[w]
-   obj@y.values <- obj@y.values[w]
-   obj@alpha.values <- obj@alpha.values[w]
-   obj
 }
 
