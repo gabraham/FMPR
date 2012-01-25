@@ -32,8 +32,8 @@ K = size(Y, 2);
 % find best hyperparameters using cross-validation, as measure by mean-squared
 % error
 folds = ceil(rand(N, 1) * nfolds);
-gamma = linspace(1e-6, 10, r);
-lambda = linspace(1e-6, 10, r);
+gamma = 10.^linspace(1e-3, 5, r);
+lambda = 10.^linspace(1e-3, 5, r);
 err = zeros(r, r, nfolds);
 errl = zeros(r, nfolds);
 
@@ -87,5 +87,5 @@ quit;
 
 EOF
 
-matlab -nodisplay -nojvm -nosplash -r 'spg'
+matlab -nodisplay -nojvm -nosplash -singleCompThread -r 'spg'
 

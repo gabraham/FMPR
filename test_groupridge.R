@@ -602,12 +602,12 @@ source("exprutil.R")
 
 N <- 100
 p <- 50
-K <- 1000
+K <- 10
 B <- getB(p=p, K=K, w=0.5, type="same")
-d <- makedata(N=N, K=K, B=B, p=p, save=FALSE, sigma=2, rep=1)
+d <- makedata(N=N, K=K, B=B, p=p, save=FALSE, sigma=1, rep=1)
 
 nfolds <- 5
-ngrid <- 20
+ngrid <- 10
 
 R <- cor(d$Ytrain)
 diag(R) <- 0
@@ -628,33 +628,36 @@ g <- vector("list", 3)
 G <- list(Gt, Gw1, Gw2)
 types <- c("threshold", "weighted", "weighted")
 
-#for(i in 1:3)
-#{
-#   system.time({
-#   r <- optim.groupridge(X=Xtrain, Y=Ytrain, G=G[[i]],
-#         nfolds=nfolds,
-#         L1=seq(l, l * 1e-3, length=ngrid),
-#         L2=10^seq(-3, 5, length=ngrid),
-#         L3=10^seq(-3, 5, length=ngrid),
-#         maxiter=1e3, type=types[i])
-#   })
-#   cat("optim.groupridge", types[i], "end\n")
-#   system.time({
-#   g[[i]] <- groupridge(X=Xtrain, Y=Ytrain,
-#         lambda1=r$opt[1], lambda2=r$opt[2], lambda3=r$opt[3],
-#         maxiter=1e4, G=G[[i]], type=types[i])
-#   })
-#   b <- g[[i]][[1]][[1]][[1]]
-#   P <- scale(d$Xtest) %*% b
-#   res[i] <- R2(as.numeric(P), as.numeric(center(d$Ytest)))
-#   cat(res[i], "\n")
-#}
-#
+l <- max(maxlambda1(Xtrain, Ytrain))
 
+L1 <- l * seq(1, 1e-3, length=ngrid)
+L2 <- seq(0, 10, length=ngrid)
+L3 <- seq(0, 10, length=ngrid)
 
 system.time({
-   g <- groupridge(X=Xtrain, Y=Ytrain,
-      lambda1=1e-3, lambda2=1e-3, lambda3=1e-3,
-      maxiter=1e4, G=Gt, type="threshold")
+   g1 <- groupridge(X=Xtrain, Y=Ytrain,
+      lambda1=L1,
+      lambda2=L2,
+      lambda3=L3,
+      maxiter=1e5, G=Gt, type="threshold", verbose=TRUE)
 })
+
+system.time({
+   g2 <- groupridge(X=Xtrain, Y=Ytrain,
+      lambda1=L1,
+      lambda2=L2,
+      lambda3=L3,
+      maxiter=1e5, G=Gt, type="threshold", verbose=TRUE)
+})
+
+mse <- sapply(seq(along=L1), function(i) {
+   sapply(seq(along=L2), function(j) {
+      sapply(seq(along=L3), function(k) {
+	 mean((g1[[i]][[j]][[k]] - g2[[i]][[j]][[k]])^2)
+      })
+   })
+})
+
+summary(as.numeric(mse))
+
 

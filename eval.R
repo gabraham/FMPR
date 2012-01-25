@@ -36,7 +36,7 @@ crossval.ridge <- function(X, Y, nfolds=5, fun=R2, lambda2)
 }
 
 crossval.groupridge <- function(X, Y, nfolds=5, G=NULL,
-      lambda1, lambda2, lambda3, type, maxiter=1e5)
+      lambda1, lambda2, lambda3, type, maxiter=1e5, verbose=FALSE)
 {
    N <- nrow(X)
    Y <- cbind(Y)
@@ -50,7 +50,7 @@ crossval.groupridge <- function(X, Y, nfolds=5, G=NULL,
       groupridge(scale(X[folds != fold, ]),
 	    center(Y[folds != fold, ]), G=G, maxiter=maxiter,
 	    lambda1=lambda1, lambda2=lambda2, lambda3=lambda3,
-	    type=type)
+	    type=type, verbose=verbose)
    })
    cat("\n")
 
@@ -102,12 +102,19 @@ optim.groupridge <- function(X, Y, nfolds, G=NULL, grid=20,
    L3=seq(0, 10, length=grid),
    type, maxiter=1e5, verbose=FALSE)
 {
+   # The L2 and L3 penalties must be in increasing order.
+   # L1 should be in decreasing order.
+   # This allows for certain optimisations in groupridge.
+   L1 <- sort(L1, decreasing=TRUE)
+   L2 <- sort(L2)
+   L3 <- sort(L3)
+
    if(is.null(G) || nrow(G) == 1)
       L3 <- 0
 
    r <- crossval.groupridge(X=X, Y=Y, nfolds=nfolds,
       lambda1=L1, lambda2=L2, lambda3=L3,
-      G=G, maxiter=maxiter, type=type)
+      G=G, maxiter=maxiter, type=type, verbose=verbose)
 
    w <- which(r == max(r, na.rm=TRUE), arr.ind=TRUE)
    list(

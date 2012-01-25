@@ -3,16 +3,18 @@
 
 dyn.load("~/Code/L1L2/groupridge.so")
 
+require(Matrix)
+
 # lambda1: scalar or K-vector
 # lambda2: scalar or K-vector
 # lambda3: scalar 
 groupridge <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
-      maxiter=1e5, eps=1e-8, type="threshold", verbose=FALSE, simplify=FALSE)
+      maxiter=1e5, eps=1e-8, type="threshold", verbose=FALSE, simplify=FALSE,
+      sparse=TRUE)
 {
    p <- ncol(X)
    Y <- cbind(Y)
    K <- ncol(Y)
-
 
    #if(length(lambda1) == 1)
    #   lambda1 <- rep(lambda1, K)
@@ -31,39 +33,71 @@ groupridge <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
       g <- as.numeric(G)
    }
 
-   r <- lapply(lambda1, function(l1) {
-	   lapply(lambda2, function(l2) {
-	      lapply(lambda3, function(l3) {
-		  # groupridge expects l1/l2/l3 to be a vector of length K,
-		  # allowing for a different penalty for each task
-		  r <- .C(fn, as.numeric(X), as.numeric(Y), 
-		     numeric(p * K), nrow(X), ncol(X), K,
-      	       	     as.numeric(rep(l1, K)), as.numeric(rep(l2, K)),
-		     as.numeric(rep(l3, K)),
-      	       	     g, as.integer(maxiter),
-      	       	     as.double(eps), as.integer(verbose), integer(1),
-		     integer(1))
-		  status <- r[[14]]
-		  if(!status) {
-		  warning("groupridge failed to converge within ",
-		     maxiter, " iterations")
-		  } else if(verbose) {
-		     cat("converged in", r[[15]], "iterations\n")
-		  }
-		     
-		  m <- matrix(r[[3]], p, K)
-		  if(any(is.na(m))) browser()
-		  m
-	      })
-	   })
+   B0 <- if(sparse) {
+      sparseMatrix(i={}, j={}, dims=c(p, K))
+   } else {
+      matrix(0, p, K)
+   }
+   
+   res <- lapply(seq(along=lambda1), function(i) {
+      lapply(seq(along=lambda2), function(j) {
+	 lapply(seq(along=lambda3), function(k) {
+	    B0 
+	 })
+      })
    })
+
+   #nz <- matrix(0, 
+
+   # Assumes that lambda2, lambda3 are sorted in
+   # increasing order, and that lambda1 is in decreasing order
+   for(i in seq(along=lambda1))
+   {
+      for(j in seq(along=lambda2))
+      {
+	 # lambda2 is in increasing order. If a given lambda1 value
+	 # with the previous lambda2 produces a model with all zeros,
+	 # then the next lambda2 will also be all zero since
+	 # increasing lambda2 only reduces the gradient.
+
+	 for(k in seq(along=lambda3))
+	 {
+	    # groupridge expects l1/l2/l3 to be a vector of length K,
+	    # allowing for a different penalty for each task, but we
+	    # don't use this feature here
+	    r <- .C(fn, as.numeric(X), as.numeric(Y), 
+	       numeric(p * K), nrow(X), ncol(X), K,
+       	       as.numeric(rep(lambda1[i], K)),
+	       as.numeric(rep(lambda2[j], K)),
+	       as.numeric(rep(lambda3[k], K)),
+       	       g, as.integer(maxiter),
+       	       as.double(eps), as.integer(verbose), integer(1),
+	       integer(1)
+	    )
+	    status <- r[[14]]
+	    if(!status) {
+	       warning("groupridge failed to converge within ",
+	          maxiter, " iterations")
+	    } else if(verbose) {
+	       cat("converged in", r[[15]], "iterations\n\n")
+	    }
+	       
+	    m <- matrix(r[[3]], p, K)
+
+	    res[[i]][[j]][[k]] <- if(sparse) {
+	       w <- which(m != 0, arr.ind=TRUE)
+	       sparseMatrix(i=w[,1], w[,2], x=m[w], dims=c(p, K))
+	    } else m
+	 }
+      }
+   }
 
    if(simplify && length(lambda1) == 1 
       && length(lambda2) == 1 
       && length(lambda3) == 1) {
-      r[[1]][[1]][[1]]
+      res[[1]][[1]][[1]]
    } else {
-      r
+      res
    }
 }
 
