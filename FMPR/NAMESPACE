@@ -1,0 +1,19 @@
+useDynLib(FMPR)
+export(
+   "optim.fmpr",
+   "fmpr",
+   "crossval.fmpr",
+   "optim.lasso",
+   "lasso",
+   "crossval.lasso",
+   "maxlambda1",
+   "getB",
+   "ridge",
+   "blockX",
+   "makedata",
+   "run.lasso",
+   "recovery",
+   "center"
+)
+
+
