@@ -1,6 +1,8 @@
 
 # Wrappers for calling lasso and groupridge
 
+require(foreach)
+
 dyn.load("~/Code/L1L2/groupridge.so")
 
 require(Matrix)
@@ -51,17 +53,17 @@ groupridge <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
 
    # Assumes that lambda2, lambda3 are sorted in
    # increasing order, and that lambda1 is in decreasing order
-   for(i in seq(along=lambda1))
-   {
-      for(j in seq(along=lambda2))
-      {
+   #for(i in seq(along=lambda1))
+   foreach(i=seq(along=lambda1)) %dopar% {
+      #for(j in seq(along=lambda2))
+      foreach(j=seq(along=lambda2)) %dopar% {
 	 # lambda2 is in increasing order. If a given lambda1 value
 	 # with the previous lambda2 produces a model with all zeros,
 	 # then the next lambda2 will also be all zero since
 	 # increasing lambda2 only reduces the gradient.
 
-	 for(k in seq(along=lambda3))
-	 {
+	 #for(k in seq(along=lambda3))
+	 foreach(k=seq(along=lambda3)) %dopar% {
 	    # groupridge expects l1/l2/l3 to be a vector of length K,
 	    # allowing for a different penalty for each task, but we
 	    # don't use this feature here

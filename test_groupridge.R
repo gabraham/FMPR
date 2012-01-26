@@ -17,6 +17,9 @@ source("methods.R")
 source("eval.R")
 source("exprutil.R")
 
+library(doMC)
+registerDoMC()
+
 #groupridge <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, g,
 #      maxiter=1e5, eps=1e-6, verbose=FALSE)
 #{
