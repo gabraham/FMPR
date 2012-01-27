@@ -60,7 +60,8 @@ fmpr <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
 	 foreach(k=seq(along=lambda3)) %dopar% {
 	    # fmpr expects l1/l2/l3 to be a vector of length K,
 	    # allowing for a different penalty for each task, but we
-	    # don't use this feature here
+	    # don't use this feature here, we use the same penalty for all
+	    # tasks
 	    r <- .C(fn, as.numeric(X), as.numeric(Y), 
 	       numeric(p * K), nrow(X), ncol(X), K,
        	       as.numeric(rep(lambda1[i], K)),

@@ -20,7 +20,6 @@ set.seed(seed)
 library(FMPR)
 
 library(doMC)
-registerDoMC()
 
 #groupridge <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, g,
 #      maxiter=1e5, eps=1e-6, verbose=FALSE)
@@ -606,13 +605,13 @@ registerDoMC()
 #
 
 N <- 100
-p <- 50
+p <- 100
 K <- 10
 B <- getB(p=p, K=K, w=0.5, type="same")
 d <- makedata(N=N, K=K, B=B, p=p, save=FALSE, sigma=1, rep=1)
 
 nfolds <- 5
-ngrid <- 10
+ngrid <- 20
 
 R <- cor(d$Ytrain)
 diag(R) <- 0
@@ -639,6 +638,7 @@ L1 <- l * seq(1, 1e-3, length=ngrid)
 L2 <- seq(0, 10, length=ngrid)
 L3 <- seq(0, 10, length=ngrid)
 
+registerDoMC(cores=1)
 system.time({
    g1 <- fmpr(X=Xtrain, Y=Ytrain,
       lambda1=L1,
@@ -647,6 +647,7 @@ system.time({
       maxiter=1e5, G=Gt, type="threshold", verbose=FALSE)
 })
 
+registerDoMC(cores=2)
 system.time({
    g2 <- fmpr(X=Xtrain, Y=Ytrain,
       lambda1=L1,

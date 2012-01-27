@@ -88,6 +88,16 @@ mytheme <- function(base_size=10)
 
 r2 <- melt(res[[1]]$R2)
 colnames(r2) <- c("Replication", "Method", "R2")
+m <- as.character(r2$Method)
+m[m == "GRt"] <- "FMPR-t"
+m[m == "GRw1"] <- "FMPR-w1"
+m[m == "GRw2"] <- "FMPR-w2"
+m[m == "SPGt"] <-  "GFlasso-t"
+m[m == "SPGw1"] <- "GFlasso-w1"
+m[m == "SPGw2"] <- "GFlasso-w2"
+m[m == "lasso"] <- "Lasso"
+m[m == "ridge"] <- "Ridge"
+r2$Method <- factor(m)
 g <- ggplot(r2, aes(Method, R2))
 g <- g + geom_boxplot()
 g <- g + scale_y_continuous(expression(R^2))

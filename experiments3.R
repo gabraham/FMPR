@@ -17,6 +17,9 @@ idv <- as.integer(idv)
 library(ROCR)
 library(glmnet)
 library(ggplot2)
+library(FMPR)
+library(doMC)
+registerDoMC(cores=2)
 
 options(error=dump.frames)
 
@@ -24,9 +27,9 @@ seed <- sample(1e6L, 1)
 #seed <- 705168
 set.seed(seed)
 
-source("methods.R")
-source("eval.R")
-source("exprutil.R")
+#source("methods.R")
+#source("eval.R")
+#source("exprutil.R")
 
 ################################################################################
 # Configure the experiments here
@@ -93,7 +96,7 @@ setup <- list(
 	 B=getB(p=50, K=10, w=0.5, type="random"), Rthresh=0.3),
 
    # Small testing experiment
-   Expr24=list(dir=c("Expr24"), N=100, p=20, K=2, sigma=1,
+   Expr24=list(dir=c("Expr24"), N=50, p=20, K=2, sigma=1,
 	 B=getB(p=20, K=2, w=0.5, type="same", sparsity=0.5), Rthresh=0.3),
 
    # High dimensions, increasing p
@@ -109,7 +112,7 @@ setup <- list(
 
 
 nreps <- 50
-grid <- 10
+grid <- 3
 nfolds <- 5
 
 # Don't call SPG automatically because it's too slow
@@ -124,7 +127,9 @@ do.spg <- function()
    res
 }
 
-res <- lapply(setup[idv], run, nreps=nreps, grid=grid, nfolds=nfolds)
+system.time({
+   res <- lapply(setup[idv], run, nreps=nreps, grid=grid, nfolds=nfolds)
+})
 save(setup, res, idv, file=sprintf("results_%s.RData", idv))
 res <- do.spg()
 save(setup, res, idv, file=sprintf("results_%s.RData", idv))

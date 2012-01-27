@@ -1,9 +1,10 @@
 useDynLib(FMPR)
 export(
    "optim.fmpr",
+   "optim.lasso",
+   "optim.elnet",
    "fmpr",
    "crossval.fmpr",
-   "optim.lasso",
    "lasso",
    "crossval.lasso",
    "maxlambda1",
@@ -13,7 +14,8 @@ export(
    "makedata",
    "run.lasso",
    "recovery",
-   "center"
+   "center",
+   "run"
 )
 
 
