@@ -2,20 +2,25 @@ useDynLib(FMPR)
 export(
    "optim.fmpr",
    "optim.lasso",
-   "optim.elnet",
-   "fmpr",
+   "optim.elnet.glmnet",
+   "optim.ridge",
    "crossval.fmpr",
-   "lasso",
    "crossval.lasso",
+   "crossval.elnet.glmnet",
+   "crossval.ridge",
+   "fmpr",
+   "lasso",
+   "ridge",
+   "fmpr.warm",
    "maxlambda1",
    "getB",
-   "ridge",
    "blockX",
    "makedata",
    "run.lasso",
    "recovery",
    "center",
-   "run"
+   "run",
+   "R2"
 )
 
 

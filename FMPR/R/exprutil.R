@@ -4,8 +4,6 @@
 makedata <- function(rep, dir=".", N=100, p=50, K=5, B, sigma=0.01,
       save=TRUE)
 {
-   cat("rep", rep, "\n")
-
    Xtrain <- scale(matrix(rnorm(N * p), N, p))
    Xtest <- scale(matrix(rnorm(N * p), N, p))
 
@@ -343,18 +341,6 @@ getB <- function(p, K, w, sparsity=0.8, type=NULL)
    }
 
    B
-}
-
-# Remove ROC/PRC replications that had non-sensical results
-clean.rocr <- function(obj)
-{
-   n <- length(obj@x.values)
-   len <- sapply(obj@x.values, length)
-   w <- len > 2
-   obj@x.values <- obj@x.values[w]
-   obj@y.values <- obj@y.values[w]
-   obj@alpha.values <- obj@alpha.values[w]
-   obj
 }
 
 # Measure recovery of non-zeros

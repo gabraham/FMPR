@@ -11,15 +11,18 @@ library(glmnet)
 options(error=dump.frames)
 
 seed <- sample(1e6L, 1)
-set.seed(seed)
+set.seed(189798)
 
 #source("methods.R")
 #source("eval.R")
 #source("exprutil.R")
 
+try({
+   detach("package:FMPR", unload=TRUE)
+})
 library(FMPR)
 
-library(doMC)
+#library(doMC)
 
 #groupridge <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, g,
 #      maxiter=1e5, eps=1e-6, verbose=FALSE)
@@ -611,7 +614,7 @@ B <- getB(p=p, K=K, w=0.5, type="same")
 d <- makedata(N=N, K=K, B=B, p=p, save=FALSE, sigma=1, rep=1)
 
 nfolds <- 5
-ngrid <- 20
+ngrid <- 10
 
 R <- cor(d$Ytrain)
 diag(R) <- 0
@@ -620,7 +623,6 @@ Rthresh <- 0.3
 Gt <- sign(R) * (abs(R) > Rthresh)
 Gw1 <- abs(R)
 Gw2 <- R^2
-#Gw3 <- cov2cor(ginv(cor(d$Ytrain)))
 
 Xtrain <- scale(d$Xtrain)
 Ytrain <- center(d$Ytrain)
@@ -635,35 +637,54 @@ types <- c("threshold", "weighted", "weighted")
 l <- max(maxlambda1(Xtrain, Ytrain))
 
 L1 <- l * seq(1, 1e-3, length=ngrid)
-L2 <- seq(0, 10, length=ngrid)
-L3 <- seq(0, 10, length=ngrid)
+L2 <- 10^seq(-3, 5, length=ngrid)
+L3 <- 10^seq(-3, 5, length=ngrid)
+#L1 <- l * 0.9
+#L2 <- 1e-3
+#L3 <- 1e-3
 
-registerDoMC(cores=1)
+#X <- Xtrain
+#Y <- Ytrain
+#Bt <- numeric(p * K)
+#LPt <- numeric(N * K)
+#lambda1 <- L1[1]
+#lambda2 <- L2[1]
+#lambda3 <- L3[1]
+#g <- as.integer(Gt)
+#eps <- 1e-8
+verbose <- FALSE
+maxiter <- 1e4
+
+#r <- .C("fmpr_threshold_warm", as.numeric(X), as.numeric(Y), 
+#	       Bt, LPt, nrow(X), ncol(X), K,
+#       	       as.numeric(rep(lambda1, K)),
+#	       as.numeric(rep(lambda2, K)),
+#	       as.numeric(rep(lambda3, K)),
+#       	       g, as.integer(maxiter),
+#       	       as.double(eps), as.integer(verbose), integer(1),
+#	       integer(1)
+#      )
+
 system.time({
    g1 <- fmpr(X=Xtrain, Y=Ytrain,
-      lambda1=L1,
-      lambda2=L2,
-      lambda3=L3,
-      maxiter=1e5, G=Gt, type="threshold", verbose=FALSE)
+      lambda1=L1, lambda2=L2, lambda3=L3,
+      maxiter=maxiter, G=Gt, type="threshold", verbose=verbose)
 })
 
-registerDoMC(cores=2)
 system.time({
-   g2 <- fmpr(X=Xtrain, Y=Ytrain,
-      lambda1=L1,
-      lambda2=L2,
-      lambda3=L3,
-      maxiter=1e5, G=Gt, type="threshold", verbose=FALSE)
+   g2 <- fmpr.warm(X=Xtrain, Y=Ytrain,
+      lambda1=L1, lambda2=L2, lambda3=L3,
+      maxiter=maxiter, G=Gt, type="threshold", verbose=verbose)
 })
-
-mse <- sapply(seq(along=L1), function(i) {
-   sapply(seq(along=L2), function(j) {
-      sapply(seq(along=L3), function(k) {
-	 mean((g1[[i]][[j]][[k]] - g2[[i]][[j]][[k]])^2)
-      })
-   })
-})
-
-summary(as.numeric(mse))
-
-
+#
+#mse <- sapply(seq(along=L1), function(i) {
+#   sapply(seq(along=L2), function(j) {
+#      sapply(seq(along=L3), function(k) {
+#	 mean((g1[[i]][[j]][[k]] - g2[[i]][[j]][[k]])^2)
+#      })
+#   })
+#})
+#
+#summary(as.numeric(mse))
+#
+#

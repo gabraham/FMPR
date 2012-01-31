@@ -6,7 +6,7 @@
 # lambda3: scalar 
 fmpr <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
       maxiter=1e5, eps=1e-8, type="threshold", verbose=FALSE, simplify=FALSE,
-      sparse=TRUE)
+      sparse=TRUE, nzmax=NULL)
 {
    p <- ncol(X)
    Y <- cbind(Y)
@@ -35,33 +35,23 @@ fmpr <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
       matrix(0, p, K)
    }
    
-   res <- lapply(seq(along=lambda1), function(i) {
-      lapply(seq(along=lambda2), function(j) {
-	 lapply(seq(along=lambda3), function(k) {
-	    B0 
-	 })
-      })
-   })
+   #B <- lapply(seq(along=lambda1), function(i) {
+   #   lapply(seq(along=lambda2), function(j) {
+   #      lapply(seq(along=lambda3), function(k) {
+   #         B0 
+   #      })
+   #   })
+   #})
 
-   #nz <- matrix(0, 
-
-   # Assumes that lambda2, lambda3 are sorted in
-   # increasing order, and that lambda1 is in decreasing order
-   #for(i in seq(along=lambda1))
-   foreach(i=seq(along=lambda1)) %dopar% {
-      #for(j in seq(along=lambda2))
+   B <- foreach(i=seq(along=lambda1)) %dopar% {
       foreach(j=seq(along=lambda2)) %dopar% {
-	 # lambda2 is in increasing order. If a given lambda1 value
-	 # with the previous lambda2 produces a model with all zeros,
-	 # then the next lambda2 will also be all zero since
-	 # increasing lambda2 only reduces the gradient.
-
-	 #for(k in seq(along=lambda3))
 	 foreach(k=seq(along=lambda3)) %dopar% {
 	    # fmpr expects l1/l2/l3 to be a vector of length K,
 	    # allowing for a different penalty for each task, but we
 	    # don't use this feature here, we use the same penalty for all
 	    # tasks
+	    if(verbose)
+	       cat("\t", i, j, k, "\n")
 	    r <- .C(fn, as.numeric(X), as.numeric(Y), 
 	       numeric(p * K), nrow(X), ncol(X), K,
        	       as.numeric(rep(lambda1[i], K)),
@@ -81,7 +71,7 @@ fmpr <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
 	       
 	    m <- matrix(r[[3]], p, K)
 
-	    res[[i]][[j]][[k]] <- if(sparse) {
+	    if(sparse) {
 	       w <- which(m != 0, arr.ind=TRUE)
 	       sparseMatrix(i=w[,1], w[,2], x=m[w], dims=c(p, K))
 	    } else m
@@ -92,15 +82,15 @@ fmpr <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
    if(simplify && length(lambda1) == 1 
       && length(lambda2) == 1 
       && length(lambda3) == 1) {
-      res[[1]][[1]][[1]]
+      B[[1]][[1]][[1]]
    } else {
-      res
+      B
    }
 }
 
-# warm restarts
-fmpr.warm <- function(X, Y, B=NULL, lambda1=0, lambda2=0, lambda3=0, G=NULL,
-      maxiter=1e5, eps=1e-8, verbose=FALSE)
+fmpr.warm <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
+      maxiter=1e5, eps=1e-8, type="threshold", verbose=FALSE, simplify=FALSE,
+      sparse=TRUE)
 {
    p <- ncol(X)
    Y <- cbind(Y)
@@ -112,54 +102,94 @@ fmpr.warm <- function(X, Y, B=NULL, lambda1=0, lambda2=0, lambda3=0, G=NULL,
    #if(length(lambda2) == 1)
    #   lambda2 <- rep(lambda2, K)
 
+   if(type != "threshold")
+      stop("type ", type, " currently not suppored in fmpr.warm")
+   fn <- "fmpr_threshold_warm"
+
    if(is.null(G))
       G <- matrix(0, K, K)
 
-   #if(is.null(B)) {
-   #   LP <- numeric(N * K)
+   g <- as.integer(G)
+   
+
+   #if(type == "threshold") {
+   #   fn <- "fmpr_threshold"
+   #   g <- as.integer(G)
    #} else {
-   #   LP <- as.numeric(X %*% B)
+   #   fn <- "fmpr_weighted"
+   #   g <- as.numeric(G)
    #}
 
-   len1 <- length(lambda1)
-   len2 <- length(lambda2)
-   len3 <- length(lambda3)
+   if(sparse) {
+      B0 <- sparseMatrix(i={}, j={}, dims=c(p, K))
+      LP0 <- sparseMatrix(i={}, j={}, dims=c(N, K))
+   } else {
+      B0 <- matrix(0, p, K)
+      LP0 <- matrix(0, N, K)
+   }
 
-   B <- array(0, c(len1, len2, len3, p, K))
-   LP <- array(0, c(len1, len2, len3, N, K))
-   
-   for(i in 1:len1)
-   {
-      L <- if(i == 1) {
-	 numeric(N * K) 
-      } else {
-	 LP[i - 1, j, k , ,]
-      }
-      for(j in 1:len2)
-      {
-	 for(k in 1:len3)
-	 {
-	    r <- .C("fmpr5", as.numeric(X), as.numeric(Y), 
-	       as.numeric(B[i, j, k, , ]), as.numeric(L),
-	       nrow(X), ncol(X), K,
-	       as.numeric(rep(lambda1[i], K)), as.numeric(rep(lambda2[j], K)),
+   #B <- lapply(seq(along=lambda1), function(i) {
+   #   lapply(seq(along=lambda2), function(j) {
+   #      lapply(seq(along=lambda3), function(k) {
+   #         B0 
+   #      })
+   #   })
+   #})
+
+   LP <- lapply(seq(along=lambda1), function(i) LP0)
+
+   # Assumes that lambda2, lambda3 are sorted in
+   # increasing order, and that lambda1 is in decreasing order
+   B <- foreach(i=seq(along=lambda1)) %dopar% {
+      foreach(j=seq(along=lambda2)) %dopar% {
+	 foreach(k=seq(along=lambda3)) %dopar% {
+
+	    if(i == 1) {
+      	       Bt <- numeric(p * K)
+      	       LPt <- numeric(N * K) 
+      	    } else {
+      	       Bt <- as.matrix(B[[i-1]][[1]][[1]])
+      	       LPt <- as.matrix(LP[[i-1]])
+      	    }
+
+	    # fmpr expects l1/l2/l3 to be a vector of length K,
+	    # allowing for a different penalty for each task, but we
+	    # don't use this feature here, we use the same penalty for all
+	    # tasks
+	    r <- .C(fn, as.numeric(X), as.numeric(Y), 
+	       as.numeric(Bt), as.numeric(LPt), nrow(X), ncol(X), K,
+       	       as.numeric(rep(lambda1[i], K)),
+	       as.numeric(rep(lambda2[j], K)),
 	       as.numeric(rep(lambda3[k], K)),
-	       as.integer(G), as.integer(maxiter),
-	       as.double(eps), as.integer(verbose), integer(1),
-	       integer(1))
+       	       g, as.integer(maxiter),
+       	       as.double(eps), as.integer(verbose), integer(1),
+	       integer(1)
+	    )
 	    status <- r[[15]]
 	    if(!status) {
 	       warning("fmpr failed to converge within ",
-		  maxiter, " iterations")
+	          maxiter, " iterations")
 	    } else if(verbose) {
-	       cat("converged in", r[[16]], "iterations\n")
+	       cat("converged in", r[[16]], "iterations\n\n")
 	    }
-	    B[i, j, k, , ] <- matrix(r[[3]], p, K)
-	    LP[i, j, k, , ] <- matrix(r[[4]], N, K)
+	       
+	    m <- matrix(r[[3]], p, K)
+
+	    B[[i]][[j]][[k]] <- if(sparse) {
+	       w <- which(m != 0, arr.ind=TRUE)
+	       sparseMatrix(i=w[,1], w[,2], x=m[w], dims=c(p, K))
+	    } else m
 	 }
       }
    }
-   B
+
+   if(simplify && length(lambda1) == 1 
+      && length(lambda2) == 1 
+      && length(lambda3) == 1) {
+      B[[1]][[1]][[1]]
+   } else {
+      B
+   }
 }
 
 lasso <- function(X, y, lambda1=0,
@@ -177,6 +207,7 @@ lasso <- function(X, y, lambda1=0,
    })
 }
 
+# Can handle ncol(Y) > 1
 ridge <- function(X, Y, lambda2=0)
 {
    Y <- cbind(Y)
@@ -184,7 +215,7 @@ ridge <- function(X, Y, lambda2=0)
    XY <- crossprod(X, Y)
    K <- ncol(Y)
    p <- ncol(X)
-   sapply(lambda2, function(l) {
+   l <- lapply(lambda2, function(l) {
       b <- try(qr.solve(XX + diag(p) * l, XY), silent=TRUE)
       if(is(b, "try-error")) {
 	 matrix(0, p, K)
@@ -192,6 +223,7 @@ ridge <- function(X, Y, lambda2=0)
 	 b
       }
    })
+   l
 }
 
 # zero mean, unit norm (not unit variance)

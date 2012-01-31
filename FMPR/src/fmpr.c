@@ -274,11 +274,17 @@ void fmpr_threshold(double *x, double *y, double *b,
 
    for(k = 0 ; k < K ; k++)
    {
+      loss[k] = 0;
       for(i = N - 1 ; i >= 0 ; --i)
-	 lossnull[k] += pow(y[i + N * k] - meany[k], 2);
+      {
+	 iNk = i + N * k;
+	 lossnull[k] += pow(y[iNk] - meany[k], 2);
+	 Err[iNk] = LP[iNk] - y[iNk];
+	 loss[k] += Err[iNk] * Err[iNk];
+      }
+      loss[k] /= N;
       lossnull[k] /= N;
       lossnullF[k] = lossnull[k] * eps;
-      loss[k] = INFINITY;
    }
 
    for(iter = 0 ; iter < maxiter ; iter++)
@@ -306,7 +312,6 @@ void fmpr_threshold(double *x, double *y, double *b,
 	       bjk = b[j + p * k];
 
 	       /* Apply inter-task ridge regression */
-	       // TODO: what about negative correlation?
 	       for(q = 0 ; q < K ; q++)
 	       {
 		  g = G[k + q * K];
@@ -336,13 +341,11 @@ void fmpr_threshold(double *x, double *y, double *b,
 
 	       oldloss[k] = loss[k];
 	       loss[k] = 0;
-	       //printf("delta:%.5f\n", delta);
 	       for(i = N - 1 ; i >= 0 ; --i)
 	       {
 		  iNk = i + N * k;
 	          LP[iNk] += x[i + N * j] * delta;
 		  Err[iNk] = LP[iNk] - y[iNk];
-		  //printf("%.5f %.5f %.5f\n", Err[iNk], LP[iNk], y[iNk]);
 	          loss[k] += Err[iNk] * Err[iNk];
 	       }
 	       loss[k] /= N;
@@ -364,7 +367,6 @@ void fmpr_threshold(double *x, double *y, double *b,
       }
 
       if(numconverged == pK)
-      //if(numconverged == ngood)
       {
          if(verbose)
             printf("all (%d) converged at iter %d\n", numconverged, iter);
@@ -433,11 +435,9 @@ void fmpr_threshold(double *x, double *y, double *b,
  * denote positive, zero, and negative correlation, resp.,
  * rather than the group K-vector grp.
  *
- * With warm restarts
- *
  */
-void fmpr_warm(double *x, double *y, double *b, double *LP,
-      int *N_p, int *p_p, int *K_p,
+void fmpr_threshold_warm(double *x, double *y, double *b,
+      double *LP, int *N_p, int *p_p, int *K_p,
       double *lambda1, double *lambda2, double *lambda3_p,
       int *G, int *maxiter_p, double *eps_p, int *verbose_p,
       int *status, int *iter_p)
@@ -457,21 +457,19 @@ void fmpr_warm(double *x, double *y, double *b, double *LP,
    int verbose = *verbose_p;
    int pK = p * K, pK1 = p * K - 1;
    double s, lambda3 = *lambda3_p;
-   int q, iNk;
+   int g, q, iNk;
 
    int *active = malloc(sizeof(int) * p * K);
    int *oldactive = malloc(sizeof(int) * p * K);
+   int *ignore = calloc(p * K, sizeof(int));
    double *Err = calloc(N * K, sizeof(double));
    double *meany = calloc(K, sizeof(double));
-   double *loss = malloc(sizeof(double) * K);
-   double *oldloss = malloc(sizeof(double) * K);
+   double *loss = calloc(K, sizeof(double));
+   double *oldloss = calloc(K, sizeof(double));
    double *lossnull = calloc(K, sizeof(double));
    double *lossnullF = calloc(K, sizeof(double));
+   double *d2_0 = calloc(p * K, sizeof(double));
    double losstotal = 0, oldlosstotal = 0;
-   int g;
-
-   for(j = pK1 ; j >= 0 ; --j)
-      active[j] = oldactive[j] = TRUE;
 
    /* null loss mean((y - mean(y))^2)*/
    for(k = 0 ; k < K ; k++)
@@ -483,22 +481,33 @@ void fmpr_warm(double *x, double *y, double *b, double *LP,
 
    for(k = 0 ; k < K ; k++)
    {
-      for(i = N - 1 ; i >= 0 ; --i)
-	 lossnull[k] += pow(y[i + N * k] - meany[k], 2);
-      lossnull[k] /= N;
-      lossnullF[k] = lossnull[k] * eps;
-      //loss[k] = INFINITY;
+      for(j = p - 1 ; j >= 0 ; --j) 
+      {
+	 for(i = N - 1 ; i >= 0 ; --i)
+	    d2_0[j + p * k] +=  x[i + j * N] * x[i + j * N];
+	 ignore[j + p * k] = d2_0[j + p * k] <= ZERO_VAR_THRESH;;
+      }
    }
 
-   for(k = K - 1 ; k >= 0 ; --k)
+   for(j = pK1 ; j >= 0 ; --j)
+   {
+      //oldactive[j] = active[j] = b[j] != 0 && !ignore[j];
+      oldactive[j] = active[j] = !ignore[j];
+   }
+
+   for(k = 0 ; k < K ; k++)
    {
       loss[k] = 0;
       for(i = N - 1 ; i >= 0 ; --i)
       {
-         iNk = i + N * k;
-         Err[iNk] = LP[iNk] - y[iNk];
-         loss[k] += Err[iNk] * Err[iNk];
+	 iNk = i + N * k;
+	 lossnull[k] += pow(y[iNk] - meany[k], 2);
+	 Err[iNk] = LP[iNk] - y[iNk];
+	 loss[k] += Err[iNk] * Err[iNk];
       }
+      loss[k] /= N;
+      lossnull[k] /= N;
+      lossnullF[k] = lossnull[k] * eps;
    }
 
    for(iter = 0 ; iter < maxiter ; iter++)
@@ -513,7 +522,8 @@ void fmpr_warm(double *x, double *y, double *b, double *LP,
 	 for(j = 0 ; j < p ; j++)
 	 {
 	    d1 = 0;
-	    d2 = 1; // assumes standardised inputs
+	    d2 = d2_0[j + p * k];
+
 	    if(!active[j + p * k])
 	       numconverged++;
 	    else
@@ -525,7 +535,6 @@ void fmpr_warm(double *x, double *y, double *b, double *LP,
 	       bjk = b[j + p * k];
 
 	       /* Apply inter-task ridge regression */
-	       // TODO: what about negative correlation?
 	       for(q = 0 ; q < K ; q++)
 	       {
 		  g = G[k + q * K];
@@ -548,7 +557,7 @@ void fmpr_warm(double *x, double *y, double *b, double *LP,
 	       else
 	       {
 	          b[j + p * k] = s - lambda1[k] * sign(s);
-		  if(fabs(b[j + p * k]) < 1e-15) // close enough to zero
+		  if(fabs(b[j + p * k]) < ZERO_THRESH) // close enough to zero
 		     b[j + p * k] = 0;
 	          delta = b[j + p * k] - bjk;
 	       }
@@ -583,13 +592,13 @@ void fmpr_warm(double *x, double *y, double *b, double *LP,
       if(numconverged == pK)
       {
          if(verbose)
-            printf("all converged at iter %d\n", iter);
+            printf("all (%d) converged at iter %d\n", numconverged, iter);
          if(allconverged == 1)
          {
             for(j = pK1; j >= 0 ; --j)
             {
                oldactive[j] = active[j];
-               active[j] = TRUE;
+               active[j] = !ignore[j];
             }
             allconverged = 2;
          }
@@ -614,7 +623,7 @@ void fmpr_warm(double *x, double *y, double *b, double *LP,
             for(j = pK1; j >= 0 ; --j)
             {
                oldactive[j] = active[j];
-               active[j] = TRUE;
+               active[j] = !ignore[j];
             }
          }
       }
@@ -623,10 +632,10 @@ void fmpr_warm(double *x, double *y, double *b, double *LP,
    if(iter >= maxiter)
    {
       if(verbose)
-	 printf("failed to converge after %d iterations\n", maxiter);
+	 printf("fmpr_threshold_warm failed to converge after %d iterations\n",
+	    maxiter);
       *status = FALSE;
    }
-
    *iter_p = iter;
 
    free(active);
@@ -637,8 +646,9 @@ void fmpr_warm(double *x, double *y, double *b, double *LP,
    free(lossnull);
    free(lossnullF);
    free(Err);
+   free(d2_0);
+   free(ignore);
 }
-
 
 /*
  * Assumes y is centred so there's no intercept
@@ -738,7 +748,6 @@ void fmpr_weighted(double *x, double *y, double *b,
 	       bjk = b[j + p * k];
 
 	       /* Apply inter-task ridge regression */
-	       // TODO: what about negative correlation?
 	       for(q = 0 ; q < K ; q++)
 	       {
 		  g = G[k + q * K];
@@ -768,13 +777,11 @@ void fmpr_weighted(double *x, double *y, double *b,
 
 	       oldloss[k] = loss[k];
 	       loss[k] = 0;
-	       //printf("delta:%.5f\n", delta);
 	       for(i = N - 1 ; i >= 0 ; --i)
 	       {
 		  iNk = i + N * k;
 	          LP[iNk] += x[i + N * j] * delta;
 		  Err[iNk] = LP[iNk] - y[iNk];
-		  //printf("%.5f %.5f %.5f\n", Err[iNk], LP[iNk], y[iNk]);
 	          loss[k] += Err[iNk] * Err[iNk];
 	       }
 	       loss[k] /= N;
@@ -796,7 +803,6 @@ void fmpr_weighted(double *x, double *y, double *b,
       }
 
       if(numconverged == pK)
-      //if(numconverged == ngood)
       {
          if(verbose)
             printf("all (%d) converged at iter %d\n", numconverged, iter);

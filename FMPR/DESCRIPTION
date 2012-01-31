@@ -3,7 +3,7 @@ Maintainer: Gad Abraham <gad.abraham@gmail.com>
 Package: FMPR
 Version: 0.01
 Date: 2012-01-26
-Depends: ggplot2, foreach, Matrix, ROCR
+Depends: ggplot2, foreach, Matrix, ROCR, glmnet
 Suggests: doMC, doParallel
 LazyData: Yes
 LazyLoad: Yes

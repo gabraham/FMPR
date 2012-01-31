@@ -1,4 +1,22 @@
 
+
+require(ROCR)
+
+# Remove ROC/PRC replications that had non-sensical results
+clean.rocr <- function(obj)
+{
+   n <- length(obj@x.values)
+   if(n == 0)
+      return(NULL)
+   len <- sapply(obj@x.values, length)
+   w <- len > 2
+   obj@x.values <- obj@x.values[w]
+   obj@y.values <- obj@y.values[w]
+   obj@alpha.values <- obj@alpha.values[w]
+   obj
+}
+
+
 # Plot the experiment results
 
 plot.exper <- function()
@@ -13,9 +31,10 @@ plot.exper <- function()
    
    par(mfrow=c(1, 2))
    
-   plot(clean.rocr(res[[1]]$recovery$gr.t$roc), avg="threshold", col=1, main="ROC",
-         xlim=c(xmin, xmax), ylim=c(ymin, ymax), lwd=3, cex=1.5, cex.axis=1.5,
-         cex.lab=1.5, lty=1)
+   plot(clean.rocr(res[[1]]$recovery$gr.t$roc), avg="threshold", col=1,
+	 main="ROC", xlim=c(xmin, xmax), ylim=c(ymin, ymax), lwd=3,
+	 cex=1.5, cex.axis=1.5, cex.lab=1.5, lty=1,
+	 xlab="Specificity", ylab="Sensitivity")
    plot(clean.rocr(res[[1]]$recovery$gr.w1$roc), avg="threshold", add=TRUE,
          col=2, lwd=3, lty=1)
    plot(clean.rocr(res[[1]]$recovery$gr.w2$roc), avg="threshold", add=TRUE,
@@ -25,15 +44,15 @@ plot.exper <- function()
    plot(clean.rocr(res[[1]]$recovery$ridge$roc), avg="threshold", add=TRUE,
          col=5, lwd=3, lty=3)
    plot(clean.rocr(res[[1]]$recovery$elnet.glmnet$roc), avg="threshold", add=TRUE,
-         col=6, lwd=3, lty=5)
+         col=6, lwd=3, lty=4)
    plot(clean.rocr(res[[1]]$recovery$spg.t$roc), avg="threshold", add=TRUE,
-         col=7, lwd=3, lty=6)
+         col=7, lwd=3, lty=5)
    plot(clean.rocr(res[[1]]$recovery$spg.w1$roc), avg="threshold", add=TRUE,
-         col=8, lwd=3, lty=6)
-   plot(clean.rocr(res[[1]]$recovery$spg.w1$roc), avg="threshold", add=TRUE,
-         col=9, lwd=3, lty=6)
+         col=8, lwd=3, lty=5)
+   plot(clean.rocr(res[[1]]$recovery$spg.w2$roc), avg="threshold", add=TRUE,
+         col=9, lwd=3, lty=5)
    
-   legend(xmin, ymin + 0.45,
+   legend(xmin, ymin + 0.4,
       c("FMPR-t", "FMPR-w1", "FMPR-w2", "Lasso",
       "Ridge", "ElasticNet",
       "GFlasso-t", "GFlasso-w1", "GFlasso-w2"),
@@ -41,7 +60,8 @@ plot.exper <- function()
    
    plot(clean.rocr(res[[1]]$recovery$gr.t$prc), avg="threshold", col=1,
          main="Precision-Recall", ylim=c(ymin, ymax), xlim=c(xmin, xmax), lwd=3,
-         cex=1.5, cex.axis=1.5, cex.lab=1.5, lty=1)
+         cex=1.5, cex.axis=1.5, cex.lab=1.5, lty=1,
+	 xlab="Recall", ylab="Precision")
    plot(clean.rocr(res[[1]]$recovery$gr.w1$prc), avg="threshold", col=2, add=TRUE,
          lwd=3, lty=1)
    plot(clean.rocr(res[[1]]$recovery$gr.w2$prc), avg="threshold", col=3, add=TRUE,
@@ -56,10 +76,10 @@ plot.exper <- function()
          col=7, lwd=3, lty=5)
    plot(clean.rocr(res[[1]]$recovery$spg.w1$prc), avg="threshold", add=TRUE,
          col=8, lwd=3, lty=5)
-   plot(clean.rocr(res[[1]]$recovery$spg.w1$prc), avg="threshold", add=TRUE,
+   plot(clean.rocr(res[[1]]$recovery$spg.w2$prc), avg="threshold", add=TRUE,
          col=9, lwd=3, lty=5)
    
-   legend(xmin, ymin + 0.45,
+   legend(xmin, ymin + 0.4,
       c("FMPR-t", "FMPR-w1", "FMPR-w2", "Lasso",
       "Ridge", "ElasticNet",
       "GFlasso-t", "GFlasso-w1", "GFlasso-w2"),
@@ -87,6 +107,14 @@ plot.exper <- function()
    }
    
    r2 <- melt(res[[1]]$R2)
+   m <- as.character(r2[,2])
+   m[m == "GRt"] <- "FMPR-t"
+   m[m == "GRw1"] <- "FMPR-w1"
+   m[m == "GRw2"] <- "FMPR-w2"
+   m[m == "SPGt"] <- "GFlasso-t"
+   m[m == "SPGw1"] <- "GFlasso-w1"
+   m[m == "SPGw2"] <- "GFlasso-w2"
+   r2[, 2] <- factor(m)
    colnames(r2) <- c("Replication", "Method", "R2")
    g <- ggplot(r2, aes(Method, R2))
    g <- g + geom_boxplot()

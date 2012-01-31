@@ -27,10 +27,11 @@ crossval.ridge <- function(X, Y, nfolds=5, fun=R2, lambda2)
    s <- sapply(1:nfolds, function(fold) {
       g <- ridge(scale(X[folds != fold, ]), center(Y[folds != fold, ]),
 	    lambda2=lambda2)
-      p <- scale(X[folds == fold, ]) %*% g
 
-      # one R^2 for each penalty
-      apply(p, 2, fun, y=center(Y[folds == fold, ]))
+      sapply(g, function(m) {
+	 p <- scale(X[folds == fold, ]) %*% m
+	 R2(p, as.numeric(center(Y[folds == fold, ])))
+      })
    })
    rowMeans(s)
 }
@@ -56,14 +57,17 @@ crossval.fmpr <- function(X, Y, nfolds=5, G=NULL,
 
    for(fold in 1:nfolds)
    {
+      Xtest <- scale(X[folds == fold, ])
+      Ytest <- as.numeric(center(Y[folds == fold, ]))
+
       for(i in 1:length(lambda1))
       {
 	 for(j in 1:length(lambda2))
 	 {
 	    for(k in 1:length(lambda3))
 	    {
-	       p <- scale(X[folds == fold, ]) %*% g[[fold]][[i]][[j]][[k]]
-	       r <- R2(as.numeric(p), as.numeric(center(Y[folds == fold, ])))
+	       p <- Xtest %*% g[[fold]][[i]][[j]][[k]]
+	       r <- R2(as.numeric(p), Ytest)
 	       res[fold, i, j, k] <- r
 	    }
 	 }
