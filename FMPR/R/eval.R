@@ -127,6 +127,21 @@ optim.fmpr <- function(X, Y, nfolds, G=NULL, grid=20,
    )
 }
 
+optim.fmpr.2 <- function(X, Y, nfolds, G=NULL, grid=20,
+   L1, L2, L3,
+   type, maxiter=1e5, verbose=FALSE)
+{
+   cv <- function()
+   {
+      r <- crossval.fmpr(X=X, Y=Y, nfolds=nfolds,
+	 lambda1=L1, lambda2=L2, lambda3=L3,
+	 G=G, maxiter=maxiter, type=type, verbose=verbose)
+      max(r, na.rm=TRU)
+   }
+   opt <- optim(c(L1[1], L2[1], L3[1]), fr=cv, method="L-BFGS-B",
+      lower=c(L1[1], L2[1], L3[1]), upper=c(L1[2], L2[2], L3[2]))
+}
+
 optim.lasso <- function(X, Y, nfolds, grid=20,
    L1=seq(0, 10, length=grid), maxiter=1e5, verbose=FALSE)
 {
