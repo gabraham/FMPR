@@ -220,7 +220,7 @@ void fmpr_threshold(double *x, double *y, double *b,
       int *N_p, int *p_p, int *K_p,
       double *lambda1, double *lambda2, double *lambda3_p,
       int *G, int *maxiter_p, double *eps_p, int *verbose_p,
-      int *status, int *iter_p)
+      int *status, int *iter_p, int *numactive_p)
 {
    int N = *N_p,
        p = *p_p,
@@ -300,7 +300,6 @@ void fmpr_threshold(double *x, double *y, double *b,
 	 for(j = 0 ; j < p ; j++)
 	 {
 	    d1 = 0;
-	    //d2 = 1; // assumes standardised inputs
 	    d2 = d2_0[j + p * k];
 	    if(!active[j + p * k])
 	       numconverged++;
@@ -309,7 +308,6 @@ void fmpr_threshold(double *x, double *y, double *b,
 	       for(i = N - 1 ; i >= 0 ; --i)
 	          d1 += x[i + j * N] * Err[i + N * k];
 
-	       // different implementation of the soft-thresholding
 	       bjk = b[j + p * k];
 
 	       /* Apply inter-task ridge regression */
@@ -318,7 +316,7 @@ void fmpr_threshold(double *x, double *y, double *b,
 		  g = G[k + q * K];
 	          if(k != q && g != 0)
 	          {
-	             d1 += lambda3 * (bjk - sign(g) * b[j + p * q]);
+	             d1 += lambda3 * (bjk - (double)sign(g) * b[j + p * q]);
 	             d2 += lambda3;
 	          }
 	       }
@@ -414,6 +412,7 @@ void fmpr_threshold(double *x, double *y, double *b,
       *status = FALSE;
    }
    *iter_p = iter;
+   *numactive_p = numactive;
 
    free(active);
    free(oldactive);
@@ -441,7 +440,7 @@ void fmpr_threshold_warm(double *x, double *y, double *b,
       double *LP, int *N_p, int *p_p, int *K_p,
       double *lambda1, double *lambda2, double *lambda3_p,
       int *G, int *maxiter_p, double *eps_p, int *verbose_p,
-      int *status, int *iter_p)
+      int *status, int *iter_p, int *numactive_p)
 {
    int N = *N_p,
        p = *p_p,
@@ -471,6 +470,7 @@ void fmpr_threshold_warm(double *x, double *y, double *b,
    double *lossnullF = calloc(K, sizeof(double));
    double *d2_0 = calloc(p * K, sizeof(double));
    double losstotal = 0, oldlosstotal = 0;
+
 
    /* null loss mean((y - mean(y))^2)*/
    for(k = 0 ; k < K ; k++)
@@ -638,6 +638,7 @@ void fmpr_threshold_warm(double *x, double *y, double *b,
       *status = FALSE;
    }
    *iter_p = iter;
+   *numactive_p = numactive;
 
    free(active);
    free(oldactive);
@@ -661,7 +662,7 @@ void fmpr_weighted(double *x, double *y, double *b,
       int *N_p, int *p_p, int *K_p,
       double *lambda1, double *lambda2, double *lambda3_p,
       double *G, int *maxiter_p, double *eps_p, int *verbose_p,
-      int *status, int *iter_p)
+      int *status, int *iter_p, int *numactive_p)
 {
    int N = *N_p,
        p = *p_p,
@@ -678,7 +679,7 @@ void fmpr_weighted(double *x, double *y, double *b,
    int verbose = *verbose_p;
    int pK = p * K, pK1 = p * K - 1;
    double s, lambda3 = *lambda3_p;
-   int q, iNk;
+   int q, iNk, kqK;
    double g;
 
    int *active = malloc(sizeof(int) * p * K);
@@ -693,6 +694,7 @@ void fmpr_weighted(double *x, double *y, double *b,
    double *lossnullF = calloc(K, sizeof(double));
    double *d2_0 = calloc(p * K, sizeof(double));
    double losstotal = 0, oldlosstotal = 0;
+   double *lambda3g = calloc(K * K, sizeof(double));
 
    /* null loss mean((y - mean(y))^2)*/
    for(k = 0 ; k < K ; k++)
@@ -717,11 +719,29 @@ void fmpr_weighted(double *x, double *y, double *b,
 
    for(k = 0 ; k < K ; k++)
    {
+      loss[k] = 0;
       for(i = N - 1 ; i >= 0 ; --i)
-	 lossnull[k] += pow(y[i + N * k] - meany[k], 2);
+      {
+	 iNk = i + N * k;
+	 lossnull[k] += pow(y[iNk] - meany[k], 2);
+	 Err[iNk] = LP[iNk] - y[iNk];
+	 loss[k] += Err[iNk] * Err[iNk];
+      }
+      loss[k] /= N;
       lossnull[k] /= N;
       lossnullF[k] = lossnull[k] * eps;
-      loss[k] = INFINITY;
+   }
+
+   /* ensure that fusion weights for tasks with themselves are zero */
+   for(k = 0 ; k < K ; k++)
+   {
+      for(q = 0 ; q < K ; q++)
+      {
+         if(q == k)
+            lambda3g[k + q * K] = 0;
+         else
+            lambda3g[k + q * K] = lambda3 * G[k + q * K];
+      }
    }
 
    for(iter = 0 ; iter < maxiter ; iter++)
@@ -736,7 +756,6 @@ void fmpr_weighted(double *x, double *y, double *b,
 	 for(j = 0 ; j < p ; j++)
 	 {
 	    d1 = 0;
-	    //d2 = 1; // assumes standardised inputs
 	    d2 = d2_0[j + p * k];
 	    if(!active[j + p * k])
 	       numconverged++;
@@ -745,18 +764,16 @@ void fmpr_weighted(double *x, double *y, double *b,
 	       for(i = N - 1 ; i >= 0 ; --i)
 	          d1 += x[i + j * N] * Err[i + N * k];
 
-	       // different implementation of the soft-thresholding
 	       bjk = b[j + p * k];
 
 	       /* Apply inter-task ridge regression */
 	       for(q = 0 ; q < K ; q++)
 	       {
-		  g = G[k + q * K];
-	          if(k != q) // don't self penalise
-	          {
-	             d1 += lambda3 * g * (bjk - sign(g) * b[j + p * q]);
-	             d2 += lambda3 * g;
-	          }
+		  kqK = k + q * K;
+		  g = G[kqK];
+	          
+	          d1 += lambda3g[kqK] * (bjk - sign(g) * b[j + p * q]);
+	          d2 += lambda3g[kqK];
 	       }
 
 	       /* Apply intra-task ridge regression */
@@ -850,6 +867,7 @@ void fmpr_weighted(double *x, double *y, double *b,
       *status = FALSE;
    }
    *iter_p = iter;
+   *numactive_p = numactive;
 
    free(active);
    free(oldactive);
@@ -862,5 +880,6 @@ void fmpr_weighted(double *x, double *y, double *b,
    free(Err);
    free(d2_0);
    free(ignore);
+   free(lambda3g);
 }
 

@@ -46,19 +46,21 @@ crossval.fmpr <- function(X, Y, nfolds=5, G=NULL,
       c(nfolds, length(lambda1), length(lambda2), length(lambda3))
    )
 
-   g <- lapply(1:nfolds, function(fold) {
-      cat("fold", fold, " ")
-      fmpr(scale(X[folds != fold, ]),
-	    center(Y[folds != fold, ]), G=G, maxiter=maxiter,
-	    lambda1=lambda1, lambda2=lambda2, lambda3=lambda3,
-	    type=type, verbose=verbose)
-   })
-   cat("\n")
-
+   # fmpr() is capable of handling lambda1,lambda2,lambda3 of varying lengths,
+   # but we don't use that feature here because we want to run different
+   # penalties on the cross-validation folds rather than different folds every
+   # time
    for(fold in 1:nfolds)
    {
-      Xtest <- scale(X[folds == fold, ])
-      Ytest <- as.numeric(center(Y[folds == fold, ]))
+      cat("inner fold", fold, "\n")
+      Xtest <- scale(X[folds == fold, , drop=FALSE])
+      Ytest <- as.numeric(center(Y[folds == fold, , drop=FALSE]))
+
+      f <- fmpr(scale(X[folds != fold, , drop=FALSE]),
+	    center(Y[folds != fold, , drop=FALSE]),
+	    G=G, maxiter=maxiter,
+	    lambda1=lambda1, lambda2=lambda2, lambda3=lambda3,
+	    type=type, verbose=verbose)
 
       for(i in 1:length(lambda1))
       {
@@ -66,14 +68,48 @@ crossval.fmpr <- function(X, Y, nfolds=5, G=NULL,
 	 {
 	    for(k in 1:length(lambda3))
 	    {
-	       p <- Xtest %*% g[[fold]][[i]][[j]][[k]]
-	       r <- R2(as.numeric(p), Ytest)
-	       res[fold, i, j, k] <- r
+	       p <- Xtest %*% f[[i]][[j]][[k]]
+	       res[fold, i, j, k] <- cbind(R2(as.numeric(p), Ytest))
 	    }
-	 }
+	 } 
       }
    }
+
    apply(res, c(2, 3, 4), mean, na.rm=TRUE)
+}
+
+crossval.spg <- function(X, Y, nfolds=5, C=NULL,
+      lambda, gamma, maxiter=1e5, verbose)
+{
+   N <- nrow(X)
+   Y <- cbind(Y)
+   folds <- sample(1:nfolds, N, TRUE)
+   res <- array(0,
+      c(nfolds, length(lambda), length(gamma))
+   )
+
+   for(fold in 1:nfolds)
+   {
+      cat("inner fold", fold, "\n")
+      Xtest <- scale(X[folds == fold, , drop=FALSE])
+      Ytest <- as.numeric(center(Y[folds == fold, , drop=FALSE]))
+
+      f <- spg(scale(X[folds != fold, , drop=FALSE]),
+	    center(Y[folds != fold, , drop=FALSE]),
+	    C=C, maxiter=maxiter, verbose=verbose,
+	    lambda=lambda, gamma=gamma)
+
+      for(i in 1:length(lambda1))
+      {
+	 for(j in 1:length(lambda2))
+	 {
+	    p <- Xtest %*% f[[i]][[j]]
+	    res[fold, i, j] <- cbind(R2(as.numeric(p), Ytest))
+	 } 
+      }
+   }
+
+   apply(res, c(2, 3), mean, na.rm=TRUE)
 }
 
 crossval.elnet.glmnet <- function(X, Y, nfolds=5, fun=R2, lambda1, alpha, ...)
@@ -100,81 +136,124 @@ crossval.elnet.glmnet <- function(X, Y, nfolds=5, fun=R2, lambda1, alpha, ...)
    apply(res, c(2, 3), mean, na.rm=TRUE)
 }
 
-optim.fmpr <- function(X, Y, nfolds, G=NULL, grid=20,
-   L1=seq(0, 10, length=grid),
-   L2=seq(0, 10, length=grid),
-   L3=seq(0, 10, length=grid),
+optim.fmpr <- function(..., method="grid")
+{
+   if(method == "search") {
+      optim.fmpr.search(...)
+   } else if(method == "grid") {
+      optim.fmpr.grid(...)
+   } else {
+      stop("unknown optim method: ", method)
+   }
+}
+
+optim.fmpr.grid <- function(X, Y, nfolds=5, G=NULL, grid=20,
+   lambda1=seq(0, 10, length=grid),
+   lambda2=seq(0, 10, length=grid),
+   lambda3=seq(0, 10, length=grid),
    type, maxiter=1e5, verbose=FALSE)
 {
-   # The L2 and L3 penalties must be in increasing order.
-   # L1 should be in decreasing order.
+   # The lambda2 and lambda3 penalties must be in increasing order.
+   # lambda1 should be in decreasing order.
    # This allows for certain optimisations in fmpr.
-   L1 <- sort(L1, decreasing=TRUE)
-   L2 <- sort(L2)
-   L3 <- sort(L3)
+   lambda1 <- sort(lambda1, decreasing=TRUE)
+   lambda2 <- sort(lambda2)
+   lambda3 <- sort(lambda3)
 
    if(is.null(G) || nrow(G) == 1)
-      L3 <- 0
+      lambda3 <- 0
 
    r <- crossval.fmpr(X=X, Y=Y, nfolds=nfolds,
-      lambda1=L1, lambda2=L2, lambda3=L3,
+      lambda1=lambda1, lambda2=lambda2, lambda3=lambda3,
       G=G, maxiter=maxiter, type=type, verbose=verbose)
 
    w <- which(r == max(r, na.rm=TRUE), arr.ind=TRUE)
    list(
       R2=r,
-      opt=c(L1=L1[w[1]], L2=L2[w[2]], L3=L3[w[3]])
+      opt=c(lambda1=lambda1[w[1]], lambda2=lambda2[w[2]], lambda3=lambda3[w[3]])
    )
 }
 
-optim.fmpr.2 <- function(X, Y, nfolds, G=NULL, grid=20,
-   L1, L2, L3,
+optim.fmpr.search <- function(X, Y, nfolds=5, G=NULL,
+   lambda1, lambda2, lambda3,
    type, maxiter=1e5, verbose=FALSE)
 {
-   cv <- function()
+  
+   cv <- function(par)
    {
       r <- crossval.fmpr(X=X, Y=Y, nfolds=nfolds,
-	 lambda1=L1, lambda2=L2, lambda3=L3,
-	 G=G, maxiter=maxiter, type=type, verbose=verbose)
-      max(r, na.rm=TRU)
+         lambda1=par[1], lambda2=par[2], lambda3=par[3],
+         G=G, maxiter=maxiter, type=type, verbose=verbose)
+      -max(r, na.rm=TRUE)
    }
-   opt <- optim(c(L1[1], L2[1], L3[1]), fr=cv, method="L-BFGS-B",
-      lower=c(L1[1], L2[1], L3[1]), upper=c(L1[2], L2[2], L3[2]))
+
+   opt <- optim(par=c(min(lambda1), min(lambda2), min(lambda3)),
+      fn=cv, method="L-BFGS-B",
+      lower=c(min(lambda1), min(lambda2), min(lambda3)),
+      upper=c(max(lambda1), max(lambda2), max(lambda3)),
+      control=list(factr=1e4))
+
+   list(
+      R2=opt$value * -1,
+      opt=opt$par
+   )
 }
 
-optim.lasso <- function(X, Y, nfolds, grid=20,
-   L1=seq(0, 10, length=grid), maxiter=1e5, verbose=FALSE)
+optim.spg <- function(X, Y, nfolds=5, C=NULL, grid=20,
+   lambda=seq(0, 10, length=grid),
+   gamma=seq(0, 10, length=grid),
+   maxiter=1e5, verbose=FALSE)
+{
+   lambda <- sort(lambda)
+   gamma <- sort(gamma)
+
+   if(is.null(C) || nrow(C) == 1)
+      gamma <- 0
+
+   r <- crossval.spg(X=X, Y=Y, nfolds=nfolds,
+      lambda=lambda, gamma=gamma, C=C,
+      maxiter=maxiter, verbose=verbose)
+
+   w <- which(r == max(r, na.rm=TRUE), arr.ind=TRUE)
+   list(
+      R2=r,
+      opt=c(lambda=lambda[w[1]], gamma=gamma[w[2]])
+   )
+}
+
+optim.lasso <- function(X, Y, nfolds=5, grid=20,
+   lambda1=seq(0, 10, length=grid), maxiter=1e5, verbose=FALSE)
 {
    r <- crossval.lasso(X=X, Y=Y, nfolds=nfolds,
-	    lambda1=L1, maxiter=maxiter, verbose=verbose)
+	    lambda1=lambda1, maxiter=maxiter, verbose=verbose)
 
    w <- which(r == max(r, na.rm=TRUE))
    list(
       R2=r,
-      opt=c(L1=L1[w[1]])
+      opt=c(lambda1=lambda1[w[1]])
    )
 }
 
-optim.ridge <- function(X, Y, nfolds, grid=20, L2=seq(0, 10, length=grid))
+optim.ridge <- function(X, Y, nfolds=5, grid=20, lambda2=seq(0, 10, length=grid))
 {
-   r <- crossval.ridge(X=X, Y=Y, nfolds=nfolds, lambda2=L2)
+   r <- crossval.ridge(X=X, Y=Y, nfolds=nfolds, lambda2=lambda2)
 
    w <- which(r == max(r, na.rm=TRUE))
    list(
       R2=r,
-      opt=c(L2=L2[w[1]])
+      opt=c(lambda2=lambda2[w[1]])
    )
 }
 
-optim.elnet.glmnet <- function(X, Y, nfolds, L1, alpha)
+optim.elnet.glmnet <- function(X, Y, nfolds=5, lambda1, alpha)
 {  
    r <- crossval.elnet.glmnet(X=X, Y=Y, nfolds=nfolds,
-	 lambda1=L1, alpha=alpha)
+	 lambda1=lambda1, alpha=alpha)
    w <- which(r == max(r, na.rm=TRUE), arr.ind=TRUE)
 
    list(
       R2=r,
-      opt=c(L1=L1[w[1]], alpha=alpha[w[2]])
+      opt=c(lambda1=lambda1[w[1]], alpha=alpha[w[2]])
    )
 }
 

@@ -1,7 +1,4 @@
 
-
-require(ROCR)
-
 # Remove ROC/PRC replications that had non-sensical results
 clean.rocr <- function(obj)
 {

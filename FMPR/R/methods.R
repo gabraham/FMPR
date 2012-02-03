@@ -12,6 +12,9 @@ fmpr <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
    Y <- cbind(Y)
    K <- ncol(Y)
 
+   if(nrow(X) != nrow(Y))
+      stop("dimensions of X and Y don't agree")
+
    #if(length(lambda1) == 1)
    #   lambda1 <- rep(lambda1, K)
    
@@ -29,22 +32,8 @@ fmpr <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
       g <- as.numeric(G)
    }
 
-   B0 <- if(sparse) {
-      sparseMatrix(i={}, j={}, dims=c(p, K))
-   } else {
-      matrix(0, p, K)
-   }
-   
-   #B <- lapply(seq(along=lambda1), function(i) {
-   #   lapply(seq(along=lambda2), function(j) {
-   #      lapply(seq(along=lambda3), function(k) {
-   #         B0 
-   #      })
-   #   })
-   #})
-
-   B <- foreach(i=seq(along=lambda1)) %dopar% {
-      foreach(j=seq(along=lambda2)) %dopar% {
+   B <- foreach(i=seq(along=lambda1)) %:% 
+      foreach(j=seq(along=lambda2)) %:%
 	 foreach(k=seq(along=lambda3)) %dopar% {
 	    # fmpr expects l1/l2/l3 to be a vector of length K,
 	    # allowing for a different penalty for each task, but we
@@ -59,14 +48,15 @@ fmpr <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
 	       as.numeric(rep(lambda3[k], K)),
        	       g, as.integer(maxiter),
        	       as.double(eps), as.integer(verbose), integer(1),
-	       integer(1)
+	       integer(1), integer(1)
 	    )
 	    status <- r[[14]]
 	    if(!status) {
 	       warning("fmpr failed to converge within ",
 	          maxiter, " iterations")
 	    } else if(verbose) {
-	       cat("converged in", r[[15]], "iterations\n\n")
+	       cat("converged in", r[[15]], "iterations",
+		  "with", r[[16]], "active variables\n\n")
 	    }
 	       
 	    m <- matrix(r[[3]], p, K)
@@ -75,8 +65,6 @@ fmpr <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
 	       w <- which(m != 0, arr.ind=TRUE)
 	       sparseMatrix(i=w[,1], w[,2], x=m[w], dims=c(p, K))
 	    } else m
-	 }
-      }
    }
 
    if(simplify && length(lambda1) == 1 
@@ -128,20 +116,12 @@ fmpr.warm <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
       LP0 <- matrix(0, N, K)
    }
 
-   #B <- lapply(seq(along=lambda1), function(i) {
-   #   lapply(seq(along=lambda2), function(j) {
-   #      lapply(seq(along=lambda3), function(k) {
-   #         B0 
-   #      })
-   #   })
-   #})
-
    LP <- lapply(seq(along=lambda1), function(i) LP0)
 
    # Assumes that lambda2, lambda3 are sorted in
    # increasing order, and that lambda1 is in decreasing order
-   B <- foreach(i=seq(along=lambda1)) %dopar% {
-      foreach(j=seq(along=lambda2)) %dopar% {
+   B <- foreach(i=seq(along=lambda1)) %:%
+      foreach(j=seq(along=lambda2)) %:%
 	 foreach(k=seq(along=lambda3)) %dopar% {
 
 	    if(i == 1) {
@@ -163,24 +143,24 @@ fmpr.warm <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
 	       as.numeric(rep(lambda3[k], K)),
        	       g, as.integer(maxiter),
        	       as.double(eps), as.integer(verbose), integer(1),
-	       integer(1)
+	       integer(1), integer(1)
 	    )
 	    status <- r[[15]]
+	    numactive <- r[[17]]
 	    if(!status) {
 	       warning("fmpr failed to converge within ",
 	          maxiter, " iterations")
 	    } else if(verbose) {
-	       cat("converged in", r[[16]], "iterations\n\n")
+	       cat("converged in", r[[16]], "iterations with",
+		     numactive, "active variables\n\n")
 	    }
 	       
 	    m <- matrix(r[[3]], p, K)
 
-	    B[[i]][[j]][[k]] <- if(sparse) {
+	    if(sparse) {
 	       w <- which(m != 0, arr.ind=TRUE)
 	       sparseMatrix(i=w[,1], w[,2], x=m[w], dims=c(p, K))
 	    } else m
-	 }
-      }
    }
 
    if(simplify && length(lambda1) == 1 
@@ -247,15 +227,15 @@ maxlambda1 <- function(X, Y)
 }
 
 # Converts an N by p matrix into a block-diagonal N*K by p*K matrix
-blockX <- function(X, p, C)
+blockX <- function(X, p, K)
 {
    N <- nrow(X)
    
-   Xblock <- matrix(0, N * C, p * C) 
-   s1 <- seq(1, N * C, N)
-   s2 <- seq(1, p * C, p)
+   Xblock <- matrix(0, N * K, p * K) 
+   s1 <- seq(1, N * K, N)
+   s2 <- seq(1, p * K, p)
 
-   for(i in 1:C)
+   for(i in 1:K)
    {
       j <- s1[i]:(s1[i] + N - 1)
       k <- s2[i]:(s2[i] + p - 1)
@@ -265,13 +245,80 @@ blockX <- function(X, p, C)
    Xblock
 }
 
-## Threshold the correlation matrix and convert into groups, finding the graph
-## that spans the connected vertices. Each connected subgraph is a group.
-#cor2grp <- function(Y, thresh=0.7)
-#{
-#   R <- abs(cor(Y))
-#   diag(R) <- 0
-#   w <- which(R >= thresh, arr.ind=TRUE)
-#   K <- numeric(length(unique(w)))
-#}
+# Makes the edges by vertices matrix for SPG
+# Same as gennetwork.m
+gennetwork <- function(Y, threshold=0.5, weight.fun=abs)
+{
+   R <- cor(Y)
+   R[abs(R) < threshold] <- 0
+
+   K <- ncol(Y)
+   nV <- K
+   UR <- R
+   UR[lower.tri(UR)] <- 0
+   diag(UR) <- 0
+   W <- weight.fun(UR)
+
+   nzUR <- which(UR != 0)
+   E <- which(UR != 0, arr.ind=TRUE)
+   Ecoef <- W[nzUR]
+   Esign <- sign(R[nzUR])
+   nE <- nrow(E)
+   C_I <- c(1:nE, 1:nE)
+   C_J <- as.numeric(E)
+   C_S <- cbind(Ecoef, -Ecoef * Esign)
+   C <- matrix(0, nE, nV)
+   C[cbind(C_I, C_J)] <- C_S
+   C
+}
+
+spg <- function(X, Y, C, lambda, gamma, tol=1e-6, mu=1e-4, maxiter=1e4,
+      simplify=FALSE, verbose=FALSE)
+{
+   K <- ncol(Y)
+   N <- nrow(Y)
+   p <- ncol(X)
+
+   XX <- crossprod(X)
+   XY <- crossprod(X, Y)
+   CNorm <- 2 * max(colSums(C^2))
+   C0 <- C
+   L0 <- eigen(XX)$values[1]
+
+   cat("CNorm:", CNorm, "\n")
+
+   B <- foreach(i=seq(along=lambda)) %:% 
+      foreach(j=seq(along=gamma)) %dopar% {
+	 L <- L0 + gamma^2 * CNorm / mu
+	 C <- gamma[j] * C0
+
+	 if(verbose)
+	    cat("spg gamma:", gamma[j], "lambda:", lambda[i], "\n")
+
+	 r <- .C("spg_core",
+   	    as.numeric(XX), as.numeric(XY),
+   	    as.numeric(X), as.numeric(Y),
+   	    as.integer(N), as.integer(p), as.integer(K),
+   	    numeric(p * K),
+   	    as.numeric(C), as.integer(nrow(C)), as.numeric(L), 
+   	    as.numeric(gamma[j]), as.numeric(lambda[i]),
+   	    as.numeric(tol), as.numeric(mu), as.integer(maxiter),
+   	    as.integer(verbose), integer(1)
+   	 )
+   	 niter <- r[[18]]
+
+	 if(verbose)
+	    cat("spg terminated in", niter, "iterations\n")
+   
+	 matrix(r[[8]], p, K)
+   }
+   
+   if(simplify
+      && length(lambda) == 1 
+      && length(gamma) == 1) {
+      B[[1]][[1]]
+   } else {
+      B
+   }
+}
 

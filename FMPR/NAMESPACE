@@ -4,13 +4,16 @@ export(
    "optim.lasso",
    "optim.elnet.glmnet",
    "optim.ridge",
+   "optim.spg",
    "crossval.fmpr",
    "crossval.lasso",
    "crossval.elnet.glmnet",
    "crossval.ridge",
+   "crossval.spg",
    "fmpr",
    "lasso",
    "ridge",
+   "spg",
    "fmpr.warm",
    "maxlambda1",
    "getB",
@@ -20,7 +23,10 @@ export(
    "recovery",
    "center",
    "run",
-   "R2"
+   "R2",
+   "plot.exper",
+   "sqr",
+   "gennetwork"
 )
 
 

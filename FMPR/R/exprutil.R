@@ -1,6 +1,8 @@
 
 # Wrappers for running the different models on the simulation data
 
+sqr <- function(x) x^2
+
 makedata <- function(rep, dir=".", N=100, p=50, K=5, B, sigma=0.01,
       save=TRUE)
 {
@@ -37,41 +39,104 @@ makedata <- function(rep, dir=".", N=100, p=50, K=5, B, sigma=0.01,
    }
 }
 
-# cortype: 1: |R|, 2: R^2
-run.spg <- function(rep, dir=".", nfolds=10, r=25, Rthresh, cortype)
+## cortype: 1: |R|, 2: R^2
+#run.spg <- function(rep, dir=".", nfolds=10, r=25, Rthresh, cortype)
+#{
+#   oldwd <- getwd()
+#   setwd(dir)
+#
+#   Xtest <- as.matrix(read.table(sprintf("Xtest_%s.txt", rep), header=FALSE))
+#   Ytest <- as.matrix(read.table(sprintf("Ytest_%s.txt", rep), header=FALSE))
+#
+#   fb <- sprintf("spg_beta_%d.txt", rep)
+#   #if(file.exists(fb)) {
+#   #   warning("in run.spg, file ", fb, " already exists, not running SPG again")
+#   #} else {
+#      system(sprintf("%s/spg.sh %s %s %s %s %s %s",
+#	 oldwd, rep, nfolds, r, ".", Rthresh, cortype))
+#   #}
+#
+#   #B.spg <- as.matrix(read.table(sprintf("spg_beta_%s.txt", rep), header=FALSE))
+#   B.spg <- spg(Xtrain, Ytrain, 
+#   P.spg <- Xtest %*% B.spg
+#   R2.spg <- R2(as.numeric(P.spg), as.numeric(Ytest))
+#   cat("R2.spg:", R2.spg, "\n")
+#
+#   B.spg.l <- as.matrix(read.table(sprintf("spg_beta_lasso_%s.txt", rep),
+#	 header=FALSE))
+#   P.spg.l <- Xtest %*% B.spg.l
+#   R2.spg.l <- R2(as.numeric(P.spg.l), as.numeric(Ytest))
+#   cat("rep", rep, "R2.spg.l:", R2.spg.l, "\n")
+#
+#   setwd(oldwd)
+#
+#   list(
+#      R2=R2.spg,
+#      R2lasso=R2.spg.l,
+#      beta=B.spg,
+#      betalasso=B.spg.l
+#   )
+#}
+
+run.spg <- function(rep, dir=".", nfolds=10, r=25, Rthresh=0.5,
+      type=c("threshold", "weighted"), weight.fun=sqr)
 {
    oldwd <- getwd()
    setwd(dir)
 
+   Xtrain <- as.matrix(read.table(sprintf("Xtrain_%s.txt", rep),
+	    header=FALSE))
    Xtest <- as.matrix(read.table(sprintf("Xtest_%s.txt", rep), header=FALSE))
+   Ytrain <- as.matrix(read.table(sprintf("Ytrain_%s.txt", rep), header=FALSE))
    Ytest <- as.matrix(read.table(sprintf("Ytest_%s.txt", rep), header=FALSE))
+   R <- cor(Ytrain)
+   diag(R) <- 0
+   
+   type <- match.arg(type)
+   G <- if(type == "threshold") {
+      sign(R) * (abs(R) > Rthresh)
+   } else if(type == "weighted") {
+      sign(R) * weight.fun(sqr)
+   }
+   
+   if(type == "threshold" && all(G == 0))
+   {
+      Rthresh <- median(R[upper.tri(R)])
+      cat("G is all zero in run.fmpr, using threshold of", Rthresh, "\n")
+      G <- sign(R) * (abs(R) > Rthresh)
+   }
 
-   fb <- sprintf("spg_beta_%d.txt", rep)
-   #if(file.exists(fb)) {
-   #   warning("in run.spg, file ", fb, " already exists, not running SPG again")
-   #} else {
-      system(sprintf("%s/spg.sh %s %s %s %s %s %s",
-	 oldwd, rep, nfolds, r, ".", Rthresh, cortype))
-   #}
+   N <- nrow(Xtrain)
+   K <- ncol(Ytrain)
+   p <- ncol(Xtrain)
 
-   B.spg <- as.matrix(read.table(sprintf("spg_beta_%s.txt", rep), header=FALSE))
-   P.spg <- Xtest %*% B.spg
-   R2.spg <- R2(as.numeric(P.spg), as.numeric(Ytest))
-   cat("R2.spg:", R2.spg, "\n")
+   Xtrain <- scale(Xtrain)
+   Ytrain <- center(Ytrain)
 
-   B.spg.l <- as.matrix(read.table(sprintf("spg_beta_lasso_%s.txt", rep),
-	 header=FALSE))
-   P.spg.l <- Xtest %*% B.spg.l
-   R2.spg.l <- R2(as.numeric(P.spg.l), as.numeric(Ytest))
-   cat("rep", rep, "R2.spg.l:", R2.spg.l, "\n")
+   cat("optim.fmpr", type, "start\n")
+   l <- max(maxlambda1(Xtrain, Ytrain))
+   r <- optim.spg(X=Xtrain, Y=Ytrain, G=G,
+	 nfolds=nfolds,
+	 lambda1=seq(l, l * 1e-3, length=r),
+	 lambda2=10^seq(-3, 5, length=r),
+	 lambda3=10^seq(-3, 5, length=r),
+	 maxiter=1e4, type=type)
+   cat("optim.fmpr", type, "end\n")
+   g <- fmpr(X=Xtrain, Y=Ytrain,
+	 lambda1=r$opt[1], lambda2=r$opt[2], lambda3=r$opt[3],
+	 maxiter=1e4, G=G, type=type)
+   g <- g[[1]][[1]][[1]]
+
+   P <- scale(Xtest) %*% g
+   res <- R2(as.numeric(P), as.numeric(center(Ytest)))
+
+   cat("rep", rep, "R2 fmpr", type, ":", res, "\n")
 
    setwd(oldwd)
 
    list(
-      R2=R2.spg,
-      R2lasso=R2.spg.l,
-      beta=B.spg,
-      betalasso=B.spg.l
+      R2=res,
+      beta=g
    )
 }
 
@@ -99,7 +164,7 @@ run.lasso <- function(rep, dir=".", nfolds=10, r=25)
 
    l <- maxlambda1(XtrainB, ytrain)
    opt <- optim.lasso(X=XtrainB, Y=ytrain, nfolds=nfolds,
-	 L1=seq(l, l * 1e-3, length=r), verbose=FALSE)
+	 lambda1=seq(l, l * 1e-3, length=r), verbose=FALSE)
    g <- lasso(X=XtrainB, y=ytrain, lambda1=opt$opt[1])
    P <- XtestB %*% g
    res <- R2(as.numeric(P), ytest)
@@ -139,7 +204,7 @@ run.ridge <- function(rep, dir=".", nfolds=10, r=25)
    ytest <- as.numeric(center(Ytest))
    
    r <- optim.ridge(X=XtrainB, Y=ytrain, nfolds=nfolds,
-	 L2=10^seq(-3, 5, length=r))
+	 lambda2=10^seq(-3, 5, length=r))
    g <- ridge(XtrainB, ytrain, lambda2=r$opt[1])
    P <- XtestB %*% g
    res <- R2(as.numeric(P), ytest)
@@ -152,8 +217,6 @@ run.ridge <- function(rep, dir=".", nfolds=10, r=25)
       beta=matrix(g, p, K)
    )
 }
-
-sqr <- function(x) x^2
 
 run.fmpr <- function(rep, dir=".", nfolds=10, r=25, Rthresh=0.5,
       type=c("threshold", "weighted"), weight.fun=sqr)
@@ -173,11 +236,15 @@ run.fmpr <- function(rep, dir=".", nfolds=10, r=25, Rthresh=0.5,
    G <- if(type == "threshold") {
       sign(R) * (abs(R) > Rthresh)
    } else if(type == "weighted") {
-      weight.fun(R)
+      sign(R) * weight.fun(R)
    }
    
-   if(all(G == 0))
-      warning("G is all zero in run.fmpr, will not consider groups")
+   if(type == "threshold" && all(G == 0))
+   {
+      Rthresh <- median(R[upper.tri(R)])
+      cat("G is all zero in run.fmpr, using threshold of", Rthresh, "\n")
+      G <- sign(R) * (abs(R) > Rthresh)
+   }
 
    N <- nrow(Xtrain)
    K <- ncol(Ytrain)
@@ -190,11 +257,9 @@ run.fmpr <- function(rep, dir=".", nfolds=10, r=25, Rthresh=0.5,
    l <- max(maxlambda1(Xtrain, Ytrain))
    r <- optim.fmpr(X=Xtrain, Y=Ytrain, G=G,
 	 nfolds=nfolds,
-	 L1=seq(l, l * 1e-3, length=r),
-	 #L2=seq(0, 10, length=r),
-	 #L3=seq(0, 10, length=r),
-	 L2=10^seq(-3, 5, length=r),
-	 L3=10^seq(-3, 5, length=r),
+	 lambda1=seq(l, l * 1e-3, length=r),
+	 lambda2=10^seq(-3, 5, length=r),
+	 lambda3=10^seq(-3, 5, length=r),
 	 maxiter=1e4, type=type)
    cat("optim.fmpr", type, "end\n")
    g <- fmpr(X=Xtrain, Y=Ytrain,
@@ -242,10 +307,10 @@ run.elnet.fmpr <- function(rep, dir=".", nfolds=10, r=25, Rthresh=0.5)
    l <- max(maxlambda1(Xtrain, Ytrain))
    r <- optim.fmpr(X=Xtrain, Y=Ytrain, G=G0,
 	 nfolds=nfolds,
-	 L1=seq(l, l * 1e-3, length=r),
-	 #L2=seq(0, 10, length=r),
-	 L2=10^seq(-3, 5, length=r),
-	 L3=0,
+	 lambda1=seq(l, l * 1e-3, length=r),
+	 #lambda2=seq(0, 10, length=r),
+	 lambda2=10^seq(-3, 5, length=r),
+	 lambda3=0,
 	 maxiter=1e4, type="threshold")
    cat("optim.elnet.fmpr end\n")
    g <- fmpr(X=Xtrain, Y=Ytrain,
@@ -290,7 +355,7 @@ run.elnet.glmnet <- function(rep, dir=".", nfolds=10, r=25, Rthresh=0.5)
    cat("optim.elnet.glmnet start\n")
    l <- maxlambda1(XtrainB, ytrain)
    r <- optim.elnet.glmnet(X=XtrainB, Y=ytrain, nfolds=nfolds,
-	 L1=seq(l, l * 1e-3, length=r),
+	 lambda1=seq(l, l * 1e-3, length=r),
 	 alpha=seq(0, 1, length=r))
    cat("optim.elnet.glmnet end\n")
 
@@ -309,7 +374,6 @@ run.elnet.glmnet <- function(rep, dir=".", nfolds=10, r=25, Rthresh=0.5)
       beta=g
    )
 }
-
 
 # p: no. variables per task
 # K: no. tasks

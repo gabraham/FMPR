@@ -27,9 +27,6 @@ seed <- sample(1e6L, 1)
 #seed <- 705168
 set.seed(seed)
 
-#source("methods.R")
-#source("eval.R")
-#source("exprutil.R")
 
 ################################################################################
 # Configure the experiments here
@@ -68,11 +65,11 @@ setup <- list(
    Expr13=list(dir=c("Expr13"), N=200, p=50, K=10, sigma=1,
 	 B=getB(p=50, K=10, w=0.1, type="same"), Rthresh=0.3),
    Expr14=list(dir=c("Expr14"), N=200, p=50, K=10, sigma=1,
-	 B=getB(p=50, K=10, w=0.5, type="same"), Rthresh=0.3),
+	 B=getB(p=50, K=10, w=0.2, type="same"), Rthresh=0.3),
    Expr15=list(dir=c("Expr15"), N=200, p=50, K=10, sigma=1,
-	 B=getB(p=50, K=10, w=0.8, type="same"), Rthresh=0.3),
+	 B=getB(p=50, K=10, w=0.3, type="same"), Rthresh=0.3),
    Expr16=list(dir=c("Expr16"), N=200, p=50, K=10, sigma=1,
-	 B=getB(p=50, K=10, w=1, type="same"), Rthresh=0.3),
+	 B=getB(p=50, K=10, w=0.4, type="same"), Rthresh=0.3),
 
    # Different correlation thresholds
    Expr17=list(dir=c("Expr17"), N=200, p=50, K=10, sigma=1,
@@ -112,7 +109,7 @@ setup <- list(
 
 
 nreps <- 50
-grid <- 3
+grid <- 10
 nfolds <- 5
 
 # Don't call SPG automatically because it's too slow
@@ -131,8 +128,8 @@ system.time({
    res <- lapply(setup[idv], run, nreps=nreps, grid=grid, nfolds=nfolds)
 })
 save(setup, res, idv, file=sprintf("results_%s.RData", idv))
-res <- do.spg()
-save(setup, res, idv, file=sprintf("results_%s.RData", idv))
+#res <- do.spg()
+#save(setup, res, idv, file=sprintf("results_%s.RData", idv))
 
 ################################################################################
 
