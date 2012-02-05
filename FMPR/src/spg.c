@@ -130,7 +130,7 @@ void spg_core(double *xx, double *xy, double *x, double *y,
    double *XWy = malloc(sizeof(double) * N * p);
    double *beta_new = malloc(sizeof(double) * p * K);
    double *obj = calloc(maxiter, sizeof(double));
-   int iter;
+   int iter, mod = 0;
 
    for(iter = 0 ; iter < maxiter ; iter++)
    {
@@ -192,7 +192,7 @@ void spg_core(double *xx, double *xy, double *x, double *y,
       obj[iter] = s1 + s2 + s3;
 
       if(verbose)
-	 Rprintf("%d loss %.10f\n", iter, obj[iter]);
+	 Rprintf("SPG iter=%d loss %.10f\n", iter, obj[iter]);
 
       if(iter > 10)
       {
@@ -211,8 +211,12 @@ void spg_core(double *xx, double *xy, double *x, double *y,
 
    if(iter >= maxiter)
    {
-      if(verbose)
-	 Rprintf("failed to converge after %d iterations\n", maxiter);
+      Rprintf("SPG failed to converge after %d iterations (lambda: %.6f, \
+gamma: %.6f)\n", lambda, gamma, maxiter);
+   }
+   else if(verbose)
+   {
+      Rprintf("SPG converged after %d iterations\n", iter);
    }
 
    free(A);

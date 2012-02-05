@@ -14,7 +14,6 @@ export(
    "lasso",
    "ridge",
    "spg",
-   "fmpr.warm",
    "maxlambda1",
    "getB",
    "blockX",
@@ -25,8 +24,13 @@ export(
    "run",
    "R2",
    "plot.exper",
-   "sqr",
-   "gennetwork"
+   "graph.sqr",
+   "graph.ind",
+   "graph.abs",
+   "gennetwork",
+   "clean.rocr",
+   "spg.test",
+   "run.spg.test"
 )
 
 

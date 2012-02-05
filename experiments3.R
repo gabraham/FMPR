@@ -19,7 +19,7 @@ library(glmnet)
 library(ggplot2)
 library(FMPR)
 library(doMC)
-registerDoMC(cores=2)
+registerDoMC(cores=1)
 
 options(error=dump.frames)
 
@@ -108,21 +108,21 @@ setup <- list(
 )
 
 
-nreps <- 50
+nreps <- 5
 grid <- 10
 nfolds <- 5
 
-# Don't call SPG automatically because it's too slow
-do.spg <- function()
-{
-   res.spg <- run.spg2(setup[[idv]], nreps=nreps, grid=grid, nfolds=nfolds)
-   save(setup, res.spg, idv, file=sprintf("results_spg_%s.RData", idv))
-   load(sprintf("results_%s.RData", idv))
-   res[[1]]$weights <- c(res[[1]]$weights, res.spg$weights)
-   res[[1]]$recovery <- c(res[[1]]$recovery, res.spg$recovery)
-   res[[1]]$R2 <- cbind(res[[1]]$R2, res.spg$R2)
-   res
-}
+## Don't call SPG automatically because it's too slow
+#do.spg <- function()
+#{
+#   res.spg <- run.spg2(setup[[idv]], nreps=nreps, grid=grid, nfolds=nfolds)
+#   save(setup, res.spg, idv, file=sprintf("results_spg_%s.RData", idv))
+#   load(sprintf("results_%s.RData", idv))
+#   res[[1]]$weights <- c(res[[1]]$weights, res.spg$weights)
+#   res[[1]]$recovery <- c(res[[1]]$recovery, res.spg$recovery)
+#   res[[1]]$R2 <- cbind(res[[1]]$R2, res.spg$R2)
+#   res
+#}
 
 system.time({
    res <- lapply(setup[idv], run, nreps=nreps, grid=grid, nfolds=nfolds)
@@ -133,6 +133,5 @@ save(setup, res, idv, file=sprintf("results_%s.RData", idv))
 
 ################################################################################
 
-source("plotexper.R", echo=TRUE)
-
+plot.exper()
 
