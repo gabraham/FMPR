@@ -1,127 +1,139 @@
-# Test groupridge
-
 options(error=dump.frames)
 
 library(FMPR)
 
-#set.seed(1898)
-
-N <- 100
-p <- 50
-K <- 10
-
-
-B <- getB(p=p, K=K, w=0.5, type="same")
-d <- makedata(N=N, K=K, B=B, p=p, save=FALSE, sigma=1, rep=1)
-
-R <- cor(d$Ytrain)
-diag(R) <- 0
-Rthresh <- 0.7
-
-X <- scale(d$Xtrain)
-Y <- scale(d$Ytrain)
-Xtest <- scale(d$Xtest)
-Ytest <- scale(d$Ytest)
-
-write.table(X, file="X.txt", col.names=FALSE, row.names=FALSE)
-write.table(Y, file="Y.txt", col.names=FALSE, row.names=FALSE)
-
-l <- max(maxlambda1(X, Y))
-
-ngrid <- 10
-
-lambda1 <- l * seq(1, 1e-3, length=ngrid)
-lambda2 <- 10^seq(-3, 6, length=ngrid)
-lambda3 <- 10^seq(-3, 6, length=ngrid)
-
-lambda <- 10^seq(-3, 6, length=ngrid)
-gamma <- 10^seq(-3, 6, length=ngrid)
-
-nfolds <- 5
+#set.seed(18281)
 
 source("FMPR/R/methods.R")
 
-C <- gennetwork(Y, threshold=Rthresh, weight.fun=ind)
-weight.fun <- ind
+#N <- 100
+#p <- 200
+#K <- 10
 
-#m <- spg(X, Y, C,
-#      lambda=0.1, gamma=10,
-#      maxiter=1e6, simplify=TRUE, verbose=TRUE)
-#
-#r.s.t <- optim.spg(X, Y, nfolds=nfolds, maxiter=1e3,
-#      lambda=lambda, gamma=gamma,
-#      threshold=Rthresh, weight.fun=weight.fun)
-#
-#m.s.t <- spg(X, Y, C,
-#      lambda=r.s.t$opt[1], gamma=r.s.t$opt[2],
-#      maxiter=1e6, simplify=TRUE)
+#X <- scale(matrix(rnorm(N * p), N, p))
+#b <- 0
+#while(all(b == 0)) {
+#   b <- rnorm(p) * sample(0:1, size=p, replace=TRUE, prob=c(0.8, 0.2))
+#}
+#B0 <- matrix(b, p, K)
+##B <- B0 * rnorm(p * K, 0, 0.3)
+#B <- B0
+#Y <- scale(X %*% B + rnorm(N * K, 0, 2))
+X <- scale(as.matrix(read.table("Expr13/Xtrain_1.txt")))
+Y <- scale(as.matrix(read.table("Expr13/Ytrain_1.txt")))
+B <- as.matrix(read.table("Expr13/B_1.txt"))
 
-#z.t <- fmpr(X, Y, G=G,
-#   lambda1=1e-3, lambda2=1e-3, lambda3=1e-3,
-#   simplify=TRUE)
+l <- max(maxlambda1(X, Y))
 
-##z.w <- fmpr(X=Xtrain, Y=Ytrain, G=Gt,
-##   lambda1=1e-3, lambda2=1e-3, lambda3=1e-3,
-##   type="weighted", simplify=TRUE)
-##
-##sum((z.w-z.t)^2)
-##
-##
-##m.s.t <- spg(X=Xtrain, Y=Ytrain,
-##   lambda=r.s.t$opt[1], gamma=r.s.t$opt[2], C=Gt, simplify=TRUE)
+ngrid <- 50
+maxiter <- 1e4
 
-r.t <- optim.fmpr(X, Y, nfolds=nfolds,
-      lambda1=lambda1, lambda2=lambda2, lambda3=lambda3,
-      threshold=Rthresh, weight.fun=ind)
+lambda1 <- l * 2^seq(-10, 0, length=ngrid)
+lambda2 <- 0
+lambda3 <- 1e4
+#lambda1 <- 10^seq(-3, 6, length=ngrid)
+#lambda2 <- 10^seq(-3, 6, length=ngrid)
+#lambda3 <- 10^seq(-3, 6, length=ngrid)
+#lambda <- 10^seq(-3, 6, length=ngrid)
+gamma <- 10^seq(-3, 6, length=ngrid)
 
-##r.w1 <- optim.fmpr(X=Xtrain, Y=Ytrain, nfolds=nfolds,
-##      lambda1=lambda1, lambda2=lambda2, lambda3=lambda3,
-##      G=Gw1, type="weighted")
-#
-##r.w2 <- optim.fmpr(X=Xtrain, Y=Ytrain, nfolds=nfolds,
-##      lambda1=lambda1, lambda2=lambda2, lambda3=lambda3,
-##      G=Gw2, type="weighted")
-#
-G <- sign(R) * (weight.fun(R) > Rthresh)
-m.t <- fmpr(X, Y,
-   lambda1=r.t$opt[1],
-   lambda2=r.t$opt[2],
-   lambda3=r.t$opt[3],
-   G=G,
-   simplify=TRUE)
+#lambda3 <- numeric(ngrid)
+#gamma <- numeric(ngrid)
 
-###m.w1 <- fmpr(X=Xtrain, Y=Ytrain,
-###   lambda1=r.w1$opt[1],
-###   lambda2=r.w1$opt[2],
-###   lambda3=r.w1$opt[3],
-###   G=Gw1, type="weighted", simplify=TRUE)
-###
-###m.w2 <- fmpr(X=Xtrain, Y=Ytrain,
-###   lambda1=r.w2$opt[1],
-###   lambda2=r.w2$opt[2],
-###   lambda3=r.w2$opt[3],
-###   G=Gw2, type="weighted", simplify=TRUE)
-###
-###
-#P.t <- Xtest %*% m.t
-###P.w1 <- Xtest %*% m.w1
-###P.w2 <- Xtest %*% m.w2
-#P.s.t <- Xtest %*% m.s.t
-###
-###R2 <- function(p, y)
-###{
-###   1 - sum((p - y)^2) / sum((y - mean(y))^2)
-###}
-##
-#R2.t <- R2(as.numeric(P.t), as.numeric(Ytest))
-###R2.w1 <- R2(as.numeric(P.w1), as.numeric(Ytest))
-###R2.w2 <- R2(as.numeric(P.w2), as.numeric(Ytest))
-#R2.s.t <- R2(as.numeric(P.s.t), as.numeric(Ytest))
-###
-#c(
-#   R2.t,
-##   #R2.w1,
-##   #R2.w2,
-#   R2.s.t
+nfolds <- 5
+
+R <- cor(Y)
+G <- graph.sqr(R)
+C <- gennetwork(Y, cortype=2, corthresh=0)
+
+r1 <- optim.fmpr(X=X, Y=Y, lambda1=lambda1, lambda2=0, lambda3=lambda3,
+      sparse=FALSE)
+r2 <- optim.spg(X=X, Y=Y, lambda=lambda1, gamma=gamma, cortype=2, corthresh=0)
+
+f1 <- fmpr(X, Y, G=G, lambda1=r1$opt[1], lambda2=r1$opt[2], lambda3=r1$opt[3],
+   sparse=FALSE, maxiter=maxiter, eps=1e-6, verbose=FALSE, simplify=TRUE)
+f2 <- spg(X, Y, C=C, lambda=r2$opt[1], gamma=r2$opt[2], tol=1e-6)[[1]][[1]]
+
+#pr1 <- prediction(
+#   predictions=lapply(f1, function(x) abs(x[[1]][[1]])),
+#   labels=lapply(1:ngrid, function(i) as.numeric(B != 0))
 #)
-###
+#pr2 <- prediction(
+#   predictions=f2,
+#   labels=lapply(1:ngrid, function(i) as.numeric(B != 0))
+#)
+#pr3 <- prediction(
+#   predictions=lapply(f3, function(x) abs(x[[1]])),
+#   labels=lapply(1:ngrid, function(i) as.numeric(B != 0))
+#)
+
+pr1 <- prediction(predictions=as.numeric(abs(f1)), labels=as.numeric(B != 0))
+pr2 <- prediction(predictions=as.numeric(abs(f2)), labels=as.numeric(B != 0))
+
+par(mfrow=c(1, 2))
+plot(roc1 <- performance(pr1, "sens", "spec"), col=1)
+plot(roc2 <- performance(pr2, "sens", "spec"), col=3, add=TRUE)
+plot(prc1 <- performance(pr1, "prec", "rec"), col=1)
+plot(prc2 <- performance(pr2, "prec", "rec"), col=3, add=TRUE)
+
+#r1 <- optim.fmpr(X=X, Y=Y,
+#   lambda1=lambda1,
+#   lambda2=0,
+#   lambda3=lambda3,
+#   maxiter=maxiter
+#)
+#
+#r2 <- optim.spg(X=X, Y=Y,
+#   lambda=lambda,
+#   gamma=gamma,
+#   maxiter=maxiter
+#)
+#
+#r3 <- optim.ridge(X, Y, lambda2=lambda2)
+#r4 <- optim.lasso(blockX(X, p, K), as.numeric(Y), lambda1=lambda1)
+#
+#
+#f1 <- fmpr(X, Y, G=G, lambda1=r1$opt[1], lambda2=r1$opt[2], lambda3=r1$opt[3],
+#      simplify=TRUE, sparse=FALSE, maxiter=maxiter)
+#f2 <- spg(X, Y, C=C, lambda=r2$opt[1], gamma=r2$opt[2], simplify=TRUE,
+#      maxiter=maxiter)
+#f3 <- ridge(X, Y, lambda2=r3$opt[1])[[1]]
+#f4 <- lasso(blockX(X, p, K), as.numeric(Y), lambda1=r4$opt[1])
+#
+#pred1 <- prediction(
+#   predictions=as.numeric(abs(f1)), labels=as.numeric(B != 0)
+#)
+#pred2 <- prediction(
+#   predictions=as.numeric(abs(f2)), labels=as.numeric(B != 0)
+#)
+#pred3 <- prediction(
+#   predictions=as.numeric(abs(f3)), labels=as.numeric(B != 0)
+#)
+#pred4 <- prediction(
+#   predictions=as.numeric(abs(f4)), labels=as.numeric(B != 0)
+#)
+#
+#prc1 <- performance(pred1, "prec", "rec")
+#prc2 <- performance(pred2, "prec", "rec")
+#prc3 <- performance(pred3, "prec", "rec")
+#prc4 <- performance(pred4, "prec", "rec")
+#
+#roc1 <- performance(pred1, "sens", "spec")
+#roc2 <- performance(pred2, "sens", "spec")
+#roc3 <- performance(pred3, "sens", "spec")
+#roc4 <- performance(pred4, "sens", "spec")
+#
+#par(mfrow=c(1, 2))
+#
+#plot(roc1, col=1)
+#plot(roc2, add=TRUE, col=2)
+#plot(roc3, add=TRUE, col=3)
+#plot(roc4, add=TRUE, col=4)
+#abline(1, -1, lty=2)
+#
+#plot(prc1, col=1, ylim=c(0, 1))
+#plot(prc2, col=2, add=TRUE)
+#plot(prc3, col=3, add=TRUE)
+#plot(prc4, col=4, add=TRUE)
+#
+#

@@ -1,28 +1,20 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <math.h>
 
 #include <R.h>
+#include <Rmath.h>
+#include <R_ext/RS.h>     /* for Calloc/Free */
+#include <R_ext/Applic.h> /* for dgemm */
 
 #define TRUE 1
 #define FALSE 0
 
-inline double sign(double x)
-{
-   if(x < 0) 
-      return -1;
-   else if(x > 0)
-      return 1;
-   else
-      return 0;
-}
-
-inline double soft_threshold(double beta, double gamma)
+static inline double soft_threshold(double beta, double gamma)
 {
    return sign(beta) * fmax(fabs(beta) - gamma, 0);
 }
 
-inline double hard_threshold(double beta, double gamma)
+static inline double hard_threshold(double beta, double gamma)
 {
    if(beta > gamma)
       return(gamma);
@@ -31,77 +23,75 @@ inline double hard_threshold(double beta, double gamma)
    return(beta);
 }
 
-/*
- * (m by n)^T times (m by p) = (n by p)
- */
-void crossprod(double *x, double *y, double *z, int *m_p, int *n_p, int *p_p)
+/* From R src/main/array.c */
+static void tcrossprod(double *x, int nrx, int ncx,
+		      double *y, int nry, int ncy, double *z)
 {
-   int i, j, k;
-   int m = *m_p,
-       n = *n_p,
-       p = *p_p;
-
-   for(i = 0 ; i < n ; i++)
-   {
-      for(j = 0 ; j < p ; j++)
-      {
-	 k = 0;
-	 z[i + j * n] = x[k + m * i] * y[k + m * j];
-	 for(k = 1 ; k < m ; k++)
-	    z[i + j * n] += x[k + m * i] * y[k + m * j];
-      }
-   }
+    char *transa = "N", *transb = "T";
+    double one = 1.0, zero = 0.0;
+    if (nrx > 0 && ncx > 0 && nry > 0 && ncy > 0) {
+	F77_CALL(dgemm)(transa, transb, &nrx, &nry, &ncx, &one,
+			x, &nrx, y, &nry, &zero, z, &nrx);
+    } else { /* zero-extent operations should return zeroes */
+	int i;
+	for(i = 0; i < nrx*nry; i++) z[i] = 0;
+    }
 }
 
-/*
- * (m by n) times (n by p) = (m by p)
- */
-void prod(double *x, double *y, double *z, int *m_p, int *n_p, int *p_p)
+/* From R src/main/array.c */
+static void matprod(double *x, int nrx, int ncx,
+		    double *y, int nry, int ncy, double *z)
 {
-   int i, j, k;
-   int m = *m_p,
-       n = *n_p,
-       p = *p_p;
+    char *transa = "N", *transb = "N";
+    int i,  j, k;
+    double one = 1.0, zero = 0.0;
+    long double sum;
+    Rboolean have_na = FALSE;
 
-   for(i = 0 ; i < m ; i++)
-   {
-      for(j = 0 ; j < p ; j++)
-      {
-	 k = 0;
-	 z[i + j * m] = x[k * m + i] * y[k + n * j];
-	 for(k = 1 ; k < n ; k++)
-	    z[i + j * m] += x[k * m + i] * y[k + n * j];
-      }
-   }
+    if (nrx > 0 && ncx > 0 && nry > 0 && ncy > 0) {
+	/* Don't trust the BLAS to handle NA/NaNs correctly: PR#4582
+	 * The test is only O(n) here
+	 */
+	for (i = 0; i < nrx*ncx; i++)
+	    if (isnan(x[i])) {have_na = TRUE; break;}
+	if (!have_na)
+	    for (i = 0; i < nry*ncy; i++)
+		if (isnan(y[i])) {have_na = TRUE; break;}
+	if (have_na) {
+	    for (i = 0; i < nrx; i++)
+		for (k = 0; k < ncy; k++) {
+		    sum = 0.0;
+		    for (j = 0; j < ncx; j++)
+			sum += x[i + j * nrx] * y[j + k * nry];
+		    z[i + k * nrx] = sum;
+		}
+	} else
+	    F77_CALL(dgemm)(transa, transb, &nrx, &ncy, &ncx, &one,
+			    x, &nrx, y, &nry, &zero, z, &nrx);
+    } else /* zero-extent operations should return zeroes */
+	for(i = 0; i < nrx*ncy; i++) z[i] = 0;
 }
 
-/*
- * (m by n) times (p by n)^T = (m by p)
- */
-void tcrossprod(double *x, double *y, double *z, int *m_p, int *n_p, int *p_p)
+/* From R src/main/array.c */
+static void crossprod(double *x, int nrx, int ncx,
+		      double *y, int nry, int ncy, double *z)
 {
-   int i, j, k;
-   int m = *m_p,
-       n = *n_p,
-       p = *p_p;
-
-   for(i = 0 ; i < m ; i++)
-   {
-      for(j = 0 ; j < p ; j++)
-      {
-	 k = 0;
-	 z[i + j * m] = x[k * m + i] * y[k * p + j];
-	 for(k = 1 ; k < n ; k++)
-	    z[i + j * m] += x[k * m + i] * y[k * p + j];
-      }
-   }
+    char *transa = "T", *transb = "N";
+    double one = 1.0, zero = 0.0;
+    if (nrx > 0 && ncx > 0 && nry > 0 && ncy > 0) {
+	F77_CALL(dgemm)(transa, transb, &ncx, &ncy, &nrx, &one,
+			x, &nrx, y, &nry, &zero, z, &ncx);
+    } else { /* zero-extent operations should return zeroes */
+	int i;
+	for(i = 0; i < ncx*ncy; i++) z[i] = 0;
+    }
 }
 
 void spg_core(double *xx, double *xy, double *x, double *y,
    int *N_p, int *p_p, int *K_p, double *beta, double *C, int *CE_p,
    double *L_p, double *gamma_p, double *lambda_p,
    double *tol_p, double *mu_p, int *maxiter_p, int *verbose_p,
-   int *niter)
+   int *niter, int *status)
 {
    int N = *N_p,
        p = *p_p,
@@ -137,25 +127,25 @@ void spg_core(double *xx, double *xy, double *x, double *y,
       for(i = p * K - 1 ; i >= 0 ; --i)
          Wmu[i] = W[i] / mu;
 
-      tcrossprod(C, Wmu, M, &CE, &K, &p); 
+      tcrossprod(C, CE, K, Wmu, p, K, M); 
       for(i = CE * p - 1 ; i >= 0 ; --i)
          A[i] = hard_threshold(M[i], 1);
 
       if(p < 2 * N && p < 1e4)
       {
-         crossprod(xx, W, tmppK, &p, &p, &K);
-         crossprod(A, C, tmppK2, &CE, &p, &K);
+         crossprod(xx, p, p, W, p, K, tmppK);
+         crossprod(A, CE, p, C, CE, K, tmppK2);
          for(i = p * K - 1 ; i >= 0 ; --i)
             grad[i] = tmppK[i] - xy[i] + tmppK2[i];
       }
       else
       {
-	 prod(x, W, tmpNK, &N, &p, &K);
+	 matprod(x, N, p, W, p, K, tmpNK);
 	 for(i = N * K - 1 ; i >= 0 ; --i)
 	    tmpNK[i] -= y[i];
 
-	 crossprod(x, tmpNK, tmppK, &N, &p, &K); 
-	 crossprod(A, C, tmppK2, &CE, &p, &K);
+	 crossprod(x, N, p, tmpNK, N, K, tmppK); 
+	 crossprod(A, CE, p, C, CE, K, tmppK2);
 
 	 for(i = p * K - 1 ; i >= 0 ; --i)
 	    grad[i] = tmppK[i] + tmppK2[i];
@@ -172,8 +162,8 @@ void spg_core(double *xx, double *xy, double *x, double *y,
 	 W[i] = beta_new[i] + (1 - theta) / theta 
 	       * theta_new * (beta_new[i] - beta[i]);
 
-      prod(x, beta_new, tmpNK, &N, &p, &K);
-      tcrossprod(C, beta_new, tmpCEp, &CE, &K, &p);
+      matprod(x, N, p, beta_new, p, K, tmpNK);
+      tcrossprod(C, CE, K, beta_new, p, K, tmpCEp);
 
       s1 = 0;
       for(i = N * K - 1 ; i >= 0 ; --i)
@@ -190,6 +180,12 @@ void spg_core(double *xx, double *xy, double *x, double *y,
       s3 *= lambda;
 
       obj[iter] = s1 + s2 + s3;
+
+      if(isinf(obj[iter]) || isnan(obj[iter]))
+      {
+	 Rprintf("SPG diverged; terminating (%.5f %.5f %.5f)\n", s1, s2, s3);
+	 break;
+      }
 
       if(verbose)
 	 Rprintf("SPG iter=%d loss %.10f\n", iter, obj[iter]);
@@ -213,10 +209,13 @@ void spg_core(double *xx, double *xy, double *x, double *y,
    {
       Rprintf("SPG failed to converge after %d iterations (lambda: %.6f, \
 gamma: %.6f)\n", lambda, gamma, maxiter);
+      *status = FALSE;
    }
-   else if(verbose)
+   else 
    {
-      Rprintf("SPG converged after %d iterations\n", iter);
+      *status = TRUE;
+      if(verbose)
+	 Rprintf("SPG converged after %d iterations\n", iter);
    }
 
    free(A);

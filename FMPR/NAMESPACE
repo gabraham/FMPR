@@ -1,6 +1,8 @@
 useDynLib(FMPR)
 export(
    "optim.fmpr",
+   "optim.fmpr.grid",
+   "optim.fmpr.search",
    "optim.lasso",
    "optim.elnet.glmnet",
    "optim.ridge",
@@ -11,6 +13,7 @@ export(
    "crossval.ridge",
    "crossval.spg",
    "fmpr",
+   "fmpr.warm",
    "lasso",
    "ridge",
    "spg",
@@ -30,7 +33,10 @@ export(
    "gennetwork",
    "clean.rocr",
    "spg.test",
-   "run.spg.test"
+   "run.spg.test",
+   "graph.ind",
+   "graph.sqr",
+   "graph.abs"
 )
 
 
