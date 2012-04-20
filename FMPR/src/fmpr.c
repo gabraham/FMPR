@@ -211,7 +211,7 @@ void lasso(double *x, double *y, double *b,
 void fmpr_weighted_warm(double *x, double *y, double *b,
       double *LP, int *N_p, int *p_p, int *K_p,
       double *lambda1, double *lambda2, double *lambda3_p,
-      int *G, int *maxiter_p, double *eps_p, int *verbose_p,
+      double *G, int *maxiter_p, double *eps_p, int *verbose_p,
       int *status, int *iter_p, int *numactive_p)
 {
    int N = *N_p,
@@ -229,7 +229,7 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
    int verbose = *verbose_p;
    int pK = p * K, pK1 = p * K - 1;
    double s, lambda3 = *lambda3_p;
-   int g, q, iNk, kqK;
+   int g, q, iNk, kqK, jpk;
 
    int *active = malloc(sizeof(int) * p * K);
    int *oldactive = malloc(sizeof(int) * p * K);
@@ -241,6 +241,7 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
    double *lossnull = calloc(K, sizeof(double));
    double *lossnullF = calloc(K, sizeof(double));
    double *d2_0 = calloc(p * K, sizeof(double));
+   double *lambda3g = calloc(K * K, sizeof(double));
    double *signG = calloc(K * K, sizeof(double));
    double losstotal = 0, oldlosstotal = 0;
    double *oneOnLambda2PlusOne = malloc(sizeof(double) * K);
@@ -254,24 +255,37 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
       meany[k] *= oneOnN;
    }
 
+   for(k = K * K - 1 ; k >= 0 ; --k)
+      signG[k] = (double)sign(G[k]);
+
    for(k = 0 ; k < K ; k++)
    {
       for(j = p - 1 ; j >= 0 ; --j) 
       {
+	 jpk = j + p * k;
 	 for(i = N - 1 ; i >= 0 ; --i)
-	    d2_0[j + p * k] +=  x[i + j * N] * x[i + j * N];
-	 ignore[j + p * k] = d2_0[j + p * k] <= ZERO_VAR_THRESH;;
+	    d2_0[jpk] +=  x[i + j * N] * x[i + j * N];
+	 ignore[jpk] = d2_0[jpk] <= ZERO_VAR_THRESH;;
+      }
+   }
+
+   for(j = pK1 ; j >= 0 ; --j)
+      oldactive[j] = active[j] = !ignore[j];
+
+   /* ensure that fusion weights for tasks with themselves are zero */
+   for(k = 0 ; k < K ; k++)
+   {
+      for(q = 0 ; q < K ; q++)
+      {
+	 kqK = k + q * K;
+         lambda3g[kqK] = 0;
+	 if(q != k)
+	    lambda3g[kqK] = lambda3 * fabs(G[kqK]);
       }
    }
 
    for(k = K - 1 ; k >= 0 ; --k)
       oneOnLambda2PlusOne[k] = 1 / (lambda2[k] + 1);
-
-   for(k = K * K - 1 ; k >= 0 ; --k)
-      signG[k] = (double)sign(G[k]);
-
-   for(j = pK1 ; j >= 0 ; --j)
-      oldactive[j] = active[j] = !ignore[j];
 
    for(k = 0 ; k < K ; k++)
    {
@@ -287,6 +301,18 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
       lossnull[k] *= oneOnN;
       lossnullF[k] = lossnull[k] * eps;
    }
+   
+   /* ensure that fusion weights for tasks with themselves are zero */
+   for(k = 0 ; k < K ; k++)
+   {
+      for(q = 0 ; q < K ; q++)
+      {
+	 kqK = k + q * K;
+         lambda3g[kqK] = 0;
+	 if(q != k)
+	    lambda3g[kqK] = lambda3 * fabs(G[kqK]);
+      }
+   }
 
    for(iter = 0 ; iter < maxiter ; iter++)
    {
@@ -299,10 +325,12 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
       {
 	 for(j = 0 ; j < p ; j++)
 	 {
-	    d1 = 0;
-	    d2 = d2_0[j + p * k];
+	    jpk = j + p * k;
 
-	    if(!active[j + p * k])
+	    d1 = 0;
+	    d2 = d2_0[jpk];
+
+	    if(!active[jpk])
 	       numconverged++;
 	    else
 	    {
@@ -310,19 +338,14 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
 	          d1 += x[i + j * N] * Err[i + N * k];
 
 	       // different implementation of the soft-thresholding
-	       bjk = b[j + p * k];
-
+	       bjk = b[jpk];
 	       
 	       /* Apply inter-task ridge regression */
 	       for(q = 0 ; q < K ; q++)
 	       {
-		  kqK = k + q * K;
-		  g = G[kqK];
-	          if(k != q && g != 0)
-	          {
-	             d1 += lambda3 * (bjk - signG[kqK] * b[j + p * q]);
-	             d2 += lambda3;
-	          }
+	          kqK = k + q * K;
+	          d1 += lambda3g[kqK] * (bjk - signG[kqK] * b[j + p * q]);
+	          d2 += lambda3g[kqK];
 	       }
 
 	       /* Apply intra-task ridge regression */
@@ -331,15 +354,15 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
 	       /* Now apply intra-task lasso */
 	       if(fabs(s) <= lambda1[k])
 	       {
-	          b[j + p * k] = 0;
+	          b[jpk] = 0;
 	          delta = -bjk;
 	       }
 	       else
 	       {
-	          b[j + p * k] = s - lambda1[k] * sign(s);
-		  if(fabs(b[j + p * k]) < ZERO_THRESH) // close enough to zero
-		     b[j + p * k] = 0;
-	          delta = b[j + p * k] - bjk;
+	          b[jpk] = s - lambda1[k] * sign(s);
+		  if(fabs(b[jpk]) < ZERO_THRESH) // close enough to zero
+		     b[jpk] = 0;
+	          delta = b[jpk] - bjk;
 	       }
 
 	       oldloss[k] = loss[k];
@@ -355,8 +378,8 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
 	       numconverged += fabs(loss[k] - oldloss[k]) < lossnullF[k];
 	    }
 
-	    active[j + p * k] = b[j + p * k] != 0;
-	    numactive += active[j + p * k];
+	    active[jpk] = b[jpk] != 0;
+	    numactive += active[jpk];
 	 }
 
 	 losstotal += loss[k];
@@ -430,6 +453,8 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
    free(d2_0);
    free(ignore);
    free(oneOnLambda2PlusOne);
+   free(lambda3g);
+   free(signG);
 }
 
 /*
@@ -457,9 +482,9 @@ void fmpr_weighted(double *x, double *y, double *b,
        allconverged = 1,
        numconverged = 0;
    int verbose = *verbose_p;
-   int pK = p * K, pK1 = p * K - 1, jpk;
+   int pK = p * K, pK1 = p * K - 1;
    double s, lambda3 = *lambda3_p;
-   int q, iNk, kqK;
+   int q, iNk, kqK, jpk;
    double g;
 
    int *active = malloc(sizeof(int) * p * K);
@@ -493,9 +518,10 @@ void fmpr_weighted(double *x, double *y, double *b,
    {
       for(j = p - 1 ; j >= 0 ; --j) 
       {
+	 jpk = j + p * k;
 	 for(i = N - 1 ; i >= 0 ; --i)
-	    d2_0[j + p * k] +=  x[i + j * N] * x[i + j * N];
-	 ignore[j + p * k] = d2_0[j + p * k] <= ZERO_VAR_THRESH;;
+	    d2_0[jpk] +=  x[i + j * N] * x[i + j * N];
+	 ignore[jpk] = d2_0[jpk] <= ZERO_VAR_THRESH;;
       }
    }
 
@@ -522,9 +548,10 @@ void fmpr_weighted(double *x, double *y, double *b,
    {
       for(q = 0 ; q < K ; q++)
       {
-         lambda3g[k + q * K] = 0;
+	 kqK = k + q * K;
+         lambda3g[kqK] = 0;
 	 if(q != k)
-	    lambda3g[k + q * K] = lambda3 * fabs(G[k + q * K]);
+	    lambda3g[kqK] = lambda3 * fabs(G[kqK]);
       }
    }
 
@@ -543,6 +570,7 @@ void fmpr_weighted(double *x, double *y, double *b,
 
 	    d1 = 0;
 	    d2 = d2_0[jpk];
+
 	    if(!active[jpk])
 	       numconverged++;
 	    else
@@ -555,9 +583,7 @@ void fmpr_weighted(double *x, double *y, double *b,
 	       /* Apply inter-task ridge regression */
 	       for(q = 0 ; q < K ; q++)
 	       {
-		  kqK = k + q * K;
-		  g = G[kqK];
-	          
+	          kqK = k + q * K;
 	          d1 += lambda3g[kqK] * (bjk - signG[kqK] * b[j + p * q]);
 	          d2 += lambda3g[kqK];
 	       }
@@ -577,7 +603,7 @@ void fmpr_weighted(double *x, double *y, double *b,
 
 		  // values close enough to zero are considered zero to avoid
 		  // silly situations where tiny numbers produced from
-		  // numerical error are considered non-zero
+		  // numerical error are considered truly non-zero
 		  if(fabs(b[jpk]) < ZERO_THRESH)
 		     b[jpk] = 0;
 	          delta = b[jpk] - bjk;

@@ -62,9 +62,9 @@ crossval.fmpr <- function(X, Y, nfolds=5,
    Y <- cbind(Y)
    folds <- sample(1:nfolds, N, TRUE)
 
-   l1 <- length(list(...)$lambda1)
-   l2 <- length(list(...)$lambda2)
-   l3 <- length(list(...)$lambda3)
+   l1 <- max(length(list(...)$lambda1), 1)
+   l2 <- max(length(list(...)$lambda2), 1)
+   l3 <- max(length(list(...)$lambda3), 1)
    verbose <- list(...)$verbose
    res <- array(0, c(nfolds, l1, l2, l3))
 
@@ -120,8 +120,8 @@ crossval.spg <- function(X, Y, nfolds=5, cortype=2, corthresh=0, ...)
    Y <- cbind(Y)
    folds <- sample(1:nfolds, N, TRUE)
 
-   ll <- length(list(...)$lambda)
-   lg <- length(list(...)$gamma)
+   ll <- max(length(list(...)$lambda), 1)
+   lg <- max(length(list(...)$gamma), 1)
    res <- array(0, c(nfolds, ll, lg))
 
    for(fold in 1:nfolds)

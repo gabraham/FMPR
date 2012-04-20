@@ -31,8 +31,8 @@ set.seed(seed)
 # Configure the experiments here
 setup <- list(
    # The reference setup
-   Expr1=list(dir=c("Expr1"), N=100, p=50, K=10, sigma=1,
-	 B=getB(p=50, K=10, w=0.1, type="same")),
+   Expr1=list(dir=c("Expr1"), N=100, p=100, K=10, sigma=1,
+	 B=getB(p=100, K=10, w=0.1, type="same")),
    
    # Different sample size
    Expr2=list(dir=c("Expr2"), N=50, p=100, K=10, sigma=1,
@@ -93,8 +93,8 @@ setup <- list(
 )
 
 
-nreps <- 5
-grid <- 10
+nreps <- 10
+grid <- 15
 nfolds <- 5
 
 system.time({
@@ -103,6 +103,18 @@ system.time({
 save(setup, res, idv, nreps, grid, nfolds, file=sprintf("results_%s.RData", idv))
 
 ################################################################################
+
+pdf("res.pdf", width=12)
+par(mfrow=c(1, 2))
+plot(res[[1]]$recovery$fmpr.w2$roc, avg="threshold", col=1)
+plot(res[[1]]$recovery$spg.w2$roc, avg="threshold", col=2, add=TRUE)
+plot(res[[1]]$recovery$lasso$roc, avg="threshold", col=3, add=TRUE)
+plot(res[[1]]$recovery$fmpr.w2$prc, avg="threshold", col=1)
+plot(res[[1]]$recovery$spg.w2$prc, avg="threshold", col=2, add=TRUE)
+plot(res[[1]]$recovery$lasso$prc, avg="threshold", col=3, add=TRUE)
+dev.off()
+
+stop()
 
 plot.exper()
 

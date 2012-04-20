@@ -19,7 +19,7 @@ graph.abs <- function(R, threshold=NA)
    R
 }
 
-fmpr <- function(..., type=c("cold", "warm"))
+fmpr <- function(..., type=c("warm", "cold"))
 {
    type <- match.arg(type)
    if(type == "warm") {
@@ -73,15 +73,13 @@ fmpr.cold <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
 	    Bjk <- vector("list", length(lambda1))
 	    nactive <- numeric(length(lambda1))
 
-	    for(i in seq(along=lambda1))
-	    {
+	    for(i in seq(along=lambda1)) {
 	       Bjk[[i]] <- B0
 	    }
 	       
 	    for(i in seq(along=lambda1))
 	    {
-	       #if(verbose)
-	          cat("\t", l1ord[i], j, k, ": ")
+	       cat("\t", l1ord[i], j, k, ": ")
 
 	       if(i > 1 && nactive[l1ord[i-1]] == 0)
 	       {
@@ -104,8 +102,7 @@ fmpr.cold <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
 	       if(!status) {
 	          cat("fmpr failed to converge within ",
 	             maxiter, " iterations")
-	       } else #if(verbose) {
-	          {
+	       } else {
 		  cat("converged in", numiter, "iterations",
 	             "with", nactive[l1ord[i]], "active variables\n\n")
 	       }
@@ -162,9 +159,6 @@ fmpr.warm <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
       lambda3 <- 0
    }
 	       
-   #B0 <- if(sparse) {
-   #   sparseMatrix(i={}, j={}, dims=c(p, K))
-   #} else matrix(0, p, K)
    B0 <- matrix(0, p, K)
    LP0 <- matrix(0, N, K)
 
@@ -183,21 +177,9 @@ fmpr.warm <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
 	    LPjk <- vector("list", length(lambda1))
 	    nactive <- numeric(length(lambda1))
 
-	    #for(i in seq(along=lambda1))
-	    #{
-	    #   Bjk[[i]] <- B0
-	    #}
-	       
 	    for(i in seq(along=lambda1))
 	    {
-	       #if(verbose)
-	          cat("\t", l1ord[i], j, k, ": ")
-
-	       #if(i > 1 && nactive[l1ord[i-1]] == 0)
-	       #{
-	       #   cat("\nterminating early, no active variables left\n")
-	       #   break
-	       #}
+	       cat("\t", l1ord[i], j, k, ": ")
 
 	       if(i == 1) {
 		  B <- B0
@@ -232,18 +214,11 @@ fmpr.warm <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
 	       if(!status) {
 	          cat("fmpr failed to converge within ",
 	             maxiter, " iterations")
-	       } else #if(verbose) {
-	          {
+	       } else {
 		  cat("converged in", numiter, "iterations",
 	             "with", nactive[l1ord[i]], "active variables\n\n")
 	       }
 	          
-	       #m <- matrix(r[[3]], p, K)
-	       #
-	       #Bjk[[l1ord[i]]] <- if(sparse) {
-	       #   w <- which(m != 0, arr.ind=TRUE)
-	       #   sparseMatrix(i=w[,1], w[,2], x=m[w], dims=c(p, K))
-	       #} else m
 	       Bjk[[l1ord[i]]] <- matrix(r[[3]], p, K)
 	       LPjk[[l1ord[i]]] <- matrix(r[[4]], N, K)
 	    }

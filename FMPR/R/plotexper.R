@@ -2,6 +2,8 @@
 # Remove ROC/PRC replications that had non-sensical results
 clean.rocr <- function(obj)
 {
+   if(is.null(obj))
+      return(NULL)
    n <- length(obj@x.values)
    if(n == 0)
       return(NULL)
