@@ -414,7 +414,7 @@ spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-6,
    }
 }
 
-fmprR <- function(X, Y, G, lambda1, lambda2, lambda3, maxiter=1e3, eps=1e-6)
+fmprR <- function(X, Y, G, lambda1=0, lambda2=0, lambda3=0, maxiter=1e3, eps=1e-6)
 {
    K <- ncol(Y)
    p <- ncol(X)
@@ -434,8 +434,8 @@ fmprR <- function(X, Y, G, lambda1, lambda2, lambda3, maxiter=1e3, eps=1e-6)
       	    d1 <- crossprod(X[,j], Err)
       	    d2 <- v[j]
 
-	    d1 <- d1 + lambda3 * sum(abs(G[k, -k]) 
-		  * (B[j, k] - sign(G[k, -k]) * B[j, -k]))
+	    # must take abs(G) since G is signed but f(r_ml) is not signed
+	    d1 <- d1 + lambda3 * sum(abs(G[k, -k]) * (B[j, k] - sign(G[k, -k]) * B[j, -k]))
 	    d2 <- d2 + lambda3 * sum(abs(G[k, -k]))
 
 	    s <- (B[j, k] - d1 / d2) / (1 + lambda2)

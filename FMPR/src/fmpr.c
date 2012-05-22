@@ -244,7 +244,7 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
    double *lambda3g = calloc(K * K, sizeof(double));
    double *signG = calloc(K * K, sizeof(double));
    double losstotal = 0, oldlosstotal = 0;
-   double *oneOnLambda2PlusOne = malloc(sizeof(double) * K);
+   //double *oneOnLambda2PlusOne = malloc(sizeof(double) * K);
    double oneOnN = 1.0 / N;
 
    /* null loss mean((y - mean(y))^2)*/
@@ -278,14 +278,16 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
       for(q = 0 ; q < K ; q++)
       {
 	 kqK = k + q * K;
-         lambda3g[kqK] = 0;
+	 /* must take absolute value of G since f(r_ml) is monotonic in
+	  * abs(r_ml) but G is signed
+	  */
 	 if(q != k)
 	    lambda3g[kqK] = lambda3 * fabs(G[kqK]);
       }
    }
 
-   for(k = K - 1 ; k >= 0 ; --k)
-      oneOnLambda2PlusOne[k] = 1 / (lambda2[k] + 1);
+   //for(k = K - 1 ; k >= 0 ; --k)
+   //   oneOnLambda2PlusOne[k] = 1 / (lambda2[k] + 1);
 
    for(k = 0 ; k < K ; k++)
    {
@@ -302,18 +304,6 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
       lossnullF[k] = lossnull[k] * eps;
    }
    
-   /* ensure that fusion weights for tasks with themselves are zero */
-   for(k = 0 ; k < K ; k++)
-   {
-      for(q = 0 ; q < K ; q++)
-      {
-	 kqK = k + q * K;
-         lambda3g[kqK] = 0;
-	 if(q != k)
-	    lambda3g[kqK] = lambda3 * fabs(G[kqK]);
-      }
-   }
-
    for(iter = 0 ; iter < maxiter ; iter++)
    {
       numactive = 0;
@@ -349,7 +339,7 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
 	       }
 
 	       /* Apply intra-task ridge regression */
-	       s = (bjk - d1 / d2) * oneOnLambda2PlusOne[k];
+	       s = (bjk - d1 / d2); //* oneOnLambda2PlusOne[k];
 
 	       /* Now apply intra-task lasso */
 	       if(fabs(s) <= lambda1[k])
@@ -452,7 +442,7 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
    free(Err);
    free(d2_0);
    free(ignore);
-   free(oneOnLambda2PlusOne);
+   //free(oneOnLambda2PlusOne);
    free(lambda3g);
    free(signG);
 }
@@ -550,6 +540,9 @@ void fmpr_weighted(double *x, double *y, double *b,
       {
 	 kqK = k + q * K;
          lambda3g[kqK] = 0;
+	 /* must take absolute value of G since f(r_ml) is monotonic in
+	  * abs(r_ml) but G is signed
+	  */
 	 if(q != k)
 	    lambda3g[kqK] = lambda3 * fabs(G[kqK]);
       }
