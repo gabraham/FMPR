@@ -302,18 +302,6 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
       lossnullF[k] = lossnull[k] * eps;
    }
    
-   /* ensure that fusion weights for tasks with themselves are zero */
-   for(k = 0 ; k < K ; k++)
-   {
-      for(q = 0 ; q < K ; q++)
-      {
-	 kqK = k + q * K;
-         lambda3g[kqK] = 0;
-	 if(q != k)
-	    lambda3g[kqK] = lambda3 * fabs(G[kqK]);
-      }
-   }
-
    for(iter = 0 ; iter < maxiter ; iter++)
    {
       numactive = 0;
