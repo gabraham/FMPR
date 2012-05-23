@@ -79,7 +79,9 @@ fmpr.cold <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
 	       
 	    for(i in seq(along=lambda1))
 	    {
-	       cat("\t", l1ord[i], j, k, ": ")
+	       if(verbose) {
+		  cat("\t", l1ord[i], j, k, ": ")
+	       }
 
 	       if(i > 1 && nactive[l1ord[i-1]] == 0)
 	       {
@@ -102,7 +104,7 @@ fmpr.cold <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
 	       if(!status) {
 	          cat("fmpr failed to converge within ",
 	             maxiter, " iterations")
-	       } else {
+	       } else if(verbose) {
 		  cat("converged in", numiter, "iterations",
 	             "with", nactive[l1ord[i]], "active variables\n\n")
 	       }
@@ -179,7 +181,9 @@ fmpr.warm <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
 
 	    for(i in seq(along=lambda1))
 	    {
-	       cat("\t", l1ord[i], j, k, ": ")
+	       if(verbose) {
+		  cat("\t", l1ord[i], j, k, ": ")
+	       }
 
 	       if(i == 1) {
 		  B <- B0
@@ -214,7 +218,7 @@ fmpr.warm <- function(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
 	       if(!status) {
 	          cat("fmpr failed to converge within ",
 	             maxiter, " iterations")
-	       } else {
+	       } else if(verbose) {
 		  cat("converged in", numiter, "iterations",
 	             "with", nactive[l1ord[i]], "active variables\n\n")
 	       }

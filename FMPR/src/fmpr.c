@@ -258,6 +258,8 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
    for(k = K * K - 1 ; k >= 0 ; --k)
       signG[k] = (double)sign(G[k]);
 
+   /* setup second derivatives of loss and which variables to ignore due to
+    * small variance */
    for(k = 0 ; k < K ; k++)
    {
       for(j = p - 1 ; j >= 0 ; --j) 
@@ -317,20 +319,20 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
 	 {
 	    jpk = j + p * k;
 
-	    d1 = 0;
-	    d2 = d2_0[jpk];
-
 	    if(!active[jpk])
 	       numconverged++;
 	    else
 	    {
+	       d1 = 0;
+	       d2 = d2_0[jpk];
+
 	       for(i = N - 1 ; i >= 0 ; --i)
 	          d1 += x[i + j * N] * Err[i + N * k];
 
 	       // different implementation of the soft-thresholding
 	       bjk = b[jpk];
 	       
-	       /* Apply inter-task ridge regression */
+	       /* Apply inter-task penalty */
 	       for(q = 0 ; q < K ; q++)
 	       {
 	          kqK = k + q * K;
@@ -355,6 +357,7 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
 	          delta = b[jpk] - bjk;
 	       }
 
+	       /* update loss and errors based on new estimates */
 	       oldloss[k] = loss[k];
 	       loss[k] = 0;
 	       for(i = N - 1 ; i >= 0 ; --i)
@@ -382,6 +385,7 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
 	 Rprintf("%d converged at iter %d\n", numconverged, iter);
       }
 
+      /* active-set convergence */
       if(numconverged == pK)
       {
          if(verbose)
