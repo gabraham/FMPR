@@ -116,7 +116,7 @@ run.lasso <- function(rep, dir=".", nfolds=10, grid=25,
    ytest <- as.numeric(scale(Ytest))
 
    l <- maxlambda1(XtrainB, ytrain)
-   opt <- optim.elnet.glmnet(X=XtrainB, Y=ytrain, nfolds=nfolds,
+   opt <- optim.elnet(X=XtrainB, Y=ytrain, nfolds=nfolds,
 	 lambda1=sort(l * lambda1r, decreasing=TRUE), alpha=1)
    P <- XtestB %*% g
    res <- R2(as.numeric(P), ytest)
@@ -171,7 +171,6 @@ run.ridge <- function(rep, dir=".", nfolds=10, grid=25,
 run.fmpr <- function(rep, dir=".", nfolds=10, grid=25,
    graph.thresh=0.5, graph.fun=graph.sqr,
    lambda1r=2^seq(-10, 0, length=grid),
-   lambda2=10^seq(-3, 6, length=grid),
    lambda3=10^seq(-3, 6, length=grid))
 {
    oldwd <- getwd()
@@ -209,13 +208,11 @@ run.fmpr <- function(rep, dir=".", nfolds=10, grid=25,
 	 nfolds=nfolds,
 	 graph.fun=graph.fun, graph.thresh=graph.thresh,
 	 lambda1=lambda1,
-	 lambda2=lambda2,
 	 lambda3=lambda3,
 	 maxiter=1e5)
    cat("optim.fmpr end\n")
    g <- fmpr(X=Xtrain, Y=Ytrain,
-	 lambda1=opt$opt["lambda1"], lambda2=opt$opt["lambda2"],
-	    lambda3=opt$opt["lambda3"],
+	 lambda1=opt$opt["lambda1"], lambda3=opt$opt["lambda3"],
 	 maxiter=1e5, G=G, simplify=TRUE)
 
    P <- scale(Xtest) %*% g
@@ -231,59 +228,7 @@ run.fmpr <- function(rep, dir=".", nfolds=10, grid=25,
    )
 }
 
-run.elnet.fmpr <- function(rep, dir=".", nfolds=10, grid=25,
-   lambda1r=2^seq(-10, 0, length=grid),
-   lambda2=10^seq(-3, 6, length=grid))
-{
-   oldwd <- getwd()
-   setwd(dir)
-
-   Xtrain <- as.matrix(read.table(sprintf("Xtrain_%s.txt", rep),
-	    header=FALSE))
-   Xtest <- as.matrix(read.table(sprintf("Xtest_%s.txt", rep), header=FALSE))
-   Ytrain <- as.matrix(read.table(sprintf("Ytrain_%s.txt", rep), header=FALSE))
-   Ytest <- as.matrix(read.table(sprintf("Ytest_%s.txt", rep), header=FALSE))
-  
-   N <- nrow(Xtrain)
-   K <- ncol(Ytrain)
-   p <- ncol(Xtrain)
-
-   Xtrain <- scale(Xtrain)
-   Ytrain <- scale(Ytrain)
-
-   G0 <- matrix(0, K, K)
-   
-   cat("optim.elnet.fmpr start\n")
-
-   # We can use fmpr to do elastic net because we just ignore the task
-   # relatedness and set lambda3 to zero.
-   l <- max(maxlambda1(Xtrain, Ytrain))
-   opt <- optim.fmpr(X=Xtrain, Y=Ytrain,
-	 nfolds=nfolds,
-	 lambda1=l * lambda1r,
-	 lambda2=lambda2,
-	 lambda3=0,
-	 maxiter=1e5)
-   cat("optim.elnet.fmpr end\n")
-   g <- fmpr(X=Xtrain, Y=Ytrain,
-	 lambda1=opt$opt["lambda1"], lambda2=opt$opt["lambda2"], lambda3=0,
-	 maxiter=1e5, G=G0)
-   g <- g[[1]][[1]][[1]]
-
-   P <- scale(Xtest) %*% g
-   res <- R2(as.numeric(P), as.numeric(scale(Ytest)))
-
-   cat("rep", rep, "R2 elasticnet.fmpr:", res, "\n")
-
-   setwd(oldwd)
-
-   list(
-      R2=res,
-      beta=g
-   )
-}
-
-run.elnet.glmnet <- function(rep, dir=".", nfolds=10, grid=25,
+run.elnet <- function(rep, dir=".", nfolds=10, grid=25,
       lambda1r=2^seq(-10, 0, length=grid), alpha=seq(0, 1, length=grid))
 {
    oldwd <- getwd()
@@ -305,12 +250,12 @@ run.elnet.glmnet <- function(rep, dir=".", nfolds=10, grid=25,
    ytrain <- scale(as.numeric(Ytrain))
    ytest <- scale(as.numeric(Ytest))
 
-   cat("optim.elnet.glmnet start\n")
+   cat("optim.elnet start\n")
    l <- maxlambda1(XtrainB, ytrain)
-   opt <- optim.elnet.glmnet(X=XtrainB, Y=ytrain, nfolds=nfolds,
+   opt <- optim.elnet(X=XtrainB, Y=ytrain, nfolds=nfolds,
 	 lambda1=sort(l * lambda1r, decreasing=TRUE), alpha=alpha)
-   cat("run.elnet.glmnet R2", opt$R2, "\n")
-   cat("optim.elnet.glmnet end\n")
+   cat("run.elnet R2", opt$R2, "\n")
+   cat("optim.elnet end\n")
 
    # glmnet docs recommend running it on entire penalty path, not just one
    g <- glmnet(x=XtrainB, y=ytrain,
@@ -322,7 +267,7 @@ run.elnet.glmnet <- function(rep, dir=".", nfolds=10, grid=25,
    P <- XtestB %*% g
    res <- R2(as.numeric(P), ytest)
 
-   cat("rep", rep, "R2 elasticnet.glmnet:", res, "\n")
+   cat("rep", rep, "R2 elasticnet:", res, "\n")
 
    setwd(oldwd)
 
@@ -412,10 +357,10 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
   # 	 corthresh=0, cortype=1)
    r.spg.w2 <- lapply(1:nreps, run.spg, dir=dir, grid=grid, nfolds=nfolds,
    	 corthresh=0, cortype=2)
-   r.lasso <- lapply(1:nreps, run.elnet.glmnet, dir=dir,
+   r.lasso <- lapply(1:nreps, run.elnet, dir=dir,
 	 grid=grid, nfolds=nfolds, alpha=1)
    #r.ridge <- lapply(1:nreps, run.ridge, dir=dir, grid=grid, nfolds=nfolds)
-   #r.elnet.glmnet <- lapply(1:nreps, run.elnet.glmnet, dir=dir,
+   #r.elnet <- lapply(1:nreps, run.glmnet, dir=dir,
    #	 grid=grid, nfolds=nfolds)
    cat("Inference done\n")
      
@@ -425,7 +370,7 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
    R2.spg.w2 <- sapply(r.spg.w2, function(x) x$R2)
    R2.lasso <- sapply(r.lasso, function(x) x$R2)
    #R2.ridge <- sapply(r.ridge, function(x) x$R2)
-   #R2.elnet.glmnet <- sapply(r.elnet.glmnet, function(x) x$R2)
+   #R2.elnet <- sapply(r.elnet, function(x) x$R2)
    
    R2.all <- cbind(
     #  FMPRw1=R2.fmpr.w1,
@@ -434,7 +379,7 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
       SPGw2=R2.spg.w2,
       lasso=R2.lasso#,
       #ridge=R2.ridge,
-      #ElasticNet=R2.elnet.glmnet
+      #ElasticNet=R2.elnet
    )
 
    #rec.fmpr.w1 <- recovery(r.fmpr.w1, rep, dir, cleanROCR)
@@ -443,7 +388,7 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
    rec.spg.w2 <- recovery(r.spg.w2, rep, dir, cleanROCR)
    rec.lasso <- recovery(r.lasso, rep, dir, cleanROCR)
    #rec.ridge <- recovery(r.ridge, rep, dir, cleanROCR)
-   #rec.elnet.glmnet <- recovery(r.elnet.glmnet, rep, dir, cleanROCR)
+   #rec.elnet <- recovery(r.elnet, rep, dir, cleanROCR)
 
    list(
       weights=list(
@@ -451,7 +396,7 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
 	 fmpr.w2=r.fmpr.w2,
 	 lasso=r.lasso,
 	 #ridge=r.ridge,
-	 #elnet.glmnet=r.elnet.glmnet,
+	 #elnet=r.elnet,
 	 #spg.w1=r.spg.w1,
 	 spg.w2=r.spg.w2
       ),
@@ -460,7 +405,7 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
 	 fmpr.w2=rec.fmpr.w2,
 	 lasso=rec.lasso,
 	 #ridge=rec.ridge,
-	 #elnet.glmnet=rec.elnet.glmnet,
+	 #elnet=rec.elnet,
 	 #spg.w1=rec.spg.w1,
 	 spg.w2=rec.spg.w2
       ),
