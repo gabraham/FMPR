@@ -122,6 +122,9 @@ void spg_core(double *xx, double *xy, double *x, double *y,
    double *obj = calloc(maxiter, sizeof(double));
    int iter, mod = 0;
 
+   if(verbose)
+      Rprintf("spg_core_new\n");
+
    for(iter = 0 ; iter < maxiter ; iter++)
    {
       for(i = p * K - 1 ; i >= 0 ; --i)
@@ -156,7 +159,7 @@ void spg_core(double *xx, double *xy, double *x, double *y,
 	       lambda * oneOnL);
 
       theta_new = (sqrt(pow(theta, 4) + 4 * theta * theta) 
-	    - theta * theta) / 2.0;
+	    - theta * theta) * 0.5;
 
       for(i = p * K - 1 ; i >= 0 ; --i)
 	 W[i] = beta_new[i] + (1 - theta) / theta 
@@ -168,7 +171,7 @@ void spg_core(double *xx, double *xy, double *x, double *y,
       s1 = 0;
       for(i = N * K - 1 ; i >= 0 ; --i)
 	 s1 += pow(y[i] - tmpNK[i], 2);
-      s1 /= 2.0;
+      s1 *= 0.5;
 
       s2 = 0;
       for(i = CE * p - 1 ; i >= 0 ; --i)

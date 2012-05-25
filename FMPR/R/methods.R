@@ -362,8 +362,13 @@ gennetwork <- function(Y, corthresh=0.5, cortype=1)
 }
 
 spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-6,
-      mu=1e-4, maxiter=1e4, simplify=FALSE, verbose=FALSE)
+   type=c("new", "old"),
+   mu=1e-4, maxiter=1e4, simplify=FALSE, verbose=FALSE)
 {
+   type <- match.arg(type)
+
+   fun <- ifelse(type == "new", "spg_core", "spg_core_old")
+
    K <- ncol(Y)
    N <- nrow(Y)
    p <- ncol(X)
@@ -390,7 +395,7 @@ spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-6,
 	 if(verbose)
 	    cat("spg gamma:", gamma[j], "lambda:", lambda[i], "\n")
 
-	 r <- .C("spg_core",
+	 r <- .C(fun,
    	    as.numeric(XX), as.numeric(XY),
    	    as.numeric(X), as.numeric(Y),
    	    as.integer(N), as.integer(p), as.integer(K),
