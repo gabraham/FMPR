@@ -302,9 +302,10 @@ maxlambda1 <- function(X, Y)
 }
 
 # Converts an N by p matrix into a block-diagonal N*K by p*K matrix
-blockX <- function(X, p, K)
+blockX <- function(X, K)
 {
    N <- nrow(X)
+   p <- ncol(X)
    
    Xblock <- matrix(0, N * K, p * K) 
    s1 <- seq(1, N * K, N)

@@ -109,8 +109,8 @@ run.lasso <- function(rep, dir=".", nfolds=10, grid=25,
    p <- ncol(Xtrain)
    K <- ncol(Ytrain)
 
-   XtrainB <- scale(blockX(Xtrain, p, K))
-   XtestB <- scale(blockX(Xtest, p, K))
+   XtrainB <- scale(blockX(Xtrain, K))
+   XtestB <- scale(blockX(Xtest, K))
 
    ytrain <- as.numeric(scale(Ytrain))
    ytest <- as.numeric(scale(Ytest))
@@ -244,8 +244,8 @@ run.elnet <- function(rep, dir=".", nfolds=10, grid=25,
    K <- ncol(Ytrain)
    p <- ncol(Xtrain)
 
-   XtrainB <- scale(blockX(Xtrain, p, K))
-   XtestB <- scale(blockX(Xtest, p, K))
+   XtrainB <- scale(blockX(Xtrain, K))
+   XtestB <- scale(blockX(Xtest, K))
 
    ytrain <- scale(as.numeric(Ytrain))
    ytest <- scale(as.numeric(Ytest))
