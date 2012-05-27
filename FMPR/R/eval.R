@@ -153,7 +153,7 @@ crossval.spg <- function(X, Y, nfolds=5, cortype=2, corthresh=0, ...)
 }
 
 # glmnet produces the solution path for multiple lambdas, for a given alpha
-crossval.elnet.glmnet <- function(X, Y, nfolds=5, lambda1=NULL, alpha=1, ...)
+crossval.elnet <- function(X, Y, nfolds=5, lambda1=NULL, alpha=1, ...)
 {
    N <- nrow(X)
    Y <- cbind(Y)
@@ -281,9 +281,9 @@ optim.ridge <- function(...)
    )
 }
 
-optim.elnet.glmnet <- function(...)
+optim.elnet <- function(...)
 {  
-   r <- crossval.elnet.glmnet(...)
+   r <- crossval.elnet(...)
 
    w <- rbind(which(r$R2 == max(r$R2, na.rm=TRUE), arr.ind=TRUE))[1,]
 
