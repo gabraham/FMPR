@@ -1,0 +1,19 @@
+\documentclass[a4paper]{article}
+
+% VignetteIndexEntry{FMPR}
+
+
+\title{Fused Multi-task Penalised Regression}
+\author{Gad Abraham}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+\section{Example}
+
+\end{document}
+
+
