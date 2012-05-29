@@ -1,9 +1,0 @@
-This is FMPR.
-
-git clone git://github.com/gabraham/FMPR
-
-R CMD INSTALL FMPR
-
-Requirements: R packages  MASS, ggplot2, foreach, Matrix, ROCR, glmnet, reshape
-Recommended: R packages doMC or doParallel
-
