@@ -11,7 +11,7 @@
 # Bmse: mean squared error of weights B
 #
 # The smaller the statistics, the better the agreement.
-run.spg.test <- function(N, p, K, spgpath)
+run.spg.test <- function(N, p, K, matlab.path, spg.path)
 {
    X <- scale(matrix(rnorm(N * p), N, p))
    Y <- scale(matrix(rnorm(N * K), N, K))
@@ -19,9 +19,9 @@ run.spg.test <- function(N, p, K, spgpath)
    write.table(X, file="X.txt", col.names=FALSE, row.names=FALSE)
    write.table(Y, file="Y.txt", col.names=FALSE, row.names=FALSE)
    
-   gamma <- runif(1, 0, 1e3)
-   lambda <- runif(1, 0, 1e3)
-   tol <- 1e-4
+   gamma <- runif(1, min=0, max=1e3)
+   lambda <- runif(1, min=0, max=1e3)
+   tol <- 1e-6
    maxiter <- 1e4
    mu <- 1e-6
    R <- abs(cor(Y))
@@ -41,7 +41,7 @@ run.spg.test <- function(N, p, K, spgpath)
    
    s <- paste(
       c(
-         paste("addpath '", spgpath, "';"),
+         paste("addpath '", spg.path, "';"),
          "X = dlmread('X.txt');",
          "Y = dlmread('Y.txt');",
          paste("option.cortype = ", cortype, ";"),
@@ -65,7 +65,7 @@ run.spg.test <- function(N, p, K, spgpath)
    )
    
    cat(s, file="run.m")
-   system("matlab -nodisplay -r run")
+   system(sprintf("%s -nodisplay -nojvm -r run", matlab.path))
    
    beta <- matrix(scan("beta.txt"), p, K, byrow=TRUE)
    Cm <- as.matrix(read.table("C.txt", header=FALSE))
@@ -74,19 +74,21 @@ run.spg.test <- function(N, p, K, spgpath)
       stop("C matrices don't agree in dimension")
 
    c(
-      Cmse=mean((C - Cm)^2),
-      Csign=mean(sign(C) != sign(Cm)),
-      Bmse=mean((beta - g)^2)
+      Cmse=mean((C - Cm)^2),	       # mean square error of gennetwork
+      Csign=mean(sign(C) != sign(Cm)), # mean error in sign of gennetwork
+      Bmse=mean((beta - g)^2)	       # mean square error of estimates
    )
 }
 
-spg.test <- function(nreps=100, spgpath="~/Software/SPG_Multi_Graph")
+spg.test <- function(nreps=50,
+   matlab.path="/Applications/MATLAB_R2012a.app/bin/matlab",
+   spg.path="~/Software/SPG_Multi_Graph")
 {
    res <- sapply(1:nreps, function(i) {
       N <- sample(1e3, 1)
       p <- sample(5e2, 1)
       K <- sample(1e2, 1) + 1 # ensures K>=2
-      run.spg.test(N, p, K, spgpath)
+      run.spg.test(N, p, K, matlab.path, spg.path)
    })
    apply(res, 1, max)
 }
