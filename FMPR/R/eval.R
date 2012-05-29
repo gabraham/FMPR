@@ -153,24 +153,24 @@ crossval.spg <- function(X, Y, nfolds=5, cortype=2, corthresh=0, ...)
 }
 
 # glmnet produces the solution path for multiple lambdas, for a given alpha
-crossval.elnet <- function(X, Y, nfolds=5, lambda1=NULL, alpha=1, ...)
+crossval.elnet <- function(X, Y, nfolds=5, lambda=NULL, alpha=1, ...)
 {
    N <- nrow(X)
    Y <- cbind(Y)
    folds <- sample(1:nfolds, N, TRUE)
 
-   l1 <- length(lambda1)
+   l1 <- length(lambda)
    la <- length(alpha)
    res <- array(NA, c(nfolds, l1, la))
 
    g <- vector("list", nfolds)
-   lambda1 <- sort(lambda1, decreasing=TRUE)
+   lambda <- sort(lambda, decreasing=TRUE)
 
    for(fold in 1:nfolds)
    {
       g[[fold]] <- foreach(i=1:la) %dopar% {
          r <- glmnet(X[folds != fold, ], Y[folds != fold],
-	       lambda=lambda1, alpha=alpha[i])
+	       lambda=lambda, alpha=alpha[i])
 	 as.matrix(coef(r))
       }
    }
@@ -191,7 +191,7 @@ crossval.elnet <- function(X, Y, nfolds=5, lambda1=NULL, alpha=1, ...)
   
    list(
       R2=r2,
-      lambda1=lambda1,
+      lambda=lambda,
       alpha=alpha
    )
 }
@@ -215,31 +215,31 @@ optim.fmpr.grid <- function(...)
    list(
       R2=r$R2,
       opt=c(
-	 lambda1=r$lambda1[w[1]],
-	 lambda2=r$lambda2[w[2]],
-	 lambda3=r$lambda3[w[3]])
+	 lambda=r$lambda[w[1]],
+	 gamma=r$gamma[w[2]]
+      )
    )
 }
 
 optim.fmpr.search <- function(X, Y, nfolds=5,
    graph.thresh=0.5, graph.fun=sqr,
-   lambda1=c(10, 0), lambda2=c(10, 0), lambda3=c(10, 0),
+   lambda=c(10, 0), gamma=c(10, 0),
    maxiter=1e5, verbose=FALSE)
 {
   
    cv <- function(par)
    {
       r <- crossval.fmpr(X=X, Y=Y, nfolds=nfolds,
-         lambda1=par[1], lambda2=par[2], lambda3=par[3],
+         lambda=par[1], gamma=par[2],
 	 graph.thresh=graph.thresh, graph.fun=graph.fun,
          maxiter=maxiter, verbose=verbose)
       -max(r$R2, na.rm=TRUE)
    }
 
-   opt <- optim(par=c(min(lambda1), min(lambda2), min(lambda3)),
+   opt <- optim(par=c(min(lambda), min(gamma)),
       fn=cv, method="L-BFGS-B",
-      lower=c(min(lambda1), min(lambda2), min(lambda3)),
-      upper=c(max(lambda1), max(lambda2), max(lambda3)),
+      lower=c(min(lambda), min(gamma)),
+      upper=c(max(lambda), max(gamma)),
       control=list(factr=1e4))
 
    list(
@@ -266,7 +266,7 @@ optim.lasso <- function(...)
    w <- rbind(which(r$R2 == max(r$R2, na.rm=TRUE)))[1,]
    list(
       R2=r$R2,
-      opt=c(lambda1=r$lambda1[w[1]])
+      opt=c(lambda=r$lambda[w[1]])
    )
 }
 
@@ -277,7 +277,7 @@ optim.ridge <- function(...)
    w <- rbind(which(r$R2 == max(r$R2, na.rm=TRUE)))[1,]
    list(
       R2=r$R2,
-      opt=c(lambda2=r$lambda2[w[1]])
+      opt=c(lambda=r$lambda[w[1]])
    )
 }
 
@@ -289,7 +289,7 @@ optim.elnet <- function(...)
 
    list(
       R2=r$R2,
-      opt=c(lambda1=r$lambda1[w[1]], alpha=r$alpha[w[2]])
+      opt=c(lambda=r$lambda[w[1]], alpha=r$alpha[w[2]])
    )
 }
 
