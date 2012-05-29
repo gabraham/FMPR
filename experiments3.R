@@ -29,7 +29,6 @@ registerDoMC(cores=4)
 options(error=dump.frames)
 
 seed <- sample(1e6L, 1)
-#seed <- 705168
 set.seed(seed)
 
 ################################################################################
@@ -98,8 +97,8 @@ setup <- list(
 )
 
 
-nreps <- 30
-grid <- 10
+nreps <- 100
+grid <- 50
 nfolds <- 5
 
 system.time({
