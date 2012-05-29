@@ -1,12 +1,4 @@
 # Code for simulating multi-task data
-#
-# Gad Abraham, 2012 (c)
-#
-
-library(devtools)
-dev_mode(TRUE)
-install("FMPR")
-
 
 v <- strsplit(commandArgs(TRUE), "=")
 for(m in v) {
