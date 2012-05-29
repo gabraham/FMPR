@@ -1,4 +1,3 @@
-#
 
 R2 <- function(pr, y) 
 {
@@ -16,22 +15,30 @@ R2 <- function(pr, y)
 mse <- function(pr, y) mean((pr - y)^2)
 center <- function(x) scale(x, center=TRUE, scale=FALSE)
 
+# scale and set NAs caused by zero variance to zero
+scalefix <- function(X)
+{
+   s <- scale(X)
+   s[is.na(s)] <- 0
+   s
+}
+
 crossval.lasso <- function(X, Y, nfolds=5, ...)
 {
    N <- nrow(X)
    Y <- cbind(Y)
    folds <- sample(1:nfolds, N, TRUE)
    s <- sapply(1:nfolds, function(fold) {
-      g <- lasso(scale(X[folds != fold, ]), scale(Y[folds != fold, ]), ...)
-      p <- scale(X[folds == fold, ]) %*% g
+      g <- lasso(scalefix(X[folds != fold, ]), scalefix(Y[folds != fold, ]), ...)
+      p <- scalefix(X[folds == fold, ]) %*% g
 
       # one R^2 for each penalty
-      apply(p, 2, R2, y=scale(Y[folds == fold, ]))
+      apply(p, 2, R2, y=scalefix(Y[folds == fold, ]))
    })
    
    list(
       R2=rowMeans(s),
-      lambda1=list(...)$lambda1
+      lambda=list(...)$lambda
    )
 }
 
@@ -42,16 +49,16 @@ crossval.ridge <- function(X, Y, nfolds=5, ...)
    folds <- sample(1:nfolds, N, TRUE)
    s <- sapply(1:nfolds, function(fold) {
       cat("inner fold", fold, "\n")
-      g <- ridge(scale(X[folds != fold, ]), scale(Y[folds != fold, ]), ...)
+      g <- ridge(scalefix(X[folds != fold, ]), scalefix(Y[folds != fold, ]), ...)
 
       sapply(g, function(m) {
-	 p <- scale(X[folds == fold, ]) %*% m
-	 R2(p, scale(Y[folds == fold, ]))
+	 p <- scalefix(X[folds == fold, ]) %*% m
+	 R2(p, scalefix(Y[folds == fold, ]))
       })
    })
    list(
       R2=rowMeans(s),
-      lambda2=list(...)$lambda2
+      lambda=list(...)$lambda
    )
 }
 
@@ -62,23 +69,22 @@ crossval.fmpr <- function(X, Y, nfolds=5,
    Y <- cbind(Y)
    folds <- sample(1:nfolds, N, TRUE)
 
-   l1 <- max(length(list(...)$lambda1), 1)
-   l2 <- max(length(list(...)$lambda2), 1)
-   l3 <- max(length(list(...)$lambda3), 1)
+   l <- max(length(list(...)$lambda), 1)
+   g <- max(length(list(...)$gamma), 1)
    verbose <- list(...)$verbose
-   res <- array(0, c(nfolds, l1, l2, l3))
+   res <- array(0, c(nfolds, l, g))
 
-   # fmpr() is capable of handling lambda1,lambda2,lambda3 of varying lengths,
+   # fmpr() is capable of handling lambda,gamma of varying lengths,
    # but we don't use that feature here because we want to run different
-   # penalties on the cross-validation folds rather than different folds every
-   # time
+   # penalties on the cross-validation folds rather than different
+   # folds every time
    for(fold in 1:nfolds)
    {
       cat("inner fold", fold, "\n")
-      Xtest <- scale(X[folds == fold, , drop=FALSE])
-      Ytest <- scale(Y[folds == fold, , drop=FALSE])
-      Xtrain <- scale(X[folds != fold, , drop=FALSE])
-      Ytrain <- scale(Y[folds != fold, , drop=FALSE])
+      Xtest <- scalefix(X[folds == fold, , drop=FALSE])
+      Ytest <- scalefix(Y[folds == fold, , drop=FALSE])
+      Xtrain <- scalefix(X[folds != fold, , drop=FALSE])
+      Ytrain <- scalefix(Y[folds != fold, , drop=FALSE])
       G <- 0
       if(ncol(Y) > 1)
       {
@@ -86,31 +92,25 @@ crossval.fmpr <- function(X, Y, nfolds=5,
 	 G <- graph.fun(R, graph.thresh)
       }
 
-      f <- fmpr(X=scale(X[folds != fold, , drop=FALSE]),
-	    Y=scale(Y[folds != fold, , drop=FALSE]), G=G, ...)
+      f <- fmpr(X=scalefix(X[folds != fold, , drop=FALSE]),
+	    Y=scalefix(Y[folds != fold, , drop=FALSE]), G=G, ...)
 
-      for(i in 1:l1)
+      for(i in 1:l)
       {
-	 for(j in 1:l2)
+	 for(j in 1:g)
 	 {
-	    for(k in 1:l3)
-	    {
-	       p <- as.matrix(Xtest %*% f[[i]][[j]][[k]])
-	       #res[fold, i, j, k] <- cbind(R2(as.numeric(p), Ytest))
-	       res[fold, i, j, k] <- cbind(R2(p, Ytest))
-
-	    }
+	    p <- as.matrix(Xtest %*% f[[i]][[j]])
+	    res[fold, i, j] <- cbind(R2(p, Ytest))
 	 } 
       }
       #if(verbose)
-	 cat("best R2:", m <- max(res[fold, , ,], na.rm=TRUE), "\n")
+	 cat("best R2:", m <- max(res[fold, ,], na.rm=TRUE), "\n")
    }
 
    list(
-      R2=apply(res, c(2, 3, 4), mean, na.rm=TRUE),
-      lambda1=list(...)$lambda1,
-      lambda2=list(...)$lambda2,
-      lambda3=list(...)$lambda3
+      R2=apply(res, c(2, 3), mean, na.rm=TRUE),
+      lambda=list(...)$lambda,
+      gamma=list(...)$gamma
    )
 }
 
@@ -128,10 +128,10 @@ crossval.spg <- function(X, Y, nfolds=5, cortype=2, corthresh=0, ...)
    {
       cat("inner fold", fold, "\n")
 
-      Xtrain <- scale(X[folds != fold, , drop=FALSE])
-      Ytrain <- scale(Y[folds != fold, , drop=FALSE])
-      Xtest <- scale(X[folds == fold, , drop=FALSE])
-      Ytest <- scale(Y[folds == fold, , drop=FALSE])
+      Xtrain <- scalefix(X[folds != fold, , drop=FALSE])
+      Ytrain <- scalefix(Y[folds != fold, , drop=FALSE])
+      Xtest <- scalefix(X[folds == fold, , drop=FALSE])
+      Ytest <- scalefix(Y[folds == fold, , drop=FALSE])
       C <- gennetwork(Ytrain, corthresh, cortype)
       f <- spg(Xtrain, Ytrain, C=C, ...)
 

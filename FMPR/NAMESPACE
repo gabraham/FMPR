@@ -1,4 +1,7 @@
 useDynLib(FMPR)
+
+S3method(plot, exper)
+
 export(
    "optim.fmpr",
    "optim.fmpr.grid",
@@ -20,18 +23,13 @@ export(
    "maxlambda1",
    "getB",
    "blockX",
-   "makedata",
-   "run.lasso",
-   "recovery",
-   "center",
-   "run",
    "R2",
+   "run",
    "plot.exper",
    "graph.sqr",
    "graph.ind",
    "graph.abs",
    "gennetwork",
-   "clean.rocr",
    "spg.test",
    "run.spg.test",
    "graph.ind",
