@@ -1,6 +1,6 @@
-\name{}
+\name{R2}
 
-\title{}
+\title{R squared}
 
 \usage{
 }

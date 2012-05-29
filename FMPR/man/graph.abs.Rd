@@ -1,6 +1,6 @@
-\name{}
+\name{graph.abs}
 
-\title{}
+\title{Make graph from similarity matrix using absolute value}
 
 \usage{
 }

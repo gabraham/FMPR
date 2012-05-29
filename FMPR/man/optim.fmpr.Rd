@@ -1,6 +1,6 @@
-\name{}
+\name{optim.fmpr}
 
-\title{}
+\title{Optimise FMPR penalties}
 
 \usage{
 }

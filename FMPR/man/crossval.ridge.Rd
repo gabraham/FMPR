@@ -1,6 +1,6 @@
-\name{}
+\name{crossval.ridge}
 
-\title{}
+\title{Crossvalidation for ridge}
 
 \usage{
 }

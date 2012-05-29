@@ -1,6 +1,6 @@
-\name{}
+\name{crossval.spg}
 
-\title{}
+\title{Cross-validation for GFlasso using SPG}
 
 \usage{
 }

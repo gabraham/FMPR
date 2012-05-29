@@ -1,6 +1,6 @@
-\name{}
+\name{lasso}
 
-\title{}
+\title{Lasso}
 
 \usage{
 }

@@ -1,6 +1,6 @@
-\name{}
+\name{maxlambda1}
 
-\title{}
+\title{Get minimum lambda1 penalty that makes all weights zero}
 
 \usage{
 }

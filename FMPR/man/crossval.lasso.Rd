@@ -1,6 +1,6 @@
-\name{}
+\name{crossval.lasso}
 
-\title{}
+\title{Crossvalidation for lasso}
 
 \usage{
 }

@@ -1,6 +1,6 @@
-\name{}
+\name{optim.elnet}
 
-\title{}
+\title{Optimise elasticnet penalties}
 
 \usage{
 }

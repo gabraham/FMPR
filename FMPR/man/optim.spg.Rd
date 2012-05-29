@@ -1,6 +1,6 @@
-\name{}
+\name{optim.spg}
 
-\title{}
+\title{Optimise GFlasso penalty}
 
 \usage{
 }

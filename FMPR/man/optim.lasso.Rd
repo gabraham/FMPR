@@ -1,6 +1,6 @@
-\name{}
+\name{optim.lasso}
 
-\title{}
+\title{Optimise lasso penalty}
 
 \usage{
 }

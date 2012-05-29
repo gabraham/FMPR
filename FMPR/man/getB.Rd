@@ -1,6 +1,6 @@
-\name{}
+\name{getB}
 
-\title{}
+\title{Make a coefficient matrix}
 
 \usage{
 }

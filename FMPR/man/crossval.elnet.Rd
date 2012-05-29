@@ -1,6 +1,6 @@
-\name{}
+\name{crossval.elnet}
 
-\title{}
+\title{Crossvalidation for elasticnet}
 
 \usage{
 }

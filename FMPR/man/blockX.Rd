@@ -5,11 +5,11 @@
 Converts an N by p matrix into a block-diagonal N*K by p*K matrix
 }
 \usage{
-   blockX(X, p, K)
+   blockX(X, K)
 }
 
 \arguments{
-   \item{X}{input matrix, of dimensions nobs x nvars)
+   \item{X}{input matrix, of dimensions nobs x nvars}
    \item{K}{number of tasks}
 }
 

@@ -1,6 +1,6 @@
-\name{}
+\name{optim.ridge}
 
-\title{}
+\title{Optimise ridge penalty}
 
 \usage{
 }

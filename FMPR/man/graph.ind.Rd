@@ -1,6 +1,6 @@
-\name{}
+\name{graph.ind}
 
-\title{}
+\title{Make graph from similarity matrix using indicator function}
 
 \usage{
 }

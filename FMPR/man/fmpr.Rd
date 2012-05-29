@@ -7,15 +7,14 @@
 \usage{
 fmpr(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
       maxiter=1e5, eps=1e-6, verbose=FALSE, simplify=FALSE,
-      sparse=TRUE, nzmax=nrow(X))
+      sparse=TRUE, nzmax=nrow(X), type=c("warm", "cold"))
 }
 
 \arguments{
   \item{X}{input matrix, of dimension nobs x nvars.}
   \item{Y}{response variable.}
-  \item{lambda1}{vector of non-negative penalties}
-  \item{lambda2}{vector of non-negative penalties}
-  \item{lambda3}{vector of non-negative penalties}
+  \item{lambda}{vector of non-negative penalties}
+  \item{gamma}{vector of non-negative penalties}
   \item{G}{K by K matrix}
   \item{maxiter}{maximum number of coordinate descent iterations}
   \item{eps}{non-negative tolerance for convergence}
@@ -30,7 +29,7 @@ fmpr(X, Y, lambda1=0, lambda2=0, lambda3=0, G=NULL,
 }
 \value{
 If simplify is FALSE, or any of the number of penalties is more than one,
-a nested list, one level for each of lambda1, lambda2, lambda3, with the final
+a nested list, one level for each of lambda, gamma with the final
 level being the estimated weights B. Otherwise, a matrix.
 }
 \references{
@@ -49,10 +48,10 @@ X <- scale(matrix(rnorm(N * p), N, p))
 B <- matrix(rnorm(p * K), p, K) # dense weights
 Y <- scale(X \%*\% B + rnorm(N * K))
 G <- graph.sqr(cor(Y))
-l1 <- max(maxlambda1(X, Y)) * 2^seq(-3, 0, length=10)
+l1 <- max(maxlambda1(X, Y)) * 2^seq(0, -3, length=10)
 l3 <- 2^seq(-3, 3, length=10)
-f <- fmpr(X=X, Y=Y, G=G, lambda1=l1, lambda3=l3)
-B <- f[[2]][[1]][[3]] # weights for lambda1[2], lambda2[1], lambda3[3]
+f <- fmpr(X=X, Y=Y, G=G, lambda=l1, gamma=l3)
+B <- f[[2]][[3]] # weights for lambda[2], gamma[3]
 }
 \keyword{models}
 \keyword{regression}

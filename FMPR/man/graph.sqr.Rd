@@ -1,6 +1,6 @@
-\name{}
+\name{graph.sqr}
 
-\title{}
+\title{Make graph from similarity matrix using squared function}
 
 \usage{
 }

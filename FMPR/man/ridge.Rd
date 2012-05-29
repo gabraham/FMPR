@@ -1,6 +1,6 @@
-\name{}
+\name{ridge}
 
-\title{}
+\title{Ridge regression}
 
 \usage{
 }

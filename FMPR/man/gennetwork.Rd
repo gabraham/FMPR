@@ -1,6 +1,6 @@
-\name{}
+\name{gennetwork}
 
-\title{}
+\title{Generate Network Matrix for GFlasso}
 
 \usage{
 }

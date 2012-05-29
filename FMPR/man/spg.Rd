@@ -6,7 +6,7 @@ lasso), using the smoothed proximal gradient method}
    Fit an L1 linear model.
   }
 \usage{
-spg(X, Y, lambda=0, gamma=0, C=NULL, tol=1e-6,
+spg(X, Y, C=NULL, lambda=0, gamma=0, C=NULL, tol=1e-6,
     mu=1e-04, maxiter=10000, simplify=FALSE, verbose=FALSE) 
 }
 

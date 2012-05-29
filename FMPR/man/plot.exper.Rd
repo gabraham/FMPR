@@ -1,6 +1,6 @@
-\name{}
+\name{plot.exper}
 
-\title{}
+\title{Plot experimental results}
 
 \usage{
 }
