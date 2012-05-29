@@ -58,7 +58,7 @@ void maxlambda1(double *x, double *y, double *lambda,
 }
 
 void lasso(double *x, double *y, double *b,
-      int *N_p, int *p_p, double *lambda1_p,
+      int *N_p, int *p_p, double *lambda_p,
       int *maxiter_p, double *eps_p, int *verbose_p)
 {
    int N = *N_p,
@@ -78,7 +78,7 @@ void lasso(double *x, double *y, double *b,
    int numactive, allconverged = 1, numconverged = 0;
    int verbose = *verbose_p;
    double meany = 0;
-   double lambda1 = *lambda1_p;
+   double lambda = *lambda_p;
    double s;
    double oneOnN = 1.0 / N;
 
@@ -127,14 +127,14 @@ void lasso(double *x, double *y, double *b,
 	 // different implementation of the soft-thresholding
 	 bj = b[j];
 	 s = bj - d1 / d2[j];
-	 if(fabs(s) <= lambda1)
+	 if(fabs(s) <= lambda)
 	 {
 	    b[j] = 0;
 	    delta = -bj;
 	 }
 	 else
 	 {
-	    b[j] = s - lambda1 * sign(s);
+	    b[j] = s - lambda * sign(s);
 	    if(fabs(b[j]) < ZERO_THRESH)
 	       b[j] = 0;
 	    delta = b[j] - bj;
@@ -210,7 +210,7 @@ void lasso(double *x, double *y, double *b,
 
 void fmpr_weighted_warm(double *x, double *y, double *b,
       double *LP, int *N_p, int *p_p, int *K_p,
-      double *lambda1, double *lambda2, double *lambda3_p,
+      double *lambda_p, double *gamma_p,
       double *G, int *maxiter_p, double *eps_p, int *verbose_p,
       int *status, int *iter_p, int *numactive_p)
 {
@@ -228,7 +228,7 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
        numconverged = 0;
    int verbose = *verbose_p;
    int pK = p * K, pK1 = p * K - 1;
-   double s, lambda3 = *lambda3_p;
+   double s, lambda = *lambda_p, gamma = *gamma_p;
    int g, q, iNk, kqK, jpk;
 
    int *active = malloc(sizeof(int) * p * K);
@@ -241,11 +241,12 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
    double *lossnull = calloc(K, sizeof(double));
    double *lossnullF = calloc(K, sizeof(double));
    double *d2_0 = calloc(p * K, sizeof(double));
-   double *lambda3g = calloc(K * K, sizeof(double));
+   double *gammaG = calloc(K * K, sizeof(double));
    double *signG = calloc(K * K, sizeof(double));
    double losstotal = 0, oldlosstotal = 0;
    //double *oneOnLambda2PlusOne = malloc(sizeof(double) * K);
-   double oneOnN = 1.0 / N;
+   double oneOnN = 1.0 / N,
+	  oneOnKp = 1.0 / (K * p);
 
    /* null loss mean((y - mean(y))^2)*/
    for(k = 0 ; k < K ; k++)
@@ -284,12 +285,9 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
 	  * abs(r_ml) but G is signed
 	  */
 	 if(q != k)
-	    lambda3g[kqK] = lambda3 * fabs(G[kqK]);
+	    gammaG[kqK] = gamma * fabs(G[kqK]);
       }
    }
-
-   //for(k = K - 1 ; k >= 0 ; --k)
-   //   oneOnLambda2PlusOne[k] = 1 / (lambda2[k] + 1);
 
    for(k = 0 ; k < K ; k++)
    {
@@ -336,22 +334,22 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
 	       for(q = 0 ; q < K ; q++)
 	       {
 	          kqK = k + q * K;
-	          d1 += lambda3g[kqK] * (bjk - signG[kqK] * b[j + p * q]);
-	          d2 += lambda3g[kqK];
+	          d1 += gammaG[kqK] * (bjk - signG[kqK] * b[j + p * q]);
+	          d2 += gammaG[kqK];
 	       }
 
 	       /* Apply intra-task ridge regression */
 	       s = (bjk - d1 / d2); //* oneOnLambda2PlusOne[k];
 
 	       /* Now apply intra-task lasso */
-	       if(fabs(s) <= lambda1[k])
+	       if(fabs(s) <= lambda)
 	       {
 	          b[jpk] = 0;
 	          delta = -bjk;
 	       }
 	       else
 	       {
-	          b[jpk] = s - lambda1[k] * sign(s);
+	          b[jpk] = s - lambda * sign(s);
 		  if(fabs(b[jpk]) < ZERO_THRESH) // close enough to zero
 		     b[jpk] = 0;
 	          delta = b[jpk] - bjk;
@@ -368,6 +366,7 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
 	          loss[k] += Err[iNk] * Err[iNk];
 	       }
 	       loss[k] *= oneOnN;
+	       //loss[k] += lambda * fabs(b[jpk]) * oneOnKp;
 	       numconverged += fabs(loss[k] - oldloss[k]) < lossnullF[k];
 	    }
 
@@ -446,8 +445,7 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
    free(Err);
    free(d2_0);
    free(ignore);
-   //free(oneOnLambda2PlusOne);
-   free(lambda3g);
+   free(gammaG);
    free(signG);
 }
 
@@ -459,7 +457,7 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
  */
 void fmpr_weighted(double *x, double *y, double *b,
       int *N_p, int *p_p, int *K_p,
-      double *lambda1, double *lambda2, double *lambda3_p,
+      double *lambda_p, double *gamma_p,
       double *G, int *maxiter_p, double *eps_p, int *verbose_p,
       int *status, int *iter_p, int *numactive_p)
 {
@@ -477,7 +475,7 @@ void fmpr_weighted(double *x, double *y, double *b,
        numconverged = 0;
    int verbose = *verbose_p;
    int pK = p * K, pK1 = p * K - 1;
-   double s, lambda3 = *lambda3_p;
+   double s, lambda = *lambda_p, gamma = *gamma_p;
    int q, iNk, kqK, jpk;
    double g;
 
@@ -493,7 +491,7 @@ void fmpr_weighted(double *x, double *y, double *b,
    double *lossnullF = calloc(K, sizeof(double));
    double *d2_0 = calloc(p * K, sizeof(double));
    double losstotal = 0, oldlosstotal = 0;
-   double *lambda3g = calloc(K * K, sizeof(double));
+   double *gammaG = calloc(K * K, sizeof(double));
    double *signG = calloc(K * K, sizeof(double));
    double oneOnN = 1.0 / N;
 
@@ -543,12 +541,12 @@ void fmpr_weighted(double *x, double *y, double *b,
       for(q = 0 ; q < K ; q++)
       {
 	 kqK = k + q * K;
-         lambda3g[kqK] = 0;
+         gammaG[kqK] = 0;
 	 /* must take absolute value of G since f(r_ml) is monotonic in
 	  * abs(r_ml) but G is signed
 	  */
 	 if(q != k)
-	    lambda3g[kqK] = lambda3 * fabs(G[kqK]);
+	    gammaG[kqK] = gamma * fabs(G[kqK]);
       }
    }
 
@@ -577,26 +575,25 @@ void fmpr_weighted(double *x, double *y, double *b,
 
 	       bjk = b[jpk];
 
-	       /* Apply inter-task ridge regression */
+	       // Apply inter-task ridge regression
 	       for(q = 0 ; q < K ; q++)
 	       {
 	          kqK = k + q * K;
-	          d1 += lambda3g[kqK] * (bjk - signG[kqK] * b[j + p * q]);
-	          d2 += lambda3g[kqK];
+	          d1 += gammaG[kqK] * (bjk - signG[kqK] * b[j + p * q]);
+	          d2 += gammaG[kqK];
 	       }
 
-	       /* Apply intra-task ridge regression */
-	       s = (bjk - d1 / d2) / (1 + lambda2[k]);
+	       s = bjk - d1 / d2;
 
 	       /* Now apply intra-task lasso */
-	       if(fabs(s) <= lambda1[k])
+	       if(fabs(s) <= lambda)
 	       {
 	          b[jpk] = 0;
 	          delta = -bjk;
 	       }
 	       else
 	       {
-	          b[jpk] = s - lambda1[k] * sign(s);
+	          b[jpk] = s - lambda * sign(s);
 
 		  // values close enough to zero are considered zero to avoid
 		  // silly situations where tiny numbers produced from
@@ -616,6 +613,8 @@ void fmpr_weighted(double *x, double *y, double *b,
 	          loss[k] += Err[iNk] * Err[iNk];
 	       }
 	       loss[k] *= oneOnN;
+	       // TODO: add the fusion loss to the total loss
+	       //loss[k] += lambda * fabs(b[jpk]) / K;
 	       numconverged += fabs(loss[k] - oldloss[k]) < lossnullF[k];
 	    }
 
@@ -693,7 +692,7 @@ void fmpr_weighted(double *x, double *y, double *b,
    free(Err);
    free(d2_0);
    free(ignore);
-   free(lambda3g);
+   free(gammaG);
    free(signG);
 }
 
