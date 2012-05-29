@@ -1,7 +1,4 @@
 # Code for simulating multi-task data
-#
-# Gad Abraham, 2012 (c)
-#
 
 v <- strsplit(commandArgs(TRUE), "=")
 for(m in v) {
@@ -19,12 +16,11 @@ library(glmnet)
 library(ggplot2)
 library(FMPR)
 library(doMC)
-registerDoMC(cores=2)
+registerDoMC(cores=4)
 
 options(error=dump.frames)
 
 seed <- sample(1e6L, 1)
-#seed <- 705168
 set.seed(seed)
 
 ################################################################################
@@ -77,11 +73,11 @@ setup <- list(
          B=getB(p=100, K=10, w=0.1, type="sparsity", mean=0, sd=0.5)),
    Expr15=list(dir=c("Expr15"), N=100, p=100, K=10, sigma=1,
          B=getB(p=100, K=10, w=0.1, type="sparsity", mean=0, sd=2)),
-   Expr17=list(dir=c("Expr17"), N=100, p=100, K=10, sigma=1,
+   Expr16=list(dir=c("Expr16"), N=100, p=100, K=10, sigma=1,
          B=getB(p=100, K=10, w=NULL, type="sparsity", mean=0, sd=2)),
 
    # Same sparsity, different weight, mean=0.5
-   Expr16=list(dir=c("Expr16"), N=100, p=100, K=10, sigma=1,
+   Expr17=list(dir=c("Expr17"), N=100, p=100, K=10, sigma=1,
          B=getB(p=100, K=10, w=NULL, type="sparsity", mean=0.5, sd=0.05)),
    Expr18=list(dir=c("Expr18"), N=100, p=100, K=10, sigma=1,
          B=getB(p=100, K=10, w=NULL, type="sparsity", mean=0.5, sd=0.5)),
@@ -93,28 +89,17 @@ setup <- list(
 )
 
 
-nreps <- 10
-grid <- 15
+nreps <- 100
+grid <- 50
 nfolds <- 5
 
 system.time({
    res <- lapply(setup[idv], run, nreps=nreps, grid=grid, nfolds=nfolds)
 })
-save(setup, res, idv, nreps, grid, nfolds, file=sprintf("results_%s.RData", idv))
+save(setup, res, idv, nreps, grid, nfolds,
+   file=sprintf("%s/results_%s.RData", setup[[idv]]$dir, idv))
 
 ################################################################################
 
-pdf("res.pdf", width=12)
-par(mfrow=c(1, 2))
-plot(res[[1]]$recovery$fmpr.w2$roc, avg="threshold", col=1)
-plot(res[[1]]$recovery$spg.w2$roc, avg="threshold", col=2, add=TRUE)
-plot(res[[1]]$recovery$lasso$roc, avg="threshold", col=3, add=TRUE)
-plot(res[[1]]$recovery$fmpr.w2$prc, avg="threshold", col=1)
-plot(res[[1]]$recovery$spg.w2$prc, avg="threshold", col=2, add=TRUE)
-plot(res[[1]]$recovery$lasso$prc, avg="threshold", col=3, add=TRUE)
-dev.off()
-
-stop()
-
-plot.exper()
+lapply(res, plot)
 

@@ -40,21 +40,21 @@ mytheme <- function(base_size=10)
 	 legend.text=theme_text(size=20),
 	 legend.title=theme_text(size=20, hjust=0),
 	 legend.key.size=unit(2, "lines"),
-	 legend.background=theme_rect(col=0, fill=0),
+	 legend.background=theme_rect(colour=0, fill=0),
 	 legend.key=theme_blank()
    ), class="options")
 }
 
-plot.exper <- function()
+plot.exper <- function(x, ...)
 {
-   pdf(sprintf("Expr%s.pdf", idv), width=12)
+   pdf(sprintf("%s/%s.pdf", x$dir, x$dir), width=12)
    
    ymin <- 0
    ymax <- 1
    xmin <- 0
    xmax <- 1
    
-   par(mfrow=c(1, 2), mar=c(5, 4, 3, 0.1) + 0.1)
+   par(mfrow=c(1, 2), mar=c(4.5, 4.1, 2.1, 0.1) + 0.1)
 
    nm <- c("roc", "prc")
    titles <- c("ROC", "PRC")
@@ -63,22 +63,23 @@ plot.exper <- function()
    
    for(i in 1:2)
    {
-      plot.rocr(res[[1]]$recovery$fmpr.w1[[nm[i]]], avg="threshold", col=1,
-            main=titles[i], xlim=c(xmin, xmax), ylim=c(ymin, ymax), lwd=3,
-            cex=1.5, cex.axis=1.5, cex.lab=1.5, lty=1,
-            xlab=xlab[i], ylab=ylab[i])
-      plot.rocr(res[[1]]$recovery$fmpr.w2[[nm[i]]], avg="threshold", add=TRUE,
-            col=2, lwd=3, lty=1)
-      plot.rocr(res[[1]]$recovery$spg.w1[[nm[i]]], avg="threshold", add=TRUE,
-            col=3, lwd=3, lty=2)
-      plot.rocr(res[[1]]$recovery$spg.w2[[nm[i]]], avg="threshold", add=TRUE,
-            col=4, lwd=3, lty=2)
-      plot.rocr(res[[1]]$recovery$lasso[[nm[i]]], avg="threshold", add=TRUE,
-            col=5, lwd=3, lty=3)
-      plot.rocr(res[[1]]$recovery$ridge[[nm[i]]], avg="threshold", add=TRUE,
-            col=6, lwd=3, lty=4)
-      plot.rocr(res[[1]]$recovery$elnet.glmnet[[nm[i]]], avg="threshold",
-	    add=TRUE, col=7, lwd=3, lty=5)
+      plot(NULL, main=titles[i], xlim=c(xmin, xmax), ylim=c(ymin, ymax),
+         cex=1.5, cex.axis=1.5, cex.lab=1.5, xlab=xlab[i], ylab=ylab[i])
+
+      plot.rocr(x$recovery$fmpr.w1[[nm[i]]], avg="threshold", add=TRUE,
+	 col=1, lwd=3, lty=1)
+      plot.rocr(x$recovery$fmpr.w2[[nm[i]]], avg="threshold", add=TRUE,
+         col=2, lwd=3, lty=1)
+      plot.rocr(x$recovery$spg.w1[[nm[i]]], avg="threshold", add=TRUE,
+         col=3, lwd=3, lty=2)
+      plot.rocr(x$recovery$spg.w2[[nm[i]]], avg="threshold", add=TRUE,
+         col=4, lwd=3, lty=2)
+      plot.rocr(x$recovery$lasso[[nm[i]]], avg="threshold", add=TRUE,
+         col=5, lwd=3, lty=3)
+      plot.rocr(x$recovery$ridge[[nm[i]]], avg="threshold", add=TRUE,
+         col=6, lwd=3, lty=4)
+      plot.rocr(x$recovery$elnet[[nm[i]]], avg="threshold", add=TRUE,
+	 col=7, lwd=3, lty=5)
       
       legend(xmin, ymin + 0.3,
          c("FMPR-w1", "FMPR-w2", "GFlasso-w1", "GFlasso-w2",
@@ -89,23 +90,22 @@ plot.exper <- function()
 
    dev.off()
    
-   r2 <- melt(res[[1]]$R2)
+   r2 <- melt(x$R2)
    m <- as.character(r2[,2])
-   #m[m == "GRt"] <- "FMPR-t"
-   #m[m == "GRw1"] <- "FMPR-w1"
-   #m[m == "GRw2"] <- "FMPR-w2"
-   #m[m == "SPGt"] <- "GFlasso-t"
+   m[m == "FMPRw1"] <- "FMPR-w1"
+   m[m == "FMPRw2"] <- "FMPR-w2"
    m[m == "SPGw1"] <- "GFlasso-w1"
    m[m == "SPGw2"] <- "GFlasso-w2"
    r2[, 2] <- factor(m)
    colnames(r2) <- c("Replication", "Method", "R2")
+
    g <- ggplot(r2, aes(Method, R2))
    g <- g + geom_boxplot()
    g <- g + scale_y_continuous(expression(R^2))
    g <- g + theme_bw() + mytheme()
    
-   pdf(sprintf("Expr%s_R2.pdf", idv), width=12)
+   pdf(sprintf("%s/%s_R2.pdf", x$dir, x$dir), width=12)
    print(g)
    dev.off()
-   
 }
+
