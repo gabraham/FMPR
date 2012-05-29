@@ -34,7 +34,8 @@ export(
    "run.spg.test",
    "graph.ind",
    "graph.sqr",
-   "graph.abs"
+   "graph.abs",
+   "makedata"
 )
 
 
