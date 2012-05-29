@@ -1,4 +1,4 @@
 FMPR
 ====
 
-Fused Penalized Multi-task Regression
+Fused Multi-task Penalised Regression
