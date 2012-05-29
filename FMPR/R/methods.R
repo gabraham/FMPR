@@ -361,13 +361,10 @@ gennetwork <- function(Y, corthresh=0.5, cortype=1)
    C
 }
 
-spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-6,
-   type=c("new", "old"),
+spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-4,
    mu=1e-4, maxiter=1e4, simplify=FALSE, verbose=FALSE)
 {
-   type <- match.arg(type)
-
-   fun <- ifelse(type == "new", "spg_core", "spg_core_old")
+   fun <- "spg_core"
 
    K <- ncol(Y)
    N <- nrow(Y)
