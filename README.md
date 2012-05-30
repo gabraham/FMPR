@@ -10,6 +10,7 @@ git clone git://github.com/gabraham/FMPR
 To install:
 
 cd FMPR
+
 R CMD INSTALL FMPR
 
 Requirements: R packages  MASS, ggplot2, foreach, Matrix, ROCR, glmnet,
