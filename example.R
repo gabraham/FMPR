@@ -1,8 +1,9 @@
 ### R code from vignette source 'fmpr.rnw'
 
 library(FMPR)
-library(doMC)
-registerDoMC(cores=4)
+if(require(doMC)) {
+   registerDoMC(cores=4)
+}
 
 
 
