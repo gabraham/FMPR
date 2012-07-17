@@ -85,12 +85,16 @@ setup <- list(
          B=getB(p=100, K=10, w=NULL, type="sparsity", mean=0.5, sd=2)),
 
    Expr20=list(dir=c("Expr20"), N=100, p=100, K=10, sigma=1,
-         B=getB(p=100, K=10, w=NULL, type="sparsity", mean=0.5, sd=0.05))
+         B=getB(p=100, K=10, w=NULL, type="sparsity", mean=0.5, sd=0.05)),,
+
+   # Negative correlations
+   Expr21=list(dir=c("Expr21"), N=100, p=100, K=10, sigma=1,
+	 B=getB(p=100, K=10, w=0.1, type="mixed"))
 )
 
 
-nreps <- 100
-grid <- 50
+nreps <- 10
+grid <- 20
 nfolds <- 5
 
 system.time({

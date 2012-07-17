@@ -45,14 +45,10 @@ mytheme <- function(base_size=10)
    ), class="options")
 }
 
-plot.exper <- function(x, ...)
+plot.exper <- function(x,
+   lim=list(roc=c(0, 1, 0, 1), prc=c(0, 1, 0, 1)), ...)
 {
    pdf(sprintf("%s/%s.pdf", x$dir, x$dir), width=12)
-   
-   ymin <- 0
-   ymax <- 1
-   xmin <- 0
-   xmax <- 1
    
    par(mfrow=c(1, 2), mar=c(4.5, 4.1, 2.1, 0.1) + 0.1)
 
@@ -61,9 +57,9 @@ plot.exper <- function(x, ...)
    xlab <- c("Specificity", "Recall")
    ylab <- c("Sensitivity", "Precision")
    
-   for(i in 1:2)
+   for(i in seq(along=nm))
    {
-      plot(NULL, main=titles[i], xlim=c(xmin, xmax), ylim=c(ymin, ymax),
+      plot(NULL, main=titles[i], xlim=lim[[i]][1:2], ylim=lim[[i]][3:4],
          cex=1.5, cex.axis=1.5, cex.lab=1.5, xlab=xlab[i], ylab=ylab[i])
 
       plot.rocr(x$recovery$fmpr.w1[[nm[i]]], avg="threshold", add=TRUE,
@@ -81,7 +77,7 @@ plot.exper <- function(x, ...)
       plot.rocr(x$recovery$elnet[[nm[i]]], avg="threshold", add=TRUE,
 	 col=7, lwd=3, lty=5)
       
-      legend(xmin, ymin + 0.3,
+      legend(lim[[i]][1], lim[[i]][3] + 0.3,
          c("FMPR-w1", "FMPR-w2", "GFlasso-w1", "GFlasso-w2",
 	    "Lasso", "Ridge", "ElasticNet"),
          col=1:7, lwd=3, lty=c(1, 1, 2, 2, 3, 4, 5)

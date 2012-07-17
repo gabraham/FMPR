@@ -286,7 +286,8 @@ run.elnet <- function(rep, dir=".", nfolds=10, grid=25,
 # type: same: same weights, same sparsity
 #       sparsity: different weights, same sparsity
 #       random: different weights and different sparsity
-getB <- function(p, K, w, sparsity=0.8, type=NULL, ...)
+#       mixed: same absolute weights with different sign, same sparsity
+getB <- function(p, K, w=0.1, sparsity=0.8, type=NULL, ...)
 {
    if(type == "same") {
       b <- 0
@@ -305,6 +306,13 @@ getB <- function(p, K, w, sparsity=0.8, type=NULL, ...)
    } else if(type == "random") {
       B <- matrix(rnorm(p * K, ...), p, K)
       B <- B * sample(0:1, p * K, TRUE, prob=c(sparsity, 1 - sparsity))
+   } else if(type == "mixed") { 
+      b <- 0
+      B <- 0
+      while(all(B == 0)) {
+	 b <- w * sample(0:1, p, TRUE, prob=c(sparsity, 1 - sparsity))
+	 B <- sapply(1:K, function(k) sample(c(-1, 1), 1) * b)
+      }
    }
 
    B

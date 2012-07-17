@@ -8,7 +8,7 @@ if(require(doMC)) {
 
 
 N <- 100
-p <- 100
+p <- 200
 K <- 10 
 w <- 0.1
 B <- getB(p=p, K=K, w=w, type="same", sparsity=0.8)
@@ -26,7 +26,7 @@ l <- max(maxlambda1(X, Y))
 ngrid <- 25
 lambda <- 2^seq(-0.01, -10, length=ngrid) * l
 gamma <- c(0, 10^seq(-5, 5, length=ngrid))
-nfolds <- 5
+nfolds <- 10
 
 
 # L2 fusion penalty
