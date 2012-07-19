@@ -84,12 +84,13 @@ GFlasso-penalised loss function for the squared loss (linear regression) is
 \mathbf{B}^* = \arg \min_{\mathbf{B} \in \mathbb{R}^{p \times K}}
 \frac{1}{2} \sum_{k=1}^K \sum_{i=1}^N (y_{ik} - x_i^T \beta_k)^2 
 + \lambda \sum_{k=1}^K \sum_{j=1}^p |\beta_{jk}|
-\\ + \; \gamma \sum_{(m,l) \in \mathcal{E}} \sum_{j=1}^p 
+\\ + \; \gamma \sum_{(m,l) \in \mathcal{E}} f(r_{ml}) \sum_{j=1}^p 
    |\beta_{jm} - \mbox{sign}(r_{ml})
 \beta_{jl}|,
 \end{eqnarray}
 where $\mathbf{B}=[\beta_1, \hdots, \beta_K]$,
 $r_{ml}$ is the Pearson correlation between the $m$th and $l$th phenotypes,
+$f(r_{ml})$ is a function monotonic in the correlation,
 $\mathcal{E}$ is the set of inter-task edges induced by thresholding the Pearson
 correlation $r_{ml}$ ($\mathcal{E}$ is the same for all the $p$ variables), and
 $\lambda \ge 0$, $\gamma \ge 0$ are the lasso and fusion penalties,
@@ -114,7 +115,7 @@ B^* = \arg \min_{B \in \mathbb{R}^{p \times K}}
 \frac{1}{2} \sum_{k=1}^K \sum_{i=1}^N (y_{ik} - x_i^T \beta_k)^2
    + \lambda \sum_{k=1}^K \sum_{j=1}^p |\beta_{jk}| \\
    + \frac{\gamma}{2}
-    \sum_{m=1}^K \sum_{l=1}^K \sum_{j=1}^p [\beta_{jm} - \mbox{sign}(r_{ml})
+    \sum_{m=1}^K \sum_{l=1}^K f(r_{ml}) \sum_{j=1}^p [\beta_{jm} - \mbox{sign}(r_{ml})
     \beta_{jl}]^2.
 \end{eqnarray}
 
@@ -305,8 +306,78 @@ sapply(list(FMPR=f, GFlasso=s, Lasso=l), function(B2) {
 })
 @
 
-\bibliography{fmpr}
-\bibliographystyle{unsrtnat}
+%\bibliography{fmpr}
+%\bibliographystyle{unsrtnat}
+
+\begin{thebibliography}{9}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Mackay et~al.(2009)Mackay, Stone, and Ayroles]{mackay2009}
+T.~F.~C. Mackay, E.~A. Stone, and J.~F. Ayroles.
+\newblock The genetics of quantitative traits: challenges and prospects.
+\newblock \emph{Nat. Rev. Genet.}, 10:\penalty0 565--577, 2009.
+
+\bibitem[Inouye et~al.(2010{\natexlab{a}})Inouye, Kettunen, Soininen, Ripatti,
+  Kumpula, H{\"a}m{\"a}l{\"a}inen, Jousilahti, Kangas, M{\"a}nnist{\"o},
+  Savolainen, Jula, Leivisk{\"a}, Palotie, Salomaa, Perola, Ala-Korpela, and
+  Peltonen]{inouye2010}
+M.~Inouye, J.~Kettunen, P.~Soininen, S.~Ripatti, L.~S. Kumpula,
+  E.~H{\"a}m{\"a}l{\"a}inen, P.~Jousilahti, A.~J. Kangas, S.~M{\"a}nnist{\"o},
+  M.~J. Savolainen, A.~Jula, J.~Leivisk{\"a}, A.~Palotie, V.~Salomaa,
+  M.~Perola, M.~Ala-Korpela, and L.~Peltonen.
+\newblock Metabonomic, transcriptomic, and genetic variation of a population
+  cohort.
+\newblock \emph{Mol. Sys. Biol.}, 6:\penalty0 441, 2010{\natexlab{a}}.
+
+\bibitem[Inouye et~al.(2010{\natexlab{b}})Inouye, Silander, Hamalainen,
+  Salomaa, Harald, et~al.]{inouye2010b}
+M.~Inouye, K.~Silander, E.~Hamalainen, V.~Salomaa, K.~Harald, et~al.
+\newblock {An Immune Response Network Associated with Blood Lipid Levels}.
+\newblock \emph{PLoS Genet.}, 6:\penalty0 e1001113, 2010{\natexlab{b}}.
+
+\bibitem[Tukiainen et~al.(2011)Tukiainen, Kettunen, Kangas, Lyytik{\aa}inen,
+  et~al.]{tukiainen2011}
+T.~Tukiainen, J.~Kettunen, A.~J. Kangas, L.-P. Lyytik{\aa}inen, et~al.
+\newblock Detailed metabolic and genetic characterization reveals new
+  associations for 30 known lipid loci.
+\newblock \emph{Hum. Mol. Genet.}, 2011.
+\newblock To appear.
+
+\bibitem[Tibshirani(1996)]{tibshirani1996}
+R.~Tibshirani.
+\newblock {Regression Shrinkage and Selection via the Lasso}.
+\newblock \emph{J. R. Statist. Soc. B}, 58:\penalty0 267--288, 1996.
+
+\bibitem[Kim and Xing(2009)]{kim2009}
+S.~Kim and E.~P. Xing.
+\newblock Statistical estimation of correlated genome associations to a
+  quantitative trait network.
+\newblock \emph{PLoS Genet.}, 5:\penalty0 e1000587, 2009.
+
+\bibitem[Tseng(2001)]{tseng2001}
+P.~Tseng.
+\newblock {Convergence of a Block Coordinate Descent Method for
+  Nondifferentiable Minimization}.
+\newblock \emph{J. Opt. Theory Appl.}, 109:\penalty0 475--494, 2001.
+
+\bibitem[Friedman et~al.(2007)Friedman, Hastie, H{\"o}fling, and
+  Tibshirani]{friedman2007}
+J.~Friedman, T.~Hastie, H.~H{\"o}fling, and R.~Tibshirani.
+\newblock Pathwise coordinate optimization.
+\newblock \emph{Ann. Appl. Statist.}, 1:\penalty0 302--332, 2007.
+
+\bibitem[Chen et~al.(2012)Chen, Lin, Kim, Carbonell, and Xing]{chen2012}
+X.~Chen, Q.~Lin, S.~Kim, J.~G. Carbonell, and E.~P. Xing.
+\newblock A smoothing proximal gradient method for general structured sparse
+  regression.
+\newblock \emph{Ann. Appl. Statist.}, 2012.
+\newblock To appear.
+
+\end{thebibliography}
 
 <<>>=
 sessionInfo()
