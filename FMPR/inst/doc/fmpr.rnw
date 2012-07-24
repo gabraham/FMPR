@@ -84,7 +84,7 @@ GFlasso-penalised loss function for the squared loss (linear regression) is
 \mathbf{B}^* = \arg \min_{\mathbf{B} \in \mathbb{R}^{p \times K}}
 \frac{1}{2} \sum_{k=1}^K \sum_{i=1}^N (y_{ik} - x_i^T \beta_k)^2 
 + \lambda \sum_{k=1}^K \sum_{j=1}^p |\beta_{jk}|
-\\ + \; \gamma \sum_{(m,l) \in \mathcal{E}} \sum_{j=1}^p 
+\\ + \; \gamma \sum_{(m,l) \in \mathcal{E}} f(r_{ml}) \sum_{j=1}^p 
    |\beta_{jm} - \mbox{sign}(r_{ml})
 \beta_{jl}|,
 \end{eqnarray}
@@ -114,7 +114,7 @@ B^* = \arg \min_{B \in \mathbb{R}^{p \times K}}
 \frac{1}{2} \sum_{k=1}^K \sum_{i=1}^N (y_{ik} - x_i^T \beta_k)^2
    + \lambda \sum_{k=1}^K \sum_{j=1}^p |\beta_{jk}| \\
    + \frac{\gamma}{2}
-    \sum_{m=1}^K \sum_{l=1}^K \sum_{j=1}^p [\beta_{jm} - \mbox{sign}(r_{ml})
+    \sum_{m=1}^K \sum_{l=1}^K f(r_{ml}) \sum_{j=1}^p [\beta_{jm} - \mbox{sign}(r_{ml})
     \beta_{jl}]^2.
 \end{eqnarray}
 

@@ -1,6 +1,9 @@
 
 # Wrappers for running the different models on the simulation data
 
+# Make the simulated data.
+#
+# All inputs X and outputs Y are standardised to zero-mean and unit-variance
 makedata <- function(rep, dir=".", N=100, p=50, K=5, B, sigma=0.01,
       save=TRUE)
 {
@@ -64,9 +67,6 @@ run.spg <- function(rep, dir=".", nfolds=10, grid=25,
    K <- ncol(Ytrain)
    p <- ncol(Xtrain)
 
-   Xtrain <- scale(Xtrain)
-   Ytrain <- scale(Ytrain)
-
    cat("optim.spg start rep", rep, "\n")
    l <- max(maxlambda1(Xtrain, Ytrain))
    lambda <- l * lambdar
@@ -79,8 +79,8 @@ run.spg <- function(rep, dir=".", nfolds=10, grid=25,
    g <- spg(X=Xtrain, Y=Ytrain, C=C,
 	 lambda=opt$opt["lambda"], gamma=opt$opt["gamma"], simplify=TRUE)
 
-   P <- scale(Xtest) %*% g
-   res <- R2(as.numeric(P), as.numeric(scale(Ytest)))
+   P <- Xtest %*% g
+   res <- R2(as.numeric(P), as.numeric(Ytest))
 
    cat("finished rep", rep, "R2 SPG", res, "\n\n")
 
@@ -89,52 +89,6 @@ run.spg <- function(rep, dir=".", nfolds=10, grid=25,
    list(
       R2=res,
       beta=g
-   )
-}
-
-run.lasso <- function(rep, dir=".", nfolds=10, grid=25,
-      lambdar=2^seq(-10, 0, length=grid), verbose=FALSE)
-{
-   oldwd <- getwd()
-   setwd(dir)
-
-   Xtrain <- as.matrix(read.table(sprintf("Xtrain_%s.txt", rep),
-	    header=FALSE))
-   Xtest <- as.matrix(read.table(sprintf("Xtest_%s.txt", rep), header=FALSE))
-   Ytrain <- as.matrix(read.table(sprintf("Ytrain_%s.txt", rep),
-	    header=FALSE))
-   Ytest <- as.matrix(read.table(sprintf("Ytest_%s.txt", rep), header=FALSE))
-
-   N <- nrow(Xtrain)
-   p <- ncol(Xtrain)
-   K <- ncol(Ytrain)
-
-   XtrainB <- scale(blockX(Xtrain, K))
-   XtestB <- scale(blockX(Xtest, K))
-
-   ytrain <- as.numeric(scale(Ytrain))
-   ytest <- as.numeric(scale(Ytest))
-
-   l <- maxlambda1(XtrainB, ytrain)
-   opt <- optim.elnet(X=XtrainB, Y=ytrain, nfolds=nfolds,
-	 lambda=sort(l * lambdar, decreasing=TRUE), alpha=1)
-   
-   g <- glmnet(x=XtrainB, y=ytrain,
-	 lambda=sort(l * lambdar, decreasing=TRUE),
-	 alpha=1)
-   # intercept should be almost zero
-   g <- as.matrix(coef(g, s=opt$opt["lambda"]))[-1, ]
-
-   P <- XtestB %*% g
-   res <- R2(as.numeric(P), ytest)
-   cat("run.lasso R2:", opt$R2, "\n")
-   cat("rep", rep, "R2 lasso:", res, "\n")
-
-   setwd(oldwd)
-
-   list(
-      R2=res,
-      beta=matrix(g, p, K)
    )
 }
 
@@ -155,7 +109,7 @@ run.ridge <- function(rep, dir=".", nfolds=10, grid=25,
    K <- ncol(Ytrain)
    p <- ncol(Xtrain)
 
-   ytest <- as.numeric(scale(Ytest))
+   ytest <- as.numeric(Ytest)
    
    opt <- optim.ridge(X=Xtrain, Y=Ytrain, nfolds=nfolds, lambda=lambda)
    g <- ridge(Xtrain, Ytrain, lambda=opt$opt["lambda"])[[1]]
@@ -174,7 +128,8 @@ run.ridge <- function(rep, dir=".", nfolds=10, grid=25,
 run.fmpr <- function(rep, dir=".", nfolds=10, grid=25,
    graph.thresh=0.5, graph.fun=graph.sqr,
    lambdar=2^seq(-10, 0, length=grid),
-   gamma=10^seq(-3, 6, length=grid))
+   gamma=c(0, 10^seq(-3, 6, length=grid)),
+   lambda2=c(0, 10^seq(-3, 6, length=grid)))
 {
    oldwd <- getwd()
    setwd(dir)
@@ -182,10 +137,13 @@ run.fmpr <- function(rep, dir=".", nfolds=10, grid=25,
    cat("run.fmpr rep", rep, "\n")
 
    Xtrain <- as.matrix(read.table(sprintf("Xtrain_%s.txt", rep),
-	    header=FALSE))
-   Xtest <- as.matrix(read.table(sprintf("Xtest_%s.txt", rep), header=FALSE))
-   Ytrain <- as.matrix(read.table(sprintf("Ytrain_%s.txt", rep), header=FALSE))
-   Ytest <- as.matrix(read.table(sprintf("Ytest_%s.txt", rep), header=FALSE))
+      header=FALSE))
+   Xtest <- as.matrix(read.table(sprintf("Xtest_%s.txt", rep),
+      header=FALSE))
+   Ytrain <- as.matrix(read.table(sprintf("Ytrain_%s.txt", rep),
+      header=FALSE))
+   Ytest <- as.matrix(read.table(sprintf("Ytest_%s.txt", rep),
+      header=FALSE))
    R <- cor(Ytrain)
    G <- graph.fun(R, graph.thresh)
    
@@ -200,9 +158,6 @@ run.fmpr <- function(rep, dir=".", nfolds=10, grid=25,
    K <- ncol(Ytrain)
    p <- ncol(Xtrain)
 
-   Xtrain <- scale(Xtrain)
-   Ytrain <- scale(Ytrain)
-
    l <- max(maxlambda1(Xtrain, Ytrain))
    lambda <- l * lambdar
 
@@ -210,65 +165,18 @@ run.fmpr <- function(rep, dir=".", nfolds=10, grid=25,
    opt <- optim.fmpr(X=Xtrain, Y=Ytrain,
 	 nfolds=nfolds,
 	 graph.fun=graph.fun, graph.thresh=graph.thresh,
-	 lambda=lambda, gamma=gamma, maxiter=1e5)
+	 lambda=lambda, gamma=gamma, lambda2=lambda2, maxiter=1e5)
    cat("optim.fmpr end\n")
    g <- fmpr(X=Xtrain, Y=Ytrain,
-	 lambda=opt$opt["lambda"], gamma=opt$opt["gamma"],
+	 lambda=opt$opt["lambda"],
+	 gamma=opt$opt["gamma"],
+	 lambda2=opt$opt["lambda2"],
 	 maxiter=1e5, G=G, simplify=TRUE)
 
-   P <- scale(Xtest) %*% g
-   res <- R2(as.numeric(P), as.numeric(scale(Ytest)))
+   P <- Xtest %*% g
+   res <- R2(as.numeric(P), as.numeric(Ytest))
 
    cat("rep", rep, "R2 fmpr", res, "\n")
-
-   setwd(oldwd)
-
-   list(
-      R2=res,
-      beta=g
-   )
-}
-
-run.elnet <- function(rep, dir=".", nfolds=10, grid=25,
-      lambdar=2^seq(-10, 0, length=grid), alpha=seq(0, 1, length=grid))
-{
-   oldwd <- getwd()
-   setwd(dir)
-
-   Xtrain <- as.matrix(read.table(sprintf("Xtrain_%s.txt", rep),
-	    header=FALSE))
-   Xtest <- as.matrix(read.table(sprintf("Xtest_%s.txt", rep), header=FALSE))
-   Ytrain <- as.matrix(read.table(sprintf("Ytrain_%s.txt", rep), header=FALSE))
-   Ytest <- as.matrix(read.table(sprintf("Ytest_%s.txt", rep), header=FALSE))
-
-   N <- nrow(Xtrain)
-   K <- ncol(Ytrain)
-   p <- ncol(Xtrain)
-
-   XtrainB <- scale(blockX(Xtrain, K))
-   XtestB <- scale(blockX(Xtest, K))
-
-   ytrain <- scale(as.numeric(Ytrain))
-   ytest <- scale(as.numeric(Ytest))
-
-   cat("optim.elnet start\n")
-   l <- maxlambda1(XtrainB, ytrain)
-   opt <- optim.elnet(X=XtrainB, Y=ytrain, nfolds=nfolds,
-	 lambda=sort(l * lambdar, decreasing=TRUE), alpha=alpha)
-   cat("run.elnet R2", opt$R2, "\n")
-   cat("optim.elnet end\n")
-
-   # glmnet docs recommend running it on entire penalty path, not just one
-   g <- glmnet(x=XtrainB, y=ytrain,
-	 lambda=sort(l * lambdar, decreasing=TRUE),
-	 alpha=opt$opt["alpha"])
-   # intercept should be almost zero
-   g <- as.matrix(coef(g, s=opt$opt["lambda"]))[-1, ]
-
-   P <- XtestB %*% g
-   res <- R2(as.numeric(P), ytest)
-
-   cat("rep", rep, "R2 elasticnet:", res, "\n")
 
    setwd(oldwd)
 
@@ -283,10 +191,12 @@ run.elnet <- function(rep, dir=".", nfolds=10, grid=25,
 # w: weight per variable, if using type="same"
 # sparsity: [0,1], degree of sparsity per task
 #
-# type: same: same weights, same sparsity
+# type: 
+#       same: same weights, same sparsity
 #       sparsity: different weights, same sparsity
 #       random: different weights and different sparsity
 #       mixed: same absolute weights with different sign, same sparsity
+#       cluster; some tasks are related with same weight, some aren't
 getB <- function(p, K, w=0.1, sparsity=0.8, type=NULL, ...)
 {
    if(type == "same") {
@@ -312,6 +222,13 @@ getB <- function(p, K, w=0.1, sparsity=0.8, type=NULL, ...)
       while(all(B == 0)) {
 	 b <- w * sample(0:1, p, TRUE, prob=c(sparsity, 1 - sparsity))
 	 B <- sapply(1:K, function(k) sample(c(-1, 1), 1) * b)
+      }
+   } else if(type == "cluster") {
+      b <- 0
+      B <- 0
+      while(all(B == 0)) {
+	 b <- w * sample(0:1, p, TRUE, prob=c(sparsity, 1 - sparsity))
+	 B <- sapply(1:K, function(k) sample(c(-1, 0, 1), 1) * b)
       }
    }
 
@@ -356,8 +273,18 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
    m <- sapply(1:nreps, makedata, dir=dir,
 	 N=setup$N, p=setup$p, K=setup$K, B=setup$B, sigma=setup$sigma)
    cat("Simulation done\n")
+
+   #list(
+   #   fmpr.w1=list(),
+   #   fmpr.w2=list(),
+   #   spg.w1=list(),
+   #   spg.w2=list(),
+   #   lasso=list(),
+   #   ridge=list()
+   #   elnet=list()
+   #)
    
-   cat("Running inference\n")
+   cat("Running methods\n")
    r.fmpr.w1 <- lapply(1:nreps, run.fmpr, dir=dir, grid=grid, nfolds=nfolds,
    	 graph.fun=graph.abs, graph.thresh=NA)
    r.fmpr.w2 <- lapply(1:nreps, run.fmpr, dir=dir, grid=grid, nfolds=nfolds,
@@ -366,12 +293,12 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
    	 corthresh=0, cortype=1)
    r.spg.w2 <- lapply(1:nreps, run.spg, dir=dir, grid=grid, nfolds=nfolds,
    	 corthresh=0, cortype=2)
-   r.lasso <- lapply(1:nreps, run.elnet, dir=dir,
-	 grid=grid, nfolds=nfolds, alpha=1)
+   r.lasso <- lapply(1:nreps, run.fmpr, dir=dir,
+	 grid=grid, nfolds=nfolds, gamma=0, lambda2=0)
    r.ridge <- lapply(1:nreps, run.ridge, dir=dir, grid=grid, nfolds=nfolds)
-   r.elnet <- lapply(1:nreps, run.elnet, dir=dir,
-   	 grid=grid, nfolds=nfolds)
-   cat("Inference done\n")
+   r.elnet <- lapply(1:nreps, run.fmpr, dir=dir,
+   	 grid=grid, nfolds=nfolds, gamma=0)
+   cat("Done\n")
      
    R2.fmpr.w1 <- sapply(r.fmpr.w1, function(x) x$R2)
    R2.fmpr.w2 <- sapply(r.fmpr.w2, function(x) x$R2)

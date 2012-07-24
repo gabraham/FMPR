@@ -23,25 +23,7 @@ scalefix <- function(X)
    s
 }
 
-crossval.lasso <- function(X, Y, nfolds=5, ...)
-{
-   N <- nrow(X)
-   Y <- cbind(Y)
-   folds <- sample(1:nfolds, N, TRUE)
-   s <- sapply(1:nfolds, function(fold) {
-      g <- lasso(scalefix(X[folds != fold, ]), scalefix(Y[folds != fold, ]), ...)
-      p <- scalefix(X[folds == fold, ]) %*% g
-
-      # one R^2 for each penalty
-      apply(p, 2, R2, y=scalefix(Y[folds == fold, ]))
-   })
-   
-   list(
-      R2=rowMeans(s),
-      lambda=list(...)$lambda
-   )
-}
-
+# FMPR can do ridge regression but it's faster to do it using specialised code
 crossval.ridge <- function(X, Y, nfolds=5, ...)
 {
    N <- nrow(X)
@@ -70,9 +52,10 @@ crossval.fmpr <- function(X, Y, nfolds=5,
    folds <- sample(1:nfolds, N, TRUE)
 
    l <- max(length(list(...)$lambda), 1)
+   l2 <- max(length(list(...)$lambda2), 1)
    g <- max(length(list(...)$gamma), 1)
    verbose <- list(...)$verbose
-   res <- array(0, c(nfolds, l, g))
+   res <- array(0, c(nfolds, l, l2, g))
 
    # fmpr() is capable of handling lambda,gamma of varying lengths,
    # but we don't use that feature here because we want to run different
@@ -97,19 +80,23 @@ crossval.fmpr <- function(X, Y, nfolds=5,
 
       for(i in 1:l)
       {
-	 for(j in 1:g)
+	 for(m in 1:l2)
 	 {
-	    p <- as.matrix(Xtest %*% f[[i]][[j]])
-	    res[fold, i, j] <- cbind(R2(p, Ytest))
-	 } 
+	    for(j in 1:g)
+	    {
+	       p <- as.matrix(Xtest %*% f[[i]][[m]][[j]])
+	       res[fold, i, m, j] <- cbind(R2(p, Ytest))
+	    }
+	 }
       }
       #if(verbose)
-	 cat("best R2:", m <- max(res[fold, ,], na.rm=TRUE), "\n")
+	 #cat("best R2:", m <- max(res[fold, , ,], na.rm=TRUE), "\n")
    }
 
    list(
-      R2=apply(res, c(2, 3), mean, na.rm=TRUE),
+      R2=apply(res, c(2, 3, 4), mean, na.rm=TRUE),
       lambda=list(...)$lambda,
+      lambda2=list(...)$lambda2,
       gamma=list(...)$gamma
    )
 }
@@ -152,50 +139,6 @@ crossval.spg <- function(X, Y, nfolds=5, cortype=2, corthresh=0, ...)
    )
 }
 
-# glmnet produces the solution path for multiple lambdas, for a given alpha
-crossval.elnet <- function(X, Y, nfolds=5, lambda=NULL, alpha=1, ...)
-{
-   N <- nrow(X)
-   Y <- cbind(Y)
-   folds <- sample(1:nfolds, N, TRUE)
-
-   l1 <- length(lambda)
-   la <- length(alpha)
-   res <- array(NA, c(nfolds, l1, la))
-
-   g <- vector("list", nfolds)
-   lambda <- sort(lambda, decreasing=TRUE)
-
-   for(fold in 1:nfolds)
-   {
-      g[[fold]] <- foreach(i=1:la) %dopar% {
-         r <- glmnet(X[folds != fold, ], Y[folds != fold],
-	       lambda=lambda, alpha=alpha[i])
-	 as.matrix(coef(r))
-      }
-   }
-
-   for(fold in 1:nfolds)
-   {
-      for(i in 1:la)
-      {
-	 b <- g[[fold]][[i]]
-         p <- cbind(1, X[folds == fold, ]) %*% b
-
-	 # one R^2 for each penalty
-	 res[fold, 1:ncol(b), i] <- apply(p, 2, R2, y=Y[folds == fold, ])
-      }
-   }
-   
-   r2 <- apply(res, c(2, 3), mean, na.rm=TRUE)
-  
-   list(
-      R2=r2,
-      lambda=lambda,
-      alpha=alpha
-   )
-}
-
 optim.fmpr <- function(method="grid", ...)
 {
    if(method == "search") {
@@ -216,21 +159,22 @@ optim.fmpr.grid <- function(...)
       R2=r$R2,
       opt=c(
 	 lambda=r$lambda[w[1]],
-	 gamma=r$gamma[w[2]]
+	 lambda2=r$lambda2[w[2]],
+	 gamma=r$gamma[w[3]]
       )
    )
 }
 
 optim.fmpr.search <- function(X, Y, nfolds=5,
    graph.thresh=0.5, graph.fun=sqr,
-   lambda=c(10, 0), gamma=c(10, 0),
+   lambda=c(10, 0), gamma=c(10, 0), lambda2=c(10, 0),
    maxiter=1e5, verbose=FALSE)
 {
   
    cv <- function(par)
    {
       r <- crossval.fmpr(X=X, Y=Y, nfolds=nfolds,
-         lambda=par[1], gamma=par[2],
+         lambda=par[1], gamma=par[2], lambda2=par[3],
 	 graph.thresh=graph.thresh, graph.fun=graph.fun,
          maxiter=maxiter, verbose=verbose)
       -max(r$R2, na.rm=TRUE)
@@ -238,8 +182,8 @@ optim.fmpr.search <- function(X, Y, nfolds=5,
 
    opt <- optim(par=c(min(lambda), min(gamma)),
       fn=cv, method="L-BFGS-B",
-      lower=c(min(lambda), min(gamma)),
-      upper=c(max(lambda), max(gamma)),
+      lower=c(min(lambda), min(gamma), min(lambda2)),
+      upper=c(max(lambda), max(gamma), max(lambda2)),
       control=list(factr=1e4))
 
    list(
@@ -259,17 +203,6 @@ optim.spg <- function(...)
    )
 }
 
-optim.lasso <- function(...)
-{
-   r <- crossval.lasso(...)
-
-   w <- rbind(which(r$R2 == max(r$R2, na.rm=TRUE)))[1,]
-   list(
-      R2=r$R2,
-      opt=c(lambda=r$lambda[w[1]])
-   )
-}
-
 optim.ridge <- function(...)
 {
    r <- crossval.ridge(...)
@@ -278,18 +211,6 @@ optim.ridge <- function(...)
    list(
       R2=r$R2,
       opt=c(lambda=r$lambda[w[1]])
-   )
-}
-
-optim.elnet <- function(...)
-{  
-   r <- crossval.elnet(...)
-
-   w <- rbind(which(r$R2 == max(r$R2, na.rm=TRUE), arr.ind=TRUE))[1,]
-
-   list(
-      R2=r$R2,
-      opt=c(lambda=r$lambda[w[1]], alpha=r$alpha[w[2]])
    )
 }
 
