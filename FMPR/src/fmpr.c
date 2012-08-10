@@ -1079,9 +1079,9 @@ void fmpr_weighted_warm2(double *x, double *y, double *b,
 	       else
 	       {
 		  /* Apply intra-task ridge regression */
-	          b[jpk] = (fabs(s) - lambda) * sign(s) * oneOnLambda2PlusOne[k];
-		  //if(fabs(b[jpk]) < ZERO_THRESH) // numerically close enough to zero
-		    // b[jpk] = 0;
+	          b[jpk] = (s - lambda * sign(s)) * oneOnLambda2PlusOne[k];
+		  if(fabs(b[jpk]) < ZERO_THRESH) // numerically close enough to zero
+		     b[jpk] = 0;
 	          delta = b[jpk] - bjk;
 	       }
 	       
