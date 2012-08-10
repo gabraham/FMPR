@@ -12,6 +12,7 @@ export(
    "crossval.ridge",
    "crossval.spg",
    "fmpr",
+   "fmpr2",
    "ridge",
    "spg",
    "maxlambda1",

@@ -129,7 +129,7 @@ run.fmpr <- function(rep, dir=".", nfolds=10, grid=25,
    graph.thresh=0.5, graph.fun=graph.sqr,
    lambdar=2^seq(-10, 0, length=grid),
    gamma=c(0, 10^seq(-3, 6, length=grid)),
-   lambda2=c(0, 10^seq(-3, 6, length=grid)))
+   lambda2=c(0, 10^seq(-3, 6, length=grid)), type="l2", huber_mu=NA)
 {
    oldwd <- getwd()
    setwd(dir)
@@ -165,13 +165,14 @@ run.fmpr <- function(rep, dir=".", nfolds=10, grid=25,
    opt <- optim.fmpr(X=Xtrain, Y=Ytrain,
 	 nfolds=nfolds,
 	 graph.fun=graph.fun, graph.thresh=graph.thresh,
-	 lambda=lambda, gamma=gamma, lambda2=lambda2, maxiter=1e5)
+	 lambda=lambda, gamma=gamma, lambda2=lambda2, maxiter=1e5, type=type,
+	 huber_mu=huber_mu)
    cat("optim.fmpr end\n")
    g <- fmpr(X=Xtrain, Y=Ytrain,
 	 lambda=opt$opt["lambda"],
 	 gamma=opt$opt["gamma"],
 	 lambda2=opt$opt["lambda2"],
-	 maxiter=1e5, G=G, simplify=TRUE)
+	 maxiter=1e5, G=G, simplify=TRUE, type=type, huber_mu=huber_mu)
 
    P <- Xtest %*% g
    res <- R2(as.numeric(P), as.numeric(Ytest))
@@ -230,6 +231,16 @@ getB <- function(p, K, w=0.1, sparsity=0.8, type=NULL, ...)
 	 b <- w * sample(0:1, p, TRUE, prob=c(sparsity, 1 - sparsity))
 	 B <- sapply(1:K, function(k) sample(c(-1, 0, 1), 1) * b)
       }
+   } else if(type == "clustersparse") {
+      B <- 0
+      while(all(B == 0)) {
+	 B <- matrix(rnorm(p * K, ...), p, K)
+	 s1 <- sample(0:1, p, TRUE, prob=c(sparsity, 1 - sparsity))
+	 s2 <- sample(0:1, K, TRUE, prob=c(sparsity, 1 - sparsity))
+	 B[s1 == 0, ] <- 0
+	 B[, s2 == 0] <- 0
+      }
+
    }
 
    B
@@ -274,34 +285,46 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
 	 N=setup$N, p=setup$p, K=setup$K, B=setup$B, sigma=setup$sigma)
    cat("Simulation done\n")
 
-   #list(
-   #   fmpr.w1=list(),
-   #   fmpr.w2=list(),
-   #   spg.w1=list(),
-   #   spg.w2=list(),
-   #   lasso=list(),
-   #   ridge=list()
-   #   elnet=list()
-   #)
-   
    cat("Running methods\n")
    r.fmpr.w1 <- lapply(1:nreps, run.fmpr, dir=dir, grid=grid, nfolds=nfolds,
    	 graph.fun=graph.abs, graph.thresh=NA)
+
    r.fmpr.w2 <- lapply(1:nreps, run.fmpr, dir=dir, grid=grid, nfolds=nfolds,
    	 graph.fun=graph.sqr, graph.thresh=NA)
+
+   r.fmpr.h1.w1 <- lapply(1:nreps, run.fmpr, dir=dir, grid=grid, nfolds=nfolds,
+   	 graph.fun=graph.abs, graph.thresh=NA, type="huber", huber_mu=1e-3)
+
+   r.fmpr.h1.w2 <- lapply(1:nreps, run.fmpr, dir=dir, grid=grid, nfolds=nfolds,
+   	 graph.fun=graph.sqr, graph.thresh=NA, type="huber", huber_mu=1e-3)
+
+   r.fmpr.h2.w1 <- lapply(1:nreps, run.fmpr, dir=dir, grid=grid, nfolds=nfolds,
+   	 graph.fun=graph.abs, graph.thresh=NA, type="huber", huber_mu=1)
+
+   r.fmpr.h2.w2 <- lapply(1:nreps, run.fmpr, dir=dir, grid=grid, nfolds=nfolds,
+   	 graph.fun=graph.sqr, graph.thresh=NA, type="huber", huber_mu=1)
+
    r.spg.w1 <- lapply(1:nreps, run.spg, dir=dir, grid=grid, nfolds=nfolds,
    	 corthresh=0, cortype=1)
+
    r.spg.w2 <- lapply(1:nreps, run.spg, dir=dir, grid=grid, nfolds=nfolds,
    	 corthresh=0, cortype=2)
+
    r.lasso <- lapply(1:nreps, run.fmpr, dir=dir,
 	 grid=grid, nfolds=nfolds, gamma=0, lambda2=0)
+
    r.ridge <- lapply(1:nreps, run.ridge, dir=dir, grid=grid, nfolds=nfolds)
+
    r.elnet <- lapply(1:nreps, run.fmpr, dir=dir,
    	 grid=grid, nfolds=nfolds, gamma=0)
    cat("Done\n")
      
    R2.fmpr.w1 <- sapply(r.fmpr.w1, function(x) x$R2)
    R2.fmpr.w2 <- sapply(r.fmpr.w2, function(x) x$R2)
+   R2.fmpr.h1.w1 <- sapply(r.fmpr.h1.w1, function(x) x$R2)
+   R2.fmpr.h1.w2 <- sapply(r.fmpr.h1.w2, function(x) x$R2)
+   R2.fmpr.h2.w1 <- sapply(r.fmpr.h2.w1, function(x) x$R2)
+   R2.fmpr.h2.w2 <- sapply(r.fmpr.h2.w2, function(x) x$R2)
    R2.spg.w1 <- sapply(r.spg.w1, function(x) x$R2)
    R2.spg.w2 <- sapply(r.spg.w2, function(x) x$R2)
    R2.lasso <- sapply(r.lasso, function(x) x$R2)
@@ -311,6 +334,10 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
    R2.all <- cbind(
       FMPRw1=R2.fmpr.w1,
       FMPRw2=R2.fmpr.w2,
+      FMPRh1w1=R2.fmpr.h1.w1,
+      FMPRh1w2=R2.fmpr.h1.w2,
+      FMPRh2w1=R2.fmpr.h2.w1,
+      FMPRh2w2=R2.fmpr.h2.w2,
       SPGw1=R2.spg.w1,
       SPGw2=R2.spg.w2,
       Lasso=R2.lasso,
@@ -320,6 +347,10 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
 
    rec.fmpr.w1 <- recovery(r.fmpr.w1, rep, dir, cleanROCR)
    rec.fmpr.w2 <- recovery(r.fmpr.w2, rep, dir, cleanROCR)
+   rec.fmpr.h1.w1 <- recovery(r.fmpr.h1.w1, rep, dir, cleanROCR)
+   rec.fmpr.h1.w2 <- recovery(r.fmpr.h2.w2, rep, dir, cleanROCR)
+   rec.fmpr.h2.w1 <- recovery(r.fmpr.h2.w1, rep, dir, cleanROCR)
+   rec.fmpr.h2.w2 <- recovery(r.fmpr.h2.w2, rep, dir, cleanROCR)
    rec.spg.w1 <- recovery(r.spg.w1, rep, dir, cleanROCR)
    rec.spg.w2 <- recovery(r.spg.w2, rep, dir, cleanROCR)
    rec.lasso <- recovery(r.lasso, rep, dir, cleanROCR)
@@ -331,6 +362,10 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
       weights=list(
 	 fmpr.w1=r.fmpr.w1,
 	 fmpr.w2=r.fmpr.w2,
+	 fmpr.h1.w1=r.fmpr.h1.w1,
+	 fmpr.h1.w2=r.fmpr.h1.w2,
+	 fmpr.h2.w1=r.fmpr.h2.w1,
+	 fmpr.h2.w2=r.fmpr.h2.w2,
 	 lasso=r.lasso,
 	 ridge=r.ridge,
 	 elnet=r.elnet,
@@ -340,6 +375,10 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
       recovery=list(
 	 fmpr.w1=rec.fmpr.w1,
 	 fmpr.w2=rec.fmpr.w2,
+	 fmpr.h1.w1=rec.fmpr.h1.w1,
+	 fmpr.h1.w2=rec.fmpr.h1.w2,
+	 fmpr.h2.w1=rec.fmpr.h2.w1,
+	 fmpr.h2.w2=rec.fmpr.h2.w2,
 	 lasso=rec.lasso,
 	 ridge=rec.ridge,
 	 elnet=rec.elnet,

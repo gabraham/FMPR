@@ -76,11 +76,23 @@ plot.exper <- function(x,
          col=6, lwd=3, lty=4)
       plot.rocr(x$recovery$elnet[[nm[i]]], avg="threshold", add=TRUE,
 	 col=7, lwd=3, lty=5)
+	 
+      plot.rocr(x$recovery$fmpr.h1.w1[[nm[i]]], avg="threshold", add=TRUE,
+	 col=8, lwd=3, lty=5)
+      plot.rocr(x$recovery$fmpr.h1.w2[[nm[i]]], avg="threshold", add=TRUE,
+         col=9, lwd=3, lty=5)
+
+      plot.rocr(x$recovery$fmpr.h2.w1[[nm[i]]], avg="threshold", add=TRUE,
+	 col=10, lwd=3, lty=5)
+      plot.rocr(x$recovery$fmpr.h2.w2[[nm[i]]], avg="threshold", add=TRUE,
+         col=10, lwd=3, lty=5)
+
       
-      legend(lim[[i]][1], lim[[i]][3] + 0.3,
+      legend(lim[[i]][1], lim[[i]][3] + 0.5,
          c("FMPR-w1", "FMPR-w2", "GFlasso-w1", "GFlasso-w2",
-	    "Lasso", "Ridge", "ElasticNet"),
-         col=1:7, lwd=3, lty=c(1, 1, 2, 2, 3, 4, 5)
+	    "Lasso", "Ridge", "ElasticNet", "Huber-1-w1", "Huber-1-w2",
+	    "Huber-2-w1", "Huber-2-w2"),
+         col=1:10, lwd=3, lty=c(1, 1, 2, 2, 3, 4, 5, 5, 5, 5)
       )
    }
 

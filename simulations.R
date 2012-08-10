@@ -94,10 +94,11 @@ setup <- list(
    # Some tasks are related (clusters), some aren't
    Expr22=list(dir=c("Expr22"), N=100, p=100, K=10, sigma=0.5,
 	 B=getB(p=100, K=10, w=0.1, type="cluster"))
+
 )
 
-nreps <- 10
-grid <- 20
+nreps <- 50
+grid <- 25
 nfolds <- 5
 
 system.time({
