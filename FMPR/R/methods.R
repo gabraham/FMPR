@@ -19,127 +19,127 @@ graph.abs <- function(R, threshold=NA)
    R
 }
 
-fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, G=NULL,
-      maxiter=1e5, eps=1e-4, verbose=FALSE, simplify=FALSE,
-      sparse=FALSE, nzmax=nrow(X), type=c("l2", "huber"), huber_mu=1e-3)
-{
-   if(length(X) == 0 || length(Y) == 0)
-      stop("X and/or Y have zero length")
-
-   p <- ncol(X)
-   Y <- cbind(Y)
-   K <- ncol(Y)
-   N <- nrow(X)
-
-   if(is.na(huber_mu))
-      huber_mu = 0;
-
-   if(nrow(X) != nrow(Y))
-      stop("dimensions of X and Y don't agree")
-
-   if(!is.null(G)) {
-      if(nrow(G) != ncol(G) || nrow(G) != K) {
-	 stop("dimensions of G and Y don't agree")
-      }
-   } else {
-      G <- matrix(0, K, K)
-      gamma <- 0
-   }
-	       
-   B0 <- matrix(0, p, K)
-   LP0 <- matrix(0, N, K)
-
-   type <- match.arg(type)
-
-   func <- switch(type,
-      "l2"="fmpr_weighted_warm",
-      "huber"="fmpr_weighted_warm_huber"
-   )
-
-   # fit models in increasing order of lambda, without messing with
-   # the original ordering of lambda requested by user
-   l1ord <- order(lambda, decreasing=TRUE)
-
-   # We parallelise the gamma but not the lambda. Assuming that
-   # the lambda are in increasing order, we can stop if there are no active
-   # variables for a given gamma, as increasing lambda will only
-   # result in no active variables again. This allows us to not waste time on
-   # models that will have zero active variables anyway.
-   Btmp <- foreach(j=seq(along=gamma)) %:% foreach(m=seq(along=lambda2)) %dopar% {
-	    Bjk <- vector("list", length(lambda))
-	    LPjk <- vector("list", length(lambda))
-	    nactive <- numeric(length(lambda))
-
-	    # process sequential along the l1 penalty
-	    for(i in seq(along=lambda))
-	    {
-	       if(verbose) {
-		  cat("\t", l1ord[i], j, ": ")
-	       }
-
-	       if(i == 1) {
-		  B <- B0
-		  LP <- LP0
-	       } else {
-		  B <- Bjk[[l1ord[i-1]]]
-		  LP <- LPjk[[l1ord[i-1]]]
-	       }
-	       
-	       r <- .C(func,
-		  as.numeric(X),       # 1: X
-		  as.numeric(Y),       # 2: Y
-	          as.numeric(B),       # 3: B
-		  as.numeric(LP),      # 4: LP
-		  nrow(X),	       # 5: N
-		  ncol(X),	       # 6: p
-		  K,		       # 7: K
-       	          lambda[l1ord[i]],    # 8: lambda
-		  lambda2[m],	       # 9: lambda2
-		  gamma[j],	       # 10: gamma
-       	          as.numeric(G),       # 11: G
-		  as.integer(maxiter), # 12: maxiter
-       	          as.double(eps),      # 13: eps
-		  as.integer(verbose), # 14: verbose
-		  integer(1),	       # 15: status
-	          integer(1),	       # 16: iter
-		  integer(1),	       # 17: numactive
-		  as.numeric(huber_mu) # 18: huber_mu
-	       )
-	       status <- r[[15]]
-	       numiter <- r[[16]]
-	       nactive[l1ord[i]] <- r[[17]]
-	       if(!status) {
-	          cat("fmpr failed to converge within ",
-	             maxiter, " iterations")
-	       } else if(verbose) {
-		  cat("fmpr converged in", numiter, "iterations",
-	             "with", nactive[l1ord[i]], "active variables\n\n")
-	       }
-	          
-	       Bjk[[l1ord[i]]] <- matrix(r[[3]], p, K)
-	       LPjk[[l1ord[i]]] <- matrix(r[[4]], N, K)
-	    }
-	    Bjk
-   }
-
-   # Invert the list so that lambda is on the first dimension again
-   B <- lapply(seq(along=lambda), function(i) {
-	    lapply(seq(along=lambda2), function(m) {
-	       lapply(seq(along=gamma), function(j) {
-		  Btmp[[j]][[m]][[i]]
-	       })
-	    })
-   })
-
-   if(simplify 
-      && length(lambda) == 1 
-      && length(gamma) == 1 
-      && length(lambda2) == 1) {
-      B[[1]][[1]][[1]]
-   } else {
-      B
-   }
-}
+#fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, G=NULL,
+#      maxiter=1e5, eps=1e-4, verbose=FALSE, simplify=FALSE,
+#      sparse=FALSE, nzmax=nrow(X), type=c("l2", "huber"), huber_mu=1e-3)
+#{
+#   if(length(X) == 0 || length(Y) == 0)
+#      stop("X and/or Y have zero length")
+#
+#   p <- ncol(X)
+#   Y <- cbind(Y)
+#   K <- ncol(Y)
+#   N <- nrow(X)
+#
+#   if(is.na(huber_mu))
+#      huber_mu = 0;
+#
+#   if(nrow(X) != nrow(Y))
+#      stop("dimensions of X and Y don't agree")
+#
+#   if(!is.null(G)) {
+#      if(nrow(G) != ncol(G) || nrow(G) != K) {
+#	 stop("dimensions of G and Y don't agree")
+#      }
+#   } else {
+#      G <- matrix(0, K, K)
+#      gamma <- 0
+#   }
+#	       
+#   B0 <- matrix(0, p, K)
+#   LP0 <- matrix(0, N, K)
+#
+#   type <- match.arg(type)
+#
+#   func <- switch(type,
+#      "l2"="fmpr_weighted_warm",
+#      "huber"="fmpr_weighted_warm_huber"
+#   )
+#
+#   # fit models in increasing order of lambda, without messing with
+#   # the original ordering of lambda requested by user
+#   l1ord <- order(lambda, decreasing=TRUE)
+#
+#   # We parallelise the gamma but not the lambda. Assuming that
+#   # the lambda are in increasing order, we can stop if there are no active
+#   # variables for a given gamma, as increasing lambda will only
+#   # result in no active variables again. This allows us to not waste time on
+#   # models that will have zero active variables anyway.
+#   Btmp <- foreach(j=seq(along=gamma)) %:% foreach(m=seq(along=lambda2)) %dopar% {
+#	    Bjk <- vector("list", length(lambda))
+#	    LPjk <- vector("list", length(lambda))
+#	    nactive <- numeric(length(lambda))
+#
+#	    # process sequential along the l1 penalty
+#	    for(i in seq(along=lambda))
+#	    {
+#	       if(verbose) {
+#		  cat("\t", l1ord[i], j, ": ")
+#	       }
+#
+#	       if(i == 1) {
+#		  B <- B0
+#		  LP <- LP0
+#	       } else {
+#		  B <- Bjk[[l1ord[i-1]]]
+#		  LP <- LPjk[[l1ord[i-1]]]
+#	       }
+#	       
+#	       r <- .C(func,
+#		  as.numeric(X),       # 1: X
+#		  as.numeric(Y),       # 2: Y
+#	          as.numeric(B),       # 3: B
+#		  as.numeric(LP),      # 4: LP
+#		  nrow(X),	       # 5: N
+#		  ncol(X),	       # 6: p
+#		  K,		       # 7: K
+#       	          lambda[l1ord[i]],    # 8: lambda
+#		  lambda2[m],	       # 9: lambda2
+#		  gamma[j],	       # 10: gamma
+#       	          as.numeric(G),       # 11: G
+#		  as.integer(maxiter), # 12: maxiter
+#       	          as.double(eps),      # 13: eps
+#		  as.integer(verbose), # 14: verbose
+#		  integer(1),	       # 15: status
+#	          integer(1),	       # 16: iter
+#		  integer(1),	       # 17: numactive
+#		  as.numeric(huber_mu) # 18: huber_mu
+#	       )
+#	       status <- r[[15]]
+#	       numiter <- r[[16]]
+#	       nactive[l1ord[i]] <- r[[17]]
+#	       if(!status) {
+#	          cat("fmpr failed to converge within ",
+#	             maxiter, " iterations")
+#	       } else if(verbose) {
+#		  cat("fmpr converged in", numiter, "iterations",
+#	             "with", nactive[l1ord[i]], "active variables\n\n")
+#	       }
+#	          
+#	       Bjk[[l1ord[i]]] <- matrix(r[[3]], p, K)
+#	       LPjk[[l1ord[i]]] <- matrix(r[[4]], N, K)
+#	    }
+#	    Bjk
+#   }
+#
+#   # Invert the list so that lambda is on the first dimension again
+#   B <- lapply(seq(along=lambda), function(i) {
+#	    lapply(seq(along=lambda2), function(m) {
+#	       lapply(seq(along=gamma), function(j) {
+#		  Btmp[[j]][[m]][[i]]
+#	       })
+#	    })
+#   })
+#
+#   if(simplify 
+#      && length(lambda) == 1 
+#      && length(gamma) == 1 
+#      && length(lambda2) == 1) {
+#      B[[1]][[1]][[1]]
+#   } else {
+#      B
+#   }
+#}
 
 lasso <- function(X, y, lambda=0,
       maxiter=1e5, eps=1e-4, verbose=FALSE)
@@ -553,7 +553,7 @@ fmprR5 <- function(X, Y, C, lambda=0, lambda2=0, gamma=0, maxiter=1e3, eps=1e-4)
    B
 }
 
-fmpr2 <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
+fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
       maxiter=1e5, eps=1e-4, verbose=FALSE, simplify=FALSE,
       sparse=FALSE, nzmax=nrow(X), type=c("l2", "huber"), huber_mu=1e-3)
 {
