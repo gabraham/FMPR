@@ -4,11 +4,15 @@ S3method(plot, exper)
 
 export(
    "optim.fmpr",
+   "optim.fmpr2",
    "optim.fmpr.grid",
    "optim.fmpr.search",
+   "optim.fmpr.grid2",
+   "optim.fmpr.search2",
    "optim.ridge",
    "optim.spg",
    "crossval.fmpr",
+   "crossval.fmpr2",
    "crossval.ridge",
    "crossval.spg",
    "fmpr",
