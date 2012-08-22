@@ -129,7 +129,7 @@ run.fmpr <- function(rep, dir=".", nfolds=10, grid=25,
    graph.thresh=0.5, graph.fun=graph.sqr,
    lambdar=2^seq(-10, 0, length=grid),
    gamma=c(0, 10^seq(-3, 6, length=grid)),
-   lambda2=c(0, 10^seq(-3, 6, length=grid)), type="l2", huber_mu=NA)
+   lambda2=c(0, 10^seq(-3, 6, length=grid)), type="l2", huber_mu=0)
 {
    oldwd <- getwd()
    setwd(dir)
@@ -350,120 +350,152 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
    cat("Simulation done\n")
 
    cat("Running methods\n")
-   r.fmpr2.w1 <- lapply(1:nreps, run.fmpr2, dir=dir, grid=grid, nfolds=nfolds,
-   	 cortype=1, corthresh=0)
+   #r.fmpr2.w1 <- lapply(1:nreps, run.fmpr2, dir=dir, grid=grid, nfolds=nfolds,
+  # 	 cortype=1, corthresh=0)
 
-   r.fmpr2.w2 <- lapply(1:nreps, run.fmpr, dir=dir, grid=grid, nfolds=nfolds,
+   r.fmpr2.w2 <- lapply(1:nreps, run.fmpr2, dir=dir, grid=grid, nfolds=nfolds,
    	 cortype=2, corthresh=0)
 
-   r.fmpr.w1 <- lapply(1:nreps, run.fmpr, dir=dir, grid=grid, nfolds=nfolds,
-   	 graph.fun=graph.abs, graph.thresh=0)
+   #r.fmpr2.h1.w1 <- lapply(1:nreps, run.fmpr2, dir=dir, grid=grid, nfolds=nfolds,
+  # 	 cortype=1, corthresh=0, type="huber", huber_mu=1e-3)
+
+   r.fmpr2.h1.w2 <- lapply(1:nreps, run.fmpr2, dir=dir, grid=grid, nfolds=nfolds,
+   	 cortype=2, corthresh=0, type="huber", huber_mu=1e-3)
+
+  # r.fmpr2.h2.w1 <- lapply(1:nreps, run.fmpr2, dir=dir, grid=grid, nfolds=nfolds,
+  # 	 cortype=1, corthresh=0, type="huber", huber_mu=1)
+
+   r.fmpr2.h2.w2 <- lapply(1:nreps, run.fmpr2, dir=dir, grid=grid, nfolds=nfolds,
+   	 cortype=2, corthresh=0, type="huber", huber_mu=1)
+
+  # r.fmpr.w1 <- lapply(1:nreps, run.fmpr, dir=dir, grid=grid, nfolds=nfolds,
+   #	 graph.fun=graph.abs, graph.thresh=0)
 
    r.fmpr.w2 <- lapply(1:nreps, run.fmpr, dir=dir, grid=grid, nfolds=nfolds,
    	 graph.fun=graph.sqr, graph.thresh=0)
 
-   r.fmpr.h1.w1 <- lapply(1:nreps, run.fmpr, dir=dir, grid=grid, nfolds=nfolds,
-   	 graph.fun=graph.abs, graph.thresh=0, type="huber", huber_mu=1e-3)
+  # r.fmpr.h1.w1 <- lapply(1:nreps, run.fmpr, dir=dir, grid=grid, nfolds=nfolds,
+  # 	 graph.fun=graph.abs, graph.thresh=0, type="huber", huber_mu=1e-3)
 
    r.fmpr.h1.w2 <- lapply(1:nreps, run.fmpr, dir=dir, grid=grid, nfolds=nfolds,
    	 graph.fun=graph.sqr, graph.thresh=0, type="huber", huber_mu=1e-3)
 
-   r.fmpr.h2.w1 <- lapply(1:nreps, run.fmpr, dir=dir, grid=grid, nfolds=nfolds,
-   	 graph.fun=graph.abs, graph.thresh=0, type="huber", huber_mu=1)
+  # r.fmpr.h2.w1 <- lapply(1:nreps, run.fmpr, dir=dir, grid=grid, nfolds=nfolds,
+  # 	 graph.fun=graph.abs, graph.thresh=0, type="huber", huber_mu=1)
 
    r.fmpr.h2.w2 <- lapply(1:nreps, run.fmpr, dir=dir, grid=grid, nfolds=nfolds,
    	 graph.fun=graph.sqr, graph.thresh=0, type="huber", huber_mu=1)
 
-   r.spg.w1 <- lapply(1:nreps, run.spg, dir=dir, grid=grid, nfolds=nfolds,
-   	 corthresh=0, cortype=1)
-
-   r.spg.w2 <- lapply(1:nreps, run.spg, dir=dir, grid=grid, nfolds=nfolds,
-   	 corthresh=0, cortype=2)
-
-   r.lasso <- lapply(1:nreps, run.fmpr, dir=dir,
-	 grid=grid, nfolds=nfolds, gamma=0, lambda2=0)
-
-   r.ridge <- lapply(1:nreps, run.ridge, dir=dir, grid=grid, nfolds=nfolds)
-
-   r.elnet <- lapply(1:nreps, run.fmpr, dir=dir,
-   	 grid=grid, nfolds=nfolds, gamma=0)
+#   r.spg.w1 <- lapply(1:nreps, run.spg, dir=dir, grid=grid, nfolds=nfolds,
+#   	 corthresh=0, cortype=1)
+#
+#   r.spg.w2 <- lapply(1:nreps, run.spg, dir=dir, grid=grid, nfolds=nfolds,
+#   	 corthresh=0, cortype=2)
+#
+#   r.lasso <- lapply(1:nreps, run.fmpr, dir=dir,
+#	 grid=grid, nfolds=nfolds, gamma=0, lambda2=0)
+#
+#   r.ridge <- lapply(1:nreps, run.ridge, dir=dir, grid=grid, nfolds=nfolds)
+#
+#   r.elnet <- lapply(1:nreps, run.fmpr, dir=dir,
+#	 grid=grid, nfolds=nfolds, gamma=0)
    cat("Done\n")
      
-   R2.fmpr.w1 <- sapply(r.fmpr.w1, function(x) x$R2)
+   #R2.fmpr.w1 <- sapply(r.fmpr.w1, function(x) x$R2)
    R2.fmpr.w2 <- sapply(r.fmpr.w2, function(x) x$R2)
-   R2.fmpr2.w1 <- sapply(r.fmpr2.w1, function(x) x$R2)
+   #R2.fmpr2.w1 <- sapply(r.fmpr2.w1, function(x) x$R2)
    R2.fmpr2.w2 <- sapply(r.fmpr2.w2, function(x) x$R2)
-   R2.fmpr.h1.w1 <- sapply(r.fmpr.h1.w1, function(x) x$R2)
+   #R2.fmpr2.h1.w1 <- sapply(r.fmpr2.h1.w1, function(x) x$R2)
+   R2.fmpr2.h1.w2 <- sapply(r.fmpr2.h1.w2, function(x) x$R2)
+   #R2.fmpr2.h2.w1 <- sapply(r.fmpr2.h2.w1, function(x) x$R2)
+   R2.fmpr2.h2.w2 <- sapply(r.fmpr2.h2.w2, function(x) x$R2)
+   #R2.fmpr.h1.w1 <- sapply(r.fmpr.h1.w1, function(x) x$R2)
    R2.fmpr.h1.w2 <- sapply(r.fmpr.h1.w2, function(x) x$R2)
-   R2.fmpr.h2.w1 <- sapply(r.fmpr.h2.w1, function(x) x$R2)
+   #R2.fmpr.h2.w1 <- sapply(r.fmpr.h2.w1, function(x) x$R2)
    R2.fmpr.h2.w2 <- sapply(r.fmpr.h2.w2, function(x) x$R2)
-   R2.spg.w1 <- sapply(r.spg.w1, function(x) x$R2)
-   R2.spg.w2 <- sapply(r.spg.w2, function(x) x$R2)
-   R2.lasso <- sapply(r.lasso, function(x) x$R2)
-   R2.ridge <- sapply(r.ridge, function(x) x$R2)
-   R2.elnet <- sapply(r.elnet, function(x) x$R2)
+   #R2.spg.w1 <- sapply(r.spg.w1, function(x) x$R2)
+   #R2.spg.w2 <- sapply(r.spg.w2, function(x) x$R2)
+   #R2.lasso <- sapply(r.lasso, function(x) x$R2)
+   #R2.ridge <- sapply(r.ridge, function(x) x$R2)
+   #R2.elnet <- sapply(r.elnet, function(x) x$R2)
   
    R2.all <- cbind(
-      FMPRw1=R2.fmpr.w1,
+      #FMPRw1=R2.fmpr.w1,
       FMPRw2=R2.fmpr.w2,
-      FMPR2w1=R2.fmpr2.w1,
+      #FMPR2w1=R2.fmpr2.w1,
       FMPR2w2=R2.fmpr2.w2,
-      FMPRh1w1=R2.fmpr.h1.w1,
+      #FMPR2h1w1=R2.fmpr2.h1.w1,
+      FMPR2h1w2=R2.fmpr2.h1.w2,
+      #FMPR2h2w1=R2.fmpr2.h2.w1,
+      FMPR2h2w2=R2.fmpr2.h2.w2,
+      #FMPRh1w1=R2.fmpr.h1.w1,
       FMPRh1w2=R2.fmpr.h1.w2,
-      FMPRh2w1=R2.fmpr.h2.w1,
-      FMPRh2w2=R2.fmpr.h2.w2,
-      SPGw1=R2.spg.w1,
-      SPGw2=R2.spg.w2,
-      Lasso=R2.lasso,
-      Ridge=R2.ridge,
-      ElasticNet=R2.elnet
+      #FMPRh2w1=R2.fmpr.h2.w1,
+      FMPRh2w2=R2.fmpr.h2.w2#,
+      #SPGw1=R2.spg.w1,
+      #SPGw2=R2.spg.w2,
+      #Lasso=R2.lasso,
+      #Ridge=R2.ridge,
+      #ElasticNet=R2.elnet
    )
 
-   rec.fmpr.w1 <- recovery(r.fmpr.w1, rep, dir, cleanROCR)
+   #rec.fmpr.w1 <- recovery(r.fmpr.w1, rep, dir, cleanROCR)
    rec.fmpr.w2 <- recovery(r.fmpr.w2, rep, dir, cleanROCR)
-   rec.fmpr2.w1 <- recovery(r.fmpr2.w1, rep, dir, cleanROCR)
+   #rec.fmpr2.w1 <- recovery(r.fmpr2.w1, rep, dir, cleanROCR)
    rec.fmpr2.w2 <- recovery(r.fmpr2.w2, rep, dir, cleanROCR)
-   rec.fmpr.h1.w1 <- recovery(r.fmpr.h1.w1, rep, dir, cleanROCR)
+   #rec.fmpr2.h1.w1 <- recovery(r.fmpr2.h1.w1, rep, dir, cleanROCR)
+   rec.fmpr2.h1.w2 <- recovery(r.fmpr2.h1.w2, rep, dir, cleanROCR)
+   #rec.fmpr2.h2.w1 <- recovery(r.fmpr2.h2.w1, rep, dir, cleanROCR)
+   rec.fmpr2.h2.w2 <- recovery(r.fmpr2.h2.w2, rep, dir, cleanROCR)
+   #rec.fmpr.h1.w1 <- recovery(r.fmpr.h1.w1, rep, dir, cleanROCR)
    rec.fmpr.h1.w2 <- recovery(r.fmpr.h2.w2, rep, dir, cleanROCR)
-   rec.fmpr.h2.w1 <- recovery(r.fmpr.h2.w1, rep, dir, cleanROCR)
+   #rec.fmpr.h2.w1 <- recovery(r.fmpr.h2.w1, rep, dir, cleanROCR)
    rec.fmpr.h2.w2 <- recovery(r.fmpr.h2.w2, rep, dir, cleanROCR)
-   rec.spg.w1 <- recovery(r.spg.w1, rep, dir, cleanROCR)
-   rec.spg.w2 <- recovery(r.spg.w2, rep, dir, cleanROCR)
-   rec.lasso <- recovery(r.lasso, rep, dir, cleanROCR)
-   rec.ridge <- recovery(r.ridge, rep, dir, cleanROCR)
-   rec.elnet <- recovery(r.elnet, rep, dir, cleanROCR)
+   #rec.spg.w1 <- recovery(r.spg.w1, rep, dir, cleanROCR)
+   #rec.spg.w2 <- recovery(r.spg.w2, rep, dir, cleanROCR)
+   #rec.lasso <- recovery(r.lasso, rep, dir, cleanROCR)
+   #rec.ridge <- recovery(r.ridge, rep, dir, cleanROCR)
+   #rec.elnet <- recovery(r.elnet, rep, dir, cleanROCR)
 
    ex <- list(
       dir=dir,
       weights=list(
-	 fmpr.w1=r.fmpr.w1,
+	 #fmpr.w1=r.fmpr.w1,
 	 fmpr.w2=r.fmpr.w2,
-	 fmpr2.w1=r.fmpr2.w1,
+	 #fmpr2.w1=r.fmpr2.w1,
 	 fmpr2.w2=r.fmpr2.w2,
-	 fmpr.h1.w1=r.fmpr.h1.w1,
+	 #fmpr2.h1.w1=r.fmpr2.h1.w1,
+	 fmpr2.h1.w2=r.fmpr2.h1.w2,
+	 #fmpr2.h2.w1=r.fmpr2.h2.w1,
+	 fmpr2.h2.w2=r.fmpr2.h2.w2,
+	 #fmpr.h1.w1=r.fmpr.h1.w1,
 	 fmpr.h1.w2=r.fmpr.h1.w2,
-	 fmpr.h2.w1=r.fmpr.h2.w1,
-	 fmpr.h2.w2=r.fmpr.h2.w2,
-	 lasso=r.lasso,
-	 ridge=r.ridge,
-	 elnet=r.elnet,
-	 spg.w1=r.spg.w1,
-	 spg.w2=r.spg.w2
+	 #fmpr.h2.w1=r.fmpr.h2.w1,
+	 fmpr.h2.w2=r.fmpr.h2.w2#,
+	 #lasso=r.lasso,
+	 #ridge=r.ridge,
+	 #elnet=r.elnet,
+	 #spg.w1=r.spg.w1,
+	 #spg.w2=r.spg.w2
       ),
       recovery=list(
-	 fmpr.w1=rec.fmpr.w1,
+	 #fmpr.w1=rec.fmpr.w1,
 	 fmpr.w2=rec.fmpr.w2,
-	 fmpr2.w1=rec.fmpr2.w1,
+	 #fmpr2.w1=rec.fmpr2.w1,
 	 fmpr2.w2=rec.fmpr2.w2,
-	 fmpr.h1.w1=rec.fmpr.h1.w1,
+	 #fmpr2.h1.w1=rec.fmpr2.h1.w1,
+	 fmpr2.h1.w2=rec.fmpr2.h1.w2,
+	 #fmpr2.h2.w1=rec.fmpr2.h2.w1,
+	 fmpr2.h2.w2=rec.fmpr2.h2.w2,
+	 #fmpr.h1.w1=rec.fmpr.h1.w1,
 	 fmpr.h1.w2=rec.fmpr.h1.w2,
-	 fmpr.h2.w1=rec.fmpr.h2.w1,
-	 fmpr.h2.w2=rec.fmpr.h2.w2,
-	 lasso=rec.lasso,
-	 ridge=rec.ridge,
-	 elnet=rec.elnet,
-	 spg.w1=rec.spg.w1,
-	 spg.w2=rec.spg.w2
+	 #fmpr.h2.w1=rec.fmpr.h2.w1,
+	 fmpr.h2.w2=rec.fmpr.h2.w2#,
+	 #lasso=rec.lasso,
+	 #ridge=rec.ridge,
+	 #elnet=rec.elnet,
+	 #spg.w1=rec.spg.w1,
+	 #spg.w2=rec.spg.w2
       ),
       R2=R2.all
    )

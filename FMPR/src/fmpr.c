@@ -229,7 +229,7 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
    int verbose = *verbose_p;
    int pK = p * K, pK1 = p * K - 1;
    double s, lambda = *lambda_p, gamma = *gamma_p;
-   int g, q, iNk, kqK, jpk;
+   int g, q, iNk, kqK, jpk, iNj;
 
    int *active = malloc(sizeof(int) * p * K);
    int *oldactive = malloc(sizeof(int) * p * K);
@@ -326,8 +326,14 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
 	       d1 = 0;
 	       d2 = d2_0[jpk];
 
+	       iNk = N * k + N - 1;
+	       iNj = N * j + N - 1;
 	       for(i = N - 1 ; i >= 0 ; --i)
-	          d1 += x[i + j * N] * Err[i + N * k];
+	       {
+	          d1 += x[iNj] * Err[iNk];
+		  iNk--;
+		  iNj--;
+	       }
 
 	       bjk = b[jpk];
 	       
@@ -359,17 +365,21 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
 	       /* update loss and errors based on new estimates */
 	       oldloss[k] = loss[k];
 	       loss[k] = 0;
+
+	       iNk = N * k + N - 1;
+	       iNj = N * j + N - 1;
 	       for(i = N - 1 ; i >= 0 ; --i)
 	       {
-		  iNk = i + N * k;
-	          LP[iNk] += x[i + N * j] * delta;
+	          LP[iNk] += x[iNj] * delta;
 		  Err[iNk] = LP[iNk] - y[iNk];
 	          loss[k] += Err[iNk] * Err[iNk];
+		  iNk--;
+		  iNj--;
 	       }
 	       loss[k] *= oneOnN;
 	       //loss[k] += lambda * fabs(b[jpk]) * oneOnKp;
-	       //numconverged += fabs(loss[k] - oldloss[k]) < lossnullF[k];
-	       numconverged++;
+	       numconverged += fabs(loss[k] - oldloss[k]) < lossnullF[k];
+	       //numconverged++;
 	    }
 
 	    active[jpk] = b[jpk] != 0;
@@ -452,7 +462,6 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
    free(oneOnLambda2PlusOne);
 }
 
-
 void fmpr_weighted_warm_huber(double *x, double *y, double *b,
       double *LP, int *N_p, int *p_p, int *K_p,
       double *lambda_p, double *lambda2_p, double *gamma_p,
@@ -474,7 +483,7 @@ void fmpr_weighted_warm_huber(double *x, double *y, double *b,
    int verbose = *verbose_p;
    int pK = p * K, pK1 = p * K - 1;
    double s, lambda = *lambda_p, gamma = *gamma_p, f;
-   int g, q, iNk, kqK, jpk;
+   int g, q, iNk, kqK, jpk, iNj;
    double huber_mu = *huber_mu_p;
 
    int *active = malloc(sizeof(int) * p * K);
@@ -572,21 +581,27 @@ void fmpr_weighted_warm_huber(double *x, double *y, double *b,
 	       d1 = 0;
 	       d2 = d2_0[jpk];
 
+	       iNj = N * j + N - 1;
+	       iNk = N * k + N - 1;
 	       for(i = N - 1 ; i >= 0 ; --i)
-	          d1 += x[i + j * N] * Err[i + N * k];
+	       {
+	          d1 += x[iNj] * Err[iNk];
+		  iNj--;
+		  iNk--;
+	       }
 
 	       bjk = b[jpk];
 	       
 	       /* Apply inter-task penalty */
 	       for(q = 0 ; q < K ; q++)
 	       {
-	          /*kqK = k + q * K;
+	          kqK = k + q * K;
 		  f = bjk - signG[kqK] * b[j + p * q];
 		  if(fabs(f) <= huber_mu)
 		     d1 += gammaG[kqK] * f / huber_mu;
 		  else
 		     d1 += gammaG[kqK] * sign(f);
-		  d2 += gammaG[kqK] / huber_mu;*/
+		  d2 += gammaG[kqK] / huber_mu;
 	       }
 
 	       s = bjk - d1 / d2;
@@ -609,12 +624,15 @@ void fmpr_weighted_warm_huber(double *x, double *y, double *b,
 	       /* update loss and errors based on new estimates */
 	       oldloss[k] = loss[k];
 	       loss[k] = 0;
+	       iNk = N * k + N - 1;
+	       iNj = N * j + N - 1;
 	       for(i = N - 1 ; i >= 0 ; --i)
 	       {
-		  iNk = i + N * k;
-	          LP[iNk] += x[i + N * j] * delta;
+	          LP[iNk] += x[iNj] * delta;
 		  Err[iNk] = LP[iNk] - y[iNk];
 	          loss[k] += Err[iNk] * Err[iNk];
+		  iNj--;
+		  iNk--;
 	       }
 	       loss[k] *= oneOnN;
 	       //loss[k] += lambda * fabs(b[jpk]) * oneOnKp;
@@ -724,7 +742,7 @@ void fmpr_weighted_warm_huber2(double *x, double *y, double *b,
    int verbose = *verbose_p;
    int pK = p * K, pK1 = p * K - 1;
    double s, lambda = *lambda_p, gamma = *gamma_p;
-   int g, q, iNk, kqK, jpk;
+   int g, q, iNk, kqK, jpk, iNj;
 
    int *active = malloc(sizeof(int) * p * K);
    int *oldactive = malloc(sizeof(int) * p * K);
@@ -806,8 +824,14 @@ void fmpr_weighted_warm_huber2(double *x, double *y, double *b,
 	       d1 = 0;
 	       d2 = d2_0[jpk];
 
+	       iNk = N * k + N - 1;
+	       iNj = N * j + N - 1;
 	       for(i = N - 1 ; i >= 0 ; --i)
-	          d1 += x[i + j * N] * Err[i + N * k];
+	       {
+	          d1 += x[iNj] * Err[iNk];
+		  iNj--;
+		  iNk--;
+	       }
 
 	       d1 *= oneOnN;
 
@@ -847,12 +871,15 @@ void fmpr_weighted_warm_huber2(double *x, double *y, double *b,
 	       /* update loss and errors based on new estimates */
 	       oldloss[k] = loss[k];
 	       loss[k] = 0;
+	       iNk = N * k + N - 1;
+	       iNj = N * j + N - 1;
 	       for(i = N - 1 ; i >= 0 ; --i)
 	       {
-		  iNk = i + N * k;
-	          LP[iNk] += x[i + N * j] * delta;
+	          LP[iNk] += x[iNj] * delta;
 		  Err[iNk] = LP[iNk] - y[iNk];
 	          loss[k] += Err[iNk] * Err[iNk];
+		  iNj--;
+		  iNk--;
 	       }
 	       loss[k] *= oneOnN;
 	       //loss[k] += lambda * fabs(b[jpk]) * oneOnKp;
@@ -955,12 +982,12 @@ void fmpr_weighted_warm2(double *x, double *y, double *b,
    double eps = *eps_p;
    int maxiter = *maxiter_p;
    int numactive,
-       allconverged = 0,
+       allconverged = 1,
        numconverged = 0;
    int verbose = *verbose_p;
    int pK = p * K, pK1 = p * K - 1;
    double s, lambda = *lambda_p, gamma = *gamma_p;
-   int g, q, iNk, kqK, jpk;
+   int g, q, iNk, kqK, jpk, iNj;
 
    int *active = malloc(sizeof(int) * p * K);
    int *oldactive = malloc(sizeof(int) * p * K);
@@ -1021,7 +1048,7 @@ void fmpr_weighted_warm2(double *x, double *y, double *b,
       lossnullF[k] = lossnull[k] * eps;
    }
 
-   Rprintf("\n");
+   //Rprintf("\n");
    
    for(iter = 1 ; iter <= maxiter ; iter++)
    {
@@ -1048,14 +1075,21 @@ void fmpr_weighted_warm2(double *x, double *y, double *b,
 	       d1 = 0;
 	       d2 = d2_0[jpk];
 
+	       iNk = N * k + N - 1;
+	       iNj = N * j + N - 1;
 	       for(i = N - 1 ; i >= 0 ; --i)
-	          d1 += x[i + j * N] * Err[i + N * k];
+	       {
+	          d1 += x[iNj] * Err[iNk];
+		  iNj--;
+		  iNk--;
+	       }
 
 	       //d1 *= oneOnN;
 
 	       bjk = b[jpk];
 	       
-	       /* Apply inter-task penalty, summing over all the edges */
+	       /* Apply inter-task penalty, summing over all the edges that
+		* task k participates in */
 	       pd1 = 0;
 	       pd2 = 0;
 	       for(e = 0 ; e < nE ; e++)
@@ -1065,8 +1099,8 @@ void fmpr_weighted_warm2(double *x, double *y, double *b,
 		  pd1 += Ckne2 * bjk;
 		  pd2 += Ckne2;
 	       }
-	       pd1 *= 2;
-	       pd2 *= 2;
+	       //pd1 *= 2;
+	       //pd2 *= 2;
 
 	       s = bjk - (d1 + pd1) / (d2 + pd2);
 
@@ -1094,17 +1128,20 @@ void fmpr_weighted_warm2(double *x, double *y, double *b,
 	       /* update loss and errors based on new estimates */
 	       oldloss[k] = loss[k];
 	       loss[k] = 0;
+	       iNk = N * k + N - 1;
+	       iNj = N * j + N - 1;
 	       for(i = N - 1 ; i >= 0 ; --i)
 	       {
-		  iNk = i + N * k;
-	          LP[iNk] += x[i + N * j] * delta;
+	          LP[iNk] += x[iNj] * delta;
 		  Err[iNk] = LP[iNk] - y[iNk];
 	          loss[k] += Err[iNk] * Err[iNk];
+		  iNk--;
+		  iNj--;
 	       }
 	       loss[k] *= oneOnN;
 	       //loss[k] += lambda * fabs(b[jpk]) * oneOnKp;
-	       //numconverged += fabs(loss[k] - oldloss[k]) < lossnullF[k];
-	       numconverged++;
+	       numconverged += fabs(loss[k] - oldloss[k]) < lossnullF[k];
+	       //numconverged++;
 	       
 	       active[jpk] = (b[jpk] != 0);
 	    }
@@ -1129,11 +1166,8 @@ void fmpr_weighted_warm2(double *x, double *y, double *b,
 	 Rprintf("%d numactive at iter %d\n", numactive, iter);
       }
 
-      allconverged++;
-
       /* active-set convergence */
-      /*if(numconverged == pK)*/
-      //if(allconverged == 1)
+      if(numconverged == pK)
       {
          if(verbose)
             Rprintf("all (%d) converged at iter %d\n", numconverged, iter);
@@ -1144,6 +1178,7 @@ void fmpr_weighted_warm2(double *x, double *y, double *b,
                oldactive[j] = active[j];
                active[j] = !ignore[j];
             }
+	    allconverged = 2;
          }
          else
          {
@@ -1163,12 +1198,12 @@ void fmpr_weighted_warm2(double *x, double *y, double *b,
 	    if(verbose)
 	       Rprintf("activeset changed at iter %d\n", iter);
 
+            allconverged = 1;
             for(j = pK1; j >= 0 ; --j)
             {
                oldactive[j] = active[j];
-            /*   active[j] = !ignore[j];*/
+               active[j] = !ignore[j];
             }
-            allconverged = 1;
          }
       }
    }

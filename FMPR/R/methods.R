@@ -34,7 +34,7 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, G=NULL,
    N <- nrow(X)
 
    if(is.na(huber_mu))
-      huber_mu = 0;
+      huber_mu <- 0
 
    if(nrow(X) != nrow(Y))
       stop("dimensions of X and Y don't agree")
@@ -570,6 +570,9 @@ fmpr2 <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
    if(nrow(X) != nrow(Y))
       stop("dimensions of X and Y don't agree")
 
+   if(is.na(huber_mu))
+      huber_mu <- 0
+
    #if(!is.null(G)) {
    #   if(nrow(G) != ncol(G) || nrow(G) != K) {
    #      stop("dimensions of G and Y don't agree")
@@ -603,6 +606,8 @@ fmpr2 <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
 	    LPjk <- vector("list", length(lambda))
 	    nactive <- numeric(length(lambda))
 
+	    C1 <- C * gamma[j]
+
 	    # process sequential along the l1 penalty
 	    for(i in seq(along=lambda))
 	    {
@@ -617,7 +622,7 @@ fmpr2 <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
 		  B <- Bjk[[l1ord[i-1]]]
 		  LP <- LPjk[[l1ord[i-1]]]
 	       }
-	       
+
 	       r <- .C(func,
 		  as.numeric(X),	  # 1: X
 		  as.numeric(Y),       	  # 2: Y
@@ -629,7 +634,7 @@ fmpr2 <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
        	          lambda[l1ord[i]],    	  # 8: lambda
 		  lambda2[m],	       	  # 9: lambda2
 		  gamma[j],	       	  # 10: gamma
-       	          as.numeric(C * gamma),  # 11: C
+       	          as.numeric(C1),         # 11: C
 		  as.integer(maxiter),	  # 12: maxiter
        	          as.double(eps),      	  # 13: eps
 		  as.integer(verbose), 	  # 14: verbose
