@@ -48,7 +48,7 @@ s <- spg(X=X, Y=Y, C=C, lambda=opt.s$opt["lambda"],
    gamma=opt.s$opt["gamma"], simplify=TRUE)
 
 # Lasso, special case of FMPR
-w <- which(opt.f$R2[, 1] == max(opt.f$R2[, 1]))
+w <- which(opt.f$R2[, 1, 1] == max(opt.f$R2[, 1, 1]))
 l <- fmpr(X=X, Y=Y, lambda=lambda[w], gamma=0, simplify=TRUE)
 
 
