@@ -2,21 +2,33 @@
 #include <stdio.h>
 #include <math.h>
 #include <R.h>
+#include <Rmath.h>
+#include <R_ext/RS.h>     /* for Calloc/Free */
+#include <R_ext/Applic.h> /* for dgemm */
 
 #define TRUE 1
 #define FALSE 0
 #define ZERO_THRESH 1e-15
 #define ZERO_VAR_THRESH 1e-6
 
-static inline double sign(double x)
+static void crossprod(double *x, int nrx, int ncx,
+   double *y, int nry, int ncy, double *z)
 {
-   if(x < 0) 
-      return -1;
-   else if(x > 0)
-      return 1;
-   else
-      return 0;
+    char *transa = "T", *transb = "N";
+    double one = 1.0, zero = 0.0;
+    F77_CALL(dgemm)(transa, transb, &ncx, &ncy, &nrx, &one,
+      x, &nrx, y, &nry, &zero, z, &ncx);
 }
+
+//static inline double sign(double x)
+//{
+//   if(x < 0) 
+//      return -1;
+//   else if(x > 0)
+//      return 1;
+//   else
+//      return 0;
+//}
 
 static inline double soft_threshold(double beta, double gamma)
 {
@@ -1007,6 +1019,10 @@ void fmpr_weighted_warm2(double *x, double *y, double *b,
    int nE = K * (K - 1) / 2, e;
    double Ckne, Ckne2, pd1, pd2;
 
+   double *CC = calloc(K * K, sizeof(double));
+
+   crossprod(C, nE, K, C, nE, K, CC);
+
    /* null loss mean((y - mean(y))^2)*/
    for(k = 0 ; k < K ; k++)
    {
@@ -1090,17 +1106,28 @@ void fmpr_weighted_warm2(double *x, double *y, double *b,
 	       
 	       /* Apply inter-task penalty, summing over all the edges that
 		* task k participates in */
+
+		
 	       pd1 = 0;
 	       pd2 = 0;
-	       for(e = 0 ; e < nE ; e++)
-	       {
-	          Ckne = C[k * nE + e];
-		  Ckne2 = Ckne * Ckne;
-		  pd1 += Ckne2 * bjk;
-		  pd2 += Ckne2;
-	       }
+	       //for(e = 0 ; e < nE ; e++)
+	       //{
+	       //   Ckne = C[k * nE + e];
+	       //   Ckne2 = Ckne * Ckne;
+	       //   pd1 += Ckne2 * bjk;
+	       //   pd2 += Ckne2;
+	       //}
 	       //pd1 *= 2;
 	       //pd2 *= 2;
+
+	       for(e = 0 ; e < K ; e++)
+	       {
+		  pd1 += b[j + e * p] * CC[e + K * k];
+	       }
+	       pd1 *= gamma;
+	       pd2 = gamma * CC[k + K * k];
+
+
 
 	       s = bjk - (d1 + pd1) / (d2 + pd2);
 
@@ -1206,6 +1233,9 @@ void fmpr_weighted_warm2(double *x, double *y, double *b,
             }
          }
       }
+      else if(verbose)
+	 Rprintf("active set not yet converged at iter %d (numconverged=%d)\n",
+	    iter, numconverged);
    }
 
    if(iter >= maxiter)
@@ -1229,4 +1259,6 @@ void fmpr_weighted_warm2(double *x, double *y, double *b,
    free(d2_0);
    free(ignore);
    free(oneOnLambda2PlusOne);
+   free(CC);
 }
+

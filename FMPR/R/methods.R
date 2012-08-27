@@ -280,7 +280,15 @@ spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-4,
 
    # This is much slower than MATLAB's eig(), and takes up most of the time
    # for smallish problems
-   L0 <- eigen(XX, only.values=TRUE, symmetric=TRUE)$values[1]
+   #L0 <- eigen(XX, only.values=TRUE, symmetric=TRUE)$values[1]
+   s <- system.time({
+      L0 <- if(p < 1e4L) {
+	 svd(X, nu=0, nv=1)$d[1]^2
+      } else {
+	 sum(XX^2)
+      }
+   })
+   cat("spg: svd took", s, "\n")
 
    cat("CNorm:", CNorm, "\n")
 
@@ -606,7 +614,7 @@ fmpr2 <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
 	    LPjk <- vector("list", length(lambda))
 	    nactive <- numeric(length(lambda))
 
-	    C1 <- C * gamma[j]
+	    #C1 <- C * gamma[j]
 
 	    # process sequential along the l1 penalty
 	    for(i in seq(along=lambda))
@@ -634,7 +642,7 @@ fmpr2 <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
        	          lambda[l1ord[i]],    	  # 8: lambda
 		  lambda2[m],	       	  # 9: lambda2
 		  gamma[j],	       	  # 10: gamma
-       	          as.numeric(C1),         # 11: C
+       	          as.numeric(C),          # 11: C
 		  as.integer(maxiter),	  # 12: maxiter
        	          as.double(eps),      	  # 13: eps
 		  as.integer(verbose), 	  # 14: verbose

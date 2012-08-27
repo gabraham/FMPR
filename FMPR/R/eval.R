@@ -116,7 +116,7 @@ crossval.fmpr2 <- function(X, Y, nfolds=5,
 
    # fmpr() is capable of handling lambda,gamma of varying lengths,
    # but we don't use that feature here because we want to run different
-   # penalties on the cross-validation folds rather than different
+   # penalties on the same cross-validation folds rather than different
    # folds every time
    for(fold in 1:nfolds)
    {
@@ -126,8 +126,7 @@ crossval.fmpr2 <- function(X, Y, nfolds=5,
       Xtrain <- scalefix(X[folds != fold, , drop=FALSE])
       Ytrain <- scalefix(Y[folds != fold, , drop=FALSE])
       C <- 0
-      if(ncol(Y) > 1)
-      {
+      if(ncol(Y) > 1) {
 	 C <- gennetwork(Y, cortype=cortype, corthresh=corthresh)
       }
 
@@ -201,6 +200,8 @@ optim.fmpr <- function(method="grid", ...)
       optim.fmpr.search(...)
    } else if(method == "grid") {
       optim.fmpr.grid(...)
+   } else if(method == "random") {
+      optim.fmpr.random(...)
    } else {
       stop("unknown optim method: ", method)
    }
@@ -212,9 +213,41 @@ optim.fmpr2 <- function(method="grid", ...)
       optim.fmpr.search2(...)
    } else if(method == "grid") {
       optim.fmpr.grid2(...)
+   } else if(method == "random") {
+      optim.fmpr2.random(...)
    } else {
       stop("unknown optim method: ", method)
    }
+}
+
+optim.fmpr.random <- function(...)
+{
+   r <- crossval.fmpr(...)
+
+   w <- rbind(which(r$R2 == max(r$R2, na.rm=TRUE), arr.ind=TRUE))[1,]
+   list(
+      R2=r$R2,
+      opt=c(
+	 lambda=r$lambda[w[1]],
+	 lambda2=r$lambda2[w[2]],
+	 gamma=r$gamma[w[3]]
+      )
+   )
+}
+
+optim.fmpr.random2 <- function(...)
+{
+   r <- crossval.fmpr2(...)
+
+   w <- rbind(which(r$R2 == max(r$R2, na.rm=TRUE), arr.ind=TRUE))[1,]
+   list(
+      R2=r$R2,
+      opt=c(
+	 lambda=r$lambda[w[1]],
+	 lambda2=r$lambda2[w[2]],
+	 gamma=r$gamma[w[3]]
+      )
+   )
 }
 
 optim.fmpr.grid <- function(...)

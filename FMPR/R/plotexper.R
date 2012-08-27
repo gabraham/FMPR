@@ -31,7 +31,7 @@ plot.rocr <- function(obj, ...)
 mytheme <- function(base_size=10)
 {
    structure(list(
-	 axis.text.x=theme_text(size=24, angle=-30),
+	 axis.text.x=theme_text(size=24, angle=-90, hjust=0),
 	 axis.text.y=theme_text(size=24, hjust=1),
 	 axis.title.x=theme_text(size=28),
 	 axis.title.y=theme_text(size=28),
@@ -49,7 +49,6 @@ plot.exper <- function(x,
    lim=list(roc=c(0, 1, 0, 1), prc=c(0, 1, 0, 1)), ...)
 {
    pdf(sprintf("%s/%s.pdf", x$dir, x$dir), width=12)
-   
    par(mfrow=c(1, 2), mar=c(4.5, 4.1, 2.1, 0.1) + 0.1, pty="s")
 
    nm <- c("roc", "prc")
@@ -62,93 +61,37 @@ plot.exper <- function(x,
       plot(NULL, main=titles[i], xlim=lim[[i]][1:2], ylim=lim[[i]][3:4],
          cex=1.5, cex.axis=1.5, cex.lab=1.5, xlab=xlab[i], ylab=ylab[i])
 
-      #plot.rocr(x$recovery$fmpr.w1[[nm[i]]], avg="threshold", add=TRUE,
-#	 col=1, lwd=3, lty=1)
-      plot.rocr(x$recovery$fmpr.w2[[nm[i]]], avg="threshold", add=TRUE,
-         col=1, lwd=3, lty=1)
+      for(j in seq(along=x$recovery))
+      {
+	 plot.rocr(x$recovery[[j]][[nm[i]]], avg="threshold", add=TRUE,
+	    col=j, lwd=3, lty=j)
+      }
 
- #     plot.rocr(x$recovery$fmpr2.w1[[nm[i]]], avg="threshold", add=TRUE,
-#	 col=2, lwd=3, lty=1)
-      plot.rocr(x$recovery$fmpr2.w2[[nm[i]]], avg="threshold", add=TRUE,
-         col=2, lwd=3, lty=2)
-
- #     plot.rocr(x$recovery$fmpr.h1.w1[[nm[i]]], avg="threshold", add=TRUE,
-#	 col=3, lwd=3, lty=1)
-      plot.rocr(x$recovery$fmpr.h1.w2[[nm[i]]], avg="threshold", add=TRUE,
-         col=3, lwd=3, lty=3)
-
- #     plot.rocr(x$recovery$fmpr.h2.w1[[nm[i]]], avg="threshold", add=TRUE,
-#	 col=4, lwd=3, lty=1)
-      plot.rocr(x$recovery$fmpr.h2.w2[[nm[i]]], avg="threshold", add=TRUE,
-         col=4, lwd=3, lty=4)
-
- #     plot.rocr(x$recovery$fmpr.h1.w1[[nm[i]]], avg="threshold", add=TRUE,
-#	 col=3, lwd=3, lty=1)
-      plot.rocr(x$recovery$fmpr2.h1.w2[[nm[i]]], avg="threshold", add=TRUE,
-         col=5, lwd=3, lty=5)
-
- #     plot.rocr(x$recovery$fmpr.h2.w1[[nm[i]]], avg="threshold", add=TRUE,
-#	 col=4, lwd=3, lty=1)
-      plot.rocr(x$recovery$fmpr2.h2.w2[[nm[i]]], avg="threshold", add=TRUE,
-         col=6, lwd=3, lty=6)
-
-      
-#      plot.rocr(x$recovery$spg.w1[[nm[i]]], avg="threshold", add=TRUE,
-#         col=5, lwd=3, lty=1)
-#      plot.rocr(x$recovery$spg.w2[[nm[i]]], avg="threshold", add=TRUE,
-#         col=5, lwd=3, lty=2)
-#
-#      plot.rocr(x$recovery$lasso[[nm[i]]], avg="threshold", add=TRUE,
-#         col=6, lwd=3, lty=1)
-#      plot.rocr(x$recovery$ridge[[nm[i]]], avg="threshold", add=TRUE,
-#         col=7, lwd=3, lty=1)
-#      plot.rocr(x$recovery$elnet[[nm[i]]], avg="threshold", add=TRUE,
-#	 col=8, lwd=3, lty=1)
-	 
-   
-      
-      #legend(lim[[i]][1] - 0.01, lim[[i]][3] + 0.55,
-      #   c(
-      #      "FMPR-w1", "FMPR-w2",
-      #      "FMPR2-w1", "FMPR2-w2",
-      #      "Huber-1-w1", "Huber-1-w2",
-      #      "Huber-2-w1", "Huber-2-w2",
-      #      "GFlasso-w1", "GFlasso-w2",
-      #      "Lasso", "Ridge", "ElasticNet"
-      #   ),
-      #   col=c(1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 8),
-      #      lwd=3, lty=c(1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 1, 1) 
-      #)
-
-        legend(lim[[i]][1] - 0.01, lim[[i]][3] + 0.55,
-         c(
-	    "FMPR", "FMPR2",
-	    "FMPR-Huber1", "FMPR-Huber2",
-	    "FMPR2-Huber1", "FMPR2-Huber2"
-	 ),
-	 col=1:6, lty=1:6, lwd=3
-      )
+      if(i == 1) {
+	 legend(lim[[i]][1] - 0.03, lim[[i]][3] + 0.75,
+      	    legend=names(x$recovery),
+      	    col=seq(along=x$recovery),
+      	    lty=seq(along=x$recovery),
+	    lwd=3, bty="n"
+      	 )
+      }
 
    }
 
    dev.off()
    
-   #r2 <- melt(x$R2)
-   #m <- as.character(r2[,2])
-   #m[m == "FMPRw1"] <- "FMPR-w1"
-   #m[m == "FMPRw2"] <- "FMPR-w2"
-   #m[m == "SPGw1"] <- "GFlasso-w1"
-   #m[m == "SPGw2"] <- "GFlasso-w2"
-   #r2[, 2] <- factor(m)
-   #colnames(r2) <- c("Replication", "Method", "R2")
+   r2 <- melt(x$R2)
+   m <- as.character(r2[,2])
+   r2[, 2] <- factor(m)
+   colnames(r2) <- c("Replication", "Method", "R2")
 
-   #g <- ggplot(r2, aes(Method, R2))
-   #g <- g + geom_boxplot()
-   #g <- g + scale_y_continuous(expression(R^2))
-   #g <- g + theme_bw() + mytheme()
-   #
-   #pdf(sprintf("%s/%s_R2.pdf", x$dir, x$dir), width=12)
-   #print(g)
-   #dev.off()
+   g <- ggplot(r2, aes(Method, R2))
+   g <- g + geom_boxplot()
+   g <- g + scale_y_continuous(expression(R^2))
+   g <- g + theme_bw() + mytheme()
+   
+   pdf(sprintf("%s/%s_R2.pdf", x$dir, x$dir))
+   print(g)
+   dev.off()
 }
 
