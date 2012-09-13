@@ -115,7 +115,7 @@ B^* = \arg \min_{B \in \mathbb{R}^{p \times K}}
 \frac{1}{2} \sum_{k=1}^K \sum_{i=1}^N (y_{ik} - x_i^T \beta_k)^2
    + \lambda \sum_{k=1}^K \sum_{j=1}^p |\beta_{jk}| \\
    + \frac{\gamma}{2}
-    \sum_{m=1}^K \sum_{l=1}^K f(r_{ml}) \sum_{j=1}^p [\beta_{jm} - \mbox{sign}(r_{ml})
+   \sum_{(m,l) \in \mathcal{E}} f(r_{ml}) \sum_{j=1}^p [\beta_{jm} - \mbox{sign}(r_{ml})
     \beta_{jl}]^2.
 \end{eqnarray}
 
@@ -150,11 +150,11 @@ in package \texttt{forecast}, for example).
 A suitable graph induction function is required in order to create a graph from
 the outputs~$\mathbf{Y}$. The function must be monotonic in the absolute value
 of the correlation. By default, \texttt{FMPR} uses the correlation matrix of
-$\mathbf{Y}$, and transforms it using the \texttt{graph.sqr} defined as
-$f(r_{ml}) = r_{ml}^2$ or the function \texttt{graph.abs} defined as $f(r_{ml})
-= |r_{ml}|$. In \textsf{R}:
+$\mathbf{Y}$, and transforms it using either the square
+$f(r_{ml}) = r_{ml}^2$ (cortype 2) or the absolute value $f(r_{ml})
+= |r_{ml}|$ (cortype 1). In \textsf{R}:
 \begin{verbatim}
-G <- graph.sqr(cor(Y))
+C <- gennetwork(Y, corthresh=0, cortype=2)
 \end{verbatim}
 
 \subsection{Penalties}
@@ -171,12 +171,12 @@ See below for an example of how to produce a suitable penalty range.
 \section{Toy Example}
 
 First we load the packages. The \texttt{doMC} package is recommended, allowing
-\textsf{R} to use multiple cores in parallel (here, four cores). Otherwise,
+\textsf{R} to use multiple cores in parallel (here, two cores). Otherwise,
 \texttt{FMPR} will run serially on one core.
 <<>>=
 library(FMPR)
 library(doMC)
-registerDoMC(cores=4)
+registerDoMC(cores=2)
 @
 
 We start by generating some random data, with identical weights of $0.1$ across
@@ -186,7 +186,7 @@ $\mathbf{Y}$ are corrupted by iid Gaussian noise.
 
 N <- 100
 p <- 100
-K <- 10 
+K <- 30 
 w <- 0.1
 B <- getB(p=p, K=K, w=w, type="same", sparsity=0.8)
 print(table(sign(B)))
@@ -199,7 +199,6 @@ Now we induce the inter-task graph based on the square of the correlation of
 $\mathbf{Y}$. Note that \texttt{FMPR} and \texttt{SPG} use a different format
 to indicate task relatedness.
 <<>>=
-G <- graph.sqr(cor(Y))
 C <- gennetwork(Y, corthresh=0, cortype=2)
 @
 
@@ -215,14 +214,13 @@ nfolds <- 5
 
 Now we run grid search for \texttt{FMPR} and \texttt{SPG} (implementing
 GFlasso), to find the optimal penalties, in terms of cross-validated $R^2$. Note
-that the objects \texttt{G} and \texttt{C} are not passed to the
-cross-validation, as they are re-estimated from scratch within each
-cross-validation replication. Instead, we pass the function \texttt{graph.sqr}
-to \texttt{fmpr} and \texttt{cortype=2} to \texttt{spg}:
+that the object \texttt{C} is not passed to the
+cross-validation, as it is re-estimated from scratch within each
+cross-validation replication. Instead, we pass \texttt{cortype=2}:
 <<>>=
 # L2 fusion penalty
 system.time({
-   opt.f <- optim.fmpr(X=X, Y=Y, graph.fun=graph.sqr,
+   opt.f <- optim.fmpr2(X=X, Y=Y, cortype=2, corthresh=0,
       lambda=lambda, gamma=gamma, nfolds=nfolds)
 })
 
@@ -238,14 +236,14 @@ entire dataset, and return just one estimated matrix $\widehat{\mathbf{B}}$ (not
 the \texttt{simplify=TRUE} argument). Since the lasso is a special case of the
 $\ell_2$ fusion loss with $\gamma=0$, we can get the lasso solution as well.
 <<>>=
-f <- fmpr(X=X, Y=Y, G=G, lambda=opt.f$opt["lambda"],
+f <- fmpr2(X=X, Y=Y, C=C, lambda=opt.f$opt["lambda"],
    gamma=opt.f$opt["gamma"], simplify=TRUE)
 s <- spg(X=X, Y=Y, C=C, lambda=opt.s$opt["lambda"],
    gamma=opt.s$opt["gamma"], simplify=TRUE)
 
 # Lasso, special case of FMPR
 w <- which(opt.f$R2[, 1, ] == max(opt.f$R2[, 1, 1]))
-l <- fmpr(X=X, Y=Y, lambda=lambda[w], gamma=0, simplify=TRUE)
+l <- fmpr2(X=X, Y=Y, lambda=lambda[w], gamma=0, simplify=TRUE)
 @
 
 Next, we estimate receiver-operating characterstic (ROC) and precision-recall
