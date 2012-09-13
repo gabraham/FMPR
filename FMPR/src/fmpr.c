@@ -1165,7 +1165,8 @@ void fmpr_weighted_warm2(double *x, double *y, double *b,
 	       }
 	       loss[k] *= oneOnN;
 	       //loss[k] += lambda * fabs(b[jpk]) * oneOnKp;
-	       numconverged += fabs(loss[k] - oldloss[k]) / fabs(loss[k]) < lossnullF[k];
+	       numconverged += fabs(loss[k] - oldloss[k])
+		  / fabs(loss[k]) < eps;
 	       //numconverged++;
 	       
 	       active[jpk] = (b[jpk] != 0);
