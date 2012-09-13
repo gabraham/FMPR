@@ -589,6 +589,11 @@ fmpr2 <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
    #   G <- matrix(0, K, K)
    #   gamma <- 0
    #}
+
+   if(is.null(C)) {
+      nE <- K * (K - 1) / 2
+      C <- matrix(0, nE, K)
+   }
 	       
    B0 <- matrix(0, p, K)
    LP0 <- matrix(0, N, K)

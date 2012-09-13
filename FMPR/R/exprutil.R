@@ -93,7 +93,7 @@ run.spg <- function(rep, dir=".", nfolds=10, grid=25,
 }
 
 run.ridge <- function(rep, dir=".", nfolds=10, grid=25,
-      lambda=10^seq(-3, 6, length=grid))
+      lambda2=10^seq(-3, 6, length=grid))
 {
    oldwd <- getwd()
    setwd(dir)
@@ -111,7 +111,7 @@ run.ridge <- function(rep, dir=".", nfolds=10, grid=25,
 
    ytest <- as.numeric(Ytest)
    
-   opt <- optim.ridge(X=Xtrain, Y=Ytrain, nfolds=nfolds, lambda=lambda)
+   opt <- optim.ridge(X=Xtrain, Y=Ytrain, nfolds=nfolds, lambda=lambda2)
    g <- ridge(Xtrain, Ytrain, lambda=opt$opt["lambda"])[[1]]
    P <- Xtest %*% g
    res <- R2(as.numeric(P), ytest)

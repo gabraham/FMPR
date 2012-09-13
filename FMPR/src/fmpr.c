@@ -1127,8 +1127,6 @@ void fmpr_weighted_warm2(double *x, double *y, double *b,
 	       pd1 *= gamma;
 	       pd2 = gamma * CC[k + K * k];
 
-
-
 	       s = bjk - (d1 + pd1) / (d2 + pd2);
 
 	       /* Now apply intra-task lasso */
@@ -1167,7 +1165,7 @@ void fmpr_weighted_warm2(double *x, double *y, double *b,
 	       }
 	       loss[k] *= oneOnN;
 	       //loss[k] += lambda * fabs(b[jpk]) * oneOnKp;
-	       numconverged += fabs(loss[k] - oldloss[k]) < lossnullF[k];
+	       numconverged += fabs(loss[k] - oldloss[k]) / fabs(loss[k]) < lossnullF[k];
 	       //numconverged++;
 	       
 	       active[jpk] = (b[jpk] != 0);

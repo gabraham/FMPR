@@ -15,8 +15,8 @@ library(ROCR)
 library(glmnet)
 library(ggplot2)
 library(FMPR)
-#library(doMC)
-#registerDoMC(cores=2)
+library(doMC)
+registerDoMC(cores=2)
 
 options(error=dump.frames)
 
@@ -97,9 +97,9 @@ setup <- list(
 
 )
 
-nreps <- 2
-grid <- 2
-nfolds <- 2
+nreps <- 10
+grid <- 20
+nfolds <- 5
 
 system.time({
    res <- lapply(setup[idv], run, nreps=nreps, grid=grid, nfolds=nfolds)
