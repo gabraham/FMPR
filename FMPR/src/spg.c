@@ -63,7 +63,7 @@ void spg_core(double *xx, double *xy, double *x, double *y,
    int N = *N_p,
        p = *p_p,
        K = *K_p;
-   int i, j, k;
+   int i;
    int CE = *CE_p;
    int verbose = *verbose_p;
    double L = *L_p,
@@ -84,10 +84,9 @@ void spg_core(double *xx, double *xy, double *x, double *y,
    double *tmppK2 = malloc(sizeof(double) * p * K);
    double *tmpCEp = malloc(sizeof(double) * CE * p);
    double *grad = malloc(sizeof(double) * p * K);
-   double *XWy = malloc(sizeof(double) * N * p);
    double *beta_new = malloc(sizeof(double) * p * K);
    double *obj = calloc(maxiter, sizeof(double));
-   int iter, mod = 0;
+   int iter;
 
    if(verbose)
       Rprintf("spg_core_new\n");

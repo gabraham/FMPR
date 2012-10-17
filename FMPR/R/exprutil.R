@@ -126,72 +126,10 @@ run.ridge <- function(rep, dir=".", nfolds=10, grid=25,
 }
 
 run.fmpr <- function(rep, dir=".", nfolds=10, grid=25,
-   graph.thresh=0, graph.fun=graph.sqr,
-   lambdar=2^seq(-10, 0, length=grid),
-   gamma=c(0, 10^seq(-3, 6, length=grid)),
-   lambda2=c(0, 10^seq(-3, 6, length=grid)), type="l2", huber_mu=0)
-{
-   oldwd <- getwd()
-   setwd(dir)
-
-   cat("run.fmpr rep", rep, "\n")
-
-   Xtrain <- as.matrix(read.table(sprintf("Xtrain_%s.txt", rep),
-      header=FALSE))
-   Xtest <- as.matrix(read.table(sprintf("Xtest_%s.txt", rep),
-      header=FALSE))
-   Ytrain <- as.matrix(read.table(sprintf("Ytrain_%s.txt", rep),
-      header=FALSE))
-   Ytest <- as.matrix(read.table(sprintf("Ytest_%s.txt", rep),
-      header=FALSE))
-   R <- cor(Ytrain)
-   G <- graph.fun(R, graph.thresh)
-
-   if(all(G == 0))
-   {
-      thresh <- median(abs(R[upper.tri(R)]))
-      cat("G is all zero in run.fmpr, using threshold of", thresh, "\n")
-      G <- graph.fun(R, thresh)
-   }
-
-   N <- nrow(Xtrain)
-   K <- ncol(Ytrain)
-   p <- ncol(Xtrain)
-
-   l <- max(maxlambda1(Xtrain, Ytrain))
-   lambda <- l * lambdar
-
-   cat("optim.fmpr start\n")
-   opt <- optim.fmpr(X=Xtrain, Y=Ytrain,
-	 nfolds=nfolds,
-	 graph.fun=graph.fun, graph.thresh=graph.thresh,
-	 lambda=lambda, gamma=gamma, lambda2=lambda2, maxiter=1e5, type=type,
-	 huber_mu=huber_mu)
-   cat("optim.fmpr end\n")
-   g <- fmpr(X=Xtrain, Y=Ytrain,
-	 lambda=opt$opt["lambda"],
-	 gamma=opt$opt["gamma"],
-	 lambda2=opt$opt["lambda2"],
-	 maxiter=1e5, G=G, simplify=TRUE, type=type, huber_mu=huber_mu)
-
-   P <- Xtest %*% g
-   res <- R2(as.numeric(P), as.numeric(Ytest))
-
-   cat("rep", rep, "R2 fmpr", res, "\n")
-
-   setwd(oldwd)
-
-   list(
-      R2=res,
-      beta=g
-   )
-}
-
-run.fmpr2 <- function(rep, dir=".", nfolds=10, grid=25,
    corthresh=0, cortype=2,
    lambdar=2^seq(-10, 0, length=grid),
    gamma=c(0, 10^seq(-3, 6, length=grid)),
-   lambda2=c(0, 10^seq(-3, 6, length=grid)), type="l2", huber_mu=0)
+   lambda2=c(0, 10^seq(-3, 6, length=grid)))
 {
    oldwd <- getwd()
    setwd(dir)
@@ -217,22 +155,22 @@ run.fmpr2 <- function(rep, dir=".", nfolds=10, grid=25,
    lambda <- l * lambdar
 
    cat("optim.fmpr start\n")
-   opt <- optim.fmpr2(X=Xtrain, Y=Ytrain,
+   opt <- optim.fmpr(X=Xtrain, Y=Ytrain,
 	 nfolds=nfolds,
 	 cortype=cortype, corthresh=corthresh,
-	 lambda=lambda, gamma=gamma, lambda2=lambda2, maxiter=1e5, type=type,
-	 huber_mu=huber_mu)
+	 lambda=lambda, gamma=gamma, lambda2=lambda2, maxiter=1e5)
+
    cat("optim.fmpr end\n")
-   g <- fmpr2(X=Xtrain, Y=Ytrain,
+   g <- fmpr(X=Xtrain, Y=Ytrain,
 	 lambda=opt$opt["lambda"],
 	 gamma=opt$opt["gamma"],
 	 lambda2=opt$opt["lambda2"],
-	 maxiter=1e5, C=C, simplify=TRUE, type=type, huber_mu=huber_mu)
+	 maxiter=1e5, C=C, simplify=TRUE)
 
    P <- Xtest %*% g
    res <- R2(as.numeric(P), as.numeric(Ytest))
 
-   cat("rep", rep, "R2 fmpr2", res, "\n")
+   cat("rep", rep, "R2 fmpr", res, "\n")
 
    setwd(oldwd)
 
@@ -341,7 +279,6 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
    cat("Simulation done\n")
 
    funcs <- c(
-      rep("run.fmpr2", 8),
       rep("run.fmpr", 8),
       rep("run.spg", 2),
       "run.fmpr", # for lasso
@@ -358,39 +295,10 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
    lambda2 <- c(0, 10^seq(-3, 6, length=grid))
 
    param <- list(
-      "FMPR2-w1"=list(cortype=1, lambdar=lambdar, gamma=gamma, lambda2=lambda2),
-      "FMPR2-w2"=list(cortype=2, lambdar=lambdar, gamma=gamma, lambda2=lambda2),
-      "FMPR2-w1-Huber1e-6"=list(cortype=1, lambdar=lambdar, gamma=gamma,
-	 lambda2=lambda2, type="huber", huber_mu=1e-6),
-      "FMPR2-w1-Huber1e-3"=list(cortype=1, lambdar=lambdar, gamma=gamma,
-	 lambda2=lambda2, type="huber", huber_mu=1e-3),
-      "FMPR2-w1-Huber1"=list(cortype=1, lambdar=lambdar, gamma=gamma,
-	 lambda2=lambda2, type="huber", huber_mu=1),
-      "FMPR2-w2-Huber1e-6"=list(cortype=2, lambdar=lambdar, gamma=gamma,
-	 lambda2=lambda2, type="huber", huber_mu=1e-6),
-      "FMPR2-w2-Huber1e-3"=list(cortype=2, lambdar=lambdar, gamma=gamma,
-	 lambda2=lambda2, type="huber", huber_mu=1e-3),
-      "FMPR2-w2-Huber1"=list(cortype=2, lambdar=lambdar, gamma=gamma,
-	 lambda2=lambda2, type="huber", huber_mu=1),
-
-      "FMPR-w1"=list(graph.fun=graph.abs, lambdar=lambdar, gamma=gamma, lambda2=lambda2),
-      "FMPR-w2"=list(graph.fun=graph.sqr, lambdar=lambdar, gamma=gamma, lambda2=lambda2),
-      "FMPR-w1-Huber1e-6"=list(graph.fun=graph.abs, lambdar=lambdar,
-	 gamma=gamma, lambda2=lambda2, type="huber", huber_mu=1e-6),
-      "FMPR-w1-Huber1e-3"=list(graph.fun=graph.abs, lambdar=lambdar,
-	 gamma=gamma, lambda2=lambda2, type="huber", huber_mu=1e-3),
-      "FMPR-w1-Huber1"=list(graph.fun=graph.abs, lambdar=lambdar, gamma=gamma,
-	 lambda2=lambda2, type="huber", huber_mu=1),
-      "FMPR-w2-Huber1e-6"=list(graph.fun=graph.sqr, lambdar=lambdar,
-	 gamma=gamma, lambda2=lambda2, type="huber", huber_mu=1e-6),
-      "FMPR-w2-Huber1e-3"=list(graph.fun=graph.sqr, lambdar=lambdar,
-	 gamma=gamma, lambda2=lambda2, type="huber", huber_mu=1e-3),
-      "FMPR-w2-Huber1"=list(graph.fun=graph.sqr, lambdar=lambdar, gamma=gamma,
-	 lambda2=lambda2, type="huber", huber_mu=1),
-
+      "FMPR-w1"=list(cortype=1, lambdar=lambdar, gamma=gamma, lambda2=lambda2),
+      "FMPR-w2"=list(cortype=2, lambdar=lambdar, gamma=gamma, lambda2=lambda2),
       "GFlasso-w1"=list(cortype=1, lambdar=lambdar, gamma=gamma),
       "GFlasso-w2"=list(cortype=2, lambdar=lambdar, gamma=gamma),
-
       Lasso=list(lambdar=lambdar, gamma=0, lambda2=0),
       Ridge=list(lambda2=lambda2),
       Elnet=list(lambdar=lambdar, lambda2=lambda2, gamma=0)

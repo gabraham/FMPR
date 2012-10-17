@@ -45,63 +45,6 @@ crossval.ridge <- function(X, Y, nfolds=5, ...)
 }
 
 crossval.fmpr <- function(X, Y, nfolds=5,
-      graph.fun=graph.sqr, graph.thresh=0, ...)
-{
-   N <- nrow(X)
-   Y <- cbind(Y)
-   folds <- sample(1:nfolds, N, TRUE)
-
-   l <- max(length(list(...)$lambda), 1)
-   l2 <- max(length(list(...)$lambda2), 1)
-   g <- max(length(list(...)$gamma), 1)
-   verbose <- list(...)$verbose
-   res <- array(0, c(nfolds, l, l2, g))
-
-   # fmpr() is capable of handling lambda,gamma of varying lengths,
-   # but we don't use that feature here because we want to run different
-   # penalties on the cross-validation folds rather than different
-   # folds every time
-   for(fold in 1:nfolds)
-   {
-      cat("inner fold", fold, "\n")
-      Xtest <- scalefix(X[folds == fold, , drop=FALSE])
-      Ytest <- scalefix(Y[folds == fold, , drop=FALSE])
-      Xtrain <- scalefix(X[folds != fold, , drop=FALSE])
-      Ytrain <- scalefix(Y[folds != fold, , drop=FALSE])
-      G <- 0
-      if(ncol(Y) > 1)
-      {
-	 R <- cor(Ytrain)
-	 G <- graph.fun(R, graph.thresh)
-      }
-
-      f <- fmpr(X=scalefix(X[folds != fold, , drop=FALSE]),
-	    Y=scalefix(Y[folds != fold, , drop=FALSE]), G=G, ...)
-
-      for(i in 1:l)
-      {
-	 for(m in 1:l2)
-	 {
-	    for(j in 1:g)
-	    {
-	       p <- as.matrix(Xtest %*% f[[i]][[m]][[j]])
-	       res[fold, i, m, j] <- cbind(R2(p, Ytest))
-	    }
-	 }
-      }
-      #if(verbose)
-	 #cat("best R2:", m <- max(res[fold, , ,], na.rm=TRUE), "\n")
-   }
-
-   list(
-      R2=apply(res, c(2, 3, 4), mean, na.rm=TRUE),
-      lambda=list(...)$lambda,
-      lambda2=list(...)$lambda2,
-      gamma=list(...)$gamma
-   )
-}
-
-crossval.fmpr2 <- function(X, Y, nfolds=5,
       cortype=1, corthresh=0, ...)
 {
    N <- nrow(X)
@@ -130,7 +73,7 @@ crossval.fmpr2 <- function(X, Y, nfolds=5,
 	 C <- gennetwork(Y, cortype=cortype, corthresh=corthresh)
       }
 
-      f <- fmpr2(X=scalefix(X[folds != fold, , drop=FALSE]),
+      f <- fmpr(X=scalefix(X[folds != fold, , drop=FALSE]),
 	    Y=scalefix(Y[folds != fold, , drop=FALSE]), C=C, ...)
 
       for(i in 1:l)
@@ -207,37 +150,9 @@ optim.fmpr <- function(method="grid", ...)
    }
 }
 
-optim.fmpr2 <- function(method="grid", ...)
-{
-   if(method == "search") {
-      optim.fmpr.search2(...)
-   } else if(method == "grid") {
-      optim.fmpr.grid2(...)
-   } else if(method == "random") {
-      optim.fmpr2.random(...)
-   } else {
-      stop("unknown optim method: ", method)
-   }
-}
-
-optim.fmpr.random <- function(...)
-{
-   r <- crossval.fmpr(...)
-
-   w <- rbind(which(r$R2 == max(r$R2, na.rm=TRUE), arr.ind=TRUE))[1,]
-   list(
-      R2=r$R2,
-      opt=c(
-	 lambda=r$lambda[w[1]],
-	 lambda2=r$lambda2[w[2]],
-	 gamma=r$gamma[w[3]]
-      )
-   )
-}
-
 optim.fmpr.random2 <- function(...)
 {
-   r <- crossval.fmpr2(...)
+   r <- crossval.fmpr(...)
 
    w <- rbind(which(r$R2 == max(r$R2, na.rm=TRUE), arr.ind=TRUE))[1,]
    list(
@@ -265,49 +180,7 @@ optim.fmpr.grid <- function(...)
    )
 }
 
-optim.fmpr.grid2 <- function(...)
-{
-   r <- crossval.fmpr2(...)
-
-   w <- rbind(which(r$R2 == max(r$R2, na.rm=TRUE), arr.ind=TRUE))[1,]
-   list(
-      R2=r$R2,
-      opt=c(
-	 lambda=r$lambda[w[1]],
-	 lambda2=r$lambda2[w[2]],
-	 gamma=r$gamma[w[3]]
-      )
-   )
-}
-
 optim.fmpr.search <- function(X, Y, nfolds=5,
-   graph.thresh=0.5, graph.fun=sqr,
-   lambda=c(10, 0), gamma=c(10, 0), lambda2=c(10, 0),
-   maxiter=1e5, verbose=FALSE)
-{
-  
-   cv <- function(par)
-   {
-      r <- crossval.fmpr(X=X, Y=Y, nfolds=nfolds,
-         lambda=par[1], gamma=par[2], lambda2=par[3],
-	 graph.thresh=graph.thresh, graph.fun=graph.fun,
-         maxiter=maxiter, verbose=verbose)
-      -max(r$R2, na.rm=TRUE)
-   }
-
-   opt <- optim(par=c(min(lambda), min(gamma)),
-      fn=cv, method="L-BFGS-B",
-      lower=c(min(lambda), min(gamma), min(lambda2)),
-      upper=c(max(lambda), max(gamma), max(lambda2)),
-      control=list(factr=1e4))
-
-   list(
-      R2=opt$value * -1,
-      opt=opt$par
-   )
-}
-
-optim.fmpr.search2 <- function(X, Y, nfolds=5,
    corthresh=0.5, cortype=1,
    lambda=c(10, 0), gamma=c(10, 0), lambda2=c(10, 0),
    maxiter=1e5, verbose=FALSE)
@@ -315,7 +188,7 @@ optim.fmpr.search2 <- function(X, Y, nfolds=5,
   
    cv <- function(par)
    {
-      r <- crossval.fmpr2(X=X, Y=Y, nfolds=nfolds,
+      r <- crossval.fmpr(X=X, Y=Y, nfolds=nfolds,
          lambda=par[1], gamma=par[2], lambda2=par[3],
 	 corthresh=corthresh, cortype=cortype,
          maxiter=maxiter, verbose=verbose)

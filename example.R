@@ -2,13 +2,11 @@
 
 library(FMPR)
 if(require(doMC)) {
-   registerDoMC(cores=4)
+   registerDoMC(cores=2)
 }
 
-
-
 N <- 100
-p <- 200
+p <- 500
 K <- 10 
 w <- 0.1
 B <- getB(p=p, K=K, w=w, type="same", sparsity=0.8)
@@ -16,11 +14,7 @@ print(table(sign(B)))
 
 X <- scale(matrix(rnorm(N * p), N, p))
 Y <- scale(X %*% B + rnorm(N * K))
-
-
-G <- graph.sqr(cor(Y))
 C <- gennetwork(Y, corthresh=0, cortype=2)
-
 
 l <- max(maxlambda1(X, Y))
 ngrid <- 25
@@ -31,24 +25,24 @@ nfolds <- 10
 
 # L2 fusion penalty
 system.time({
-   opt.f <- optim.fmpr(X=X, Y=Y, graph.fun=graph.sqr,
-      lambda=lambda, gamma=gamma, nfolds=nfolds)
+   opt.f <- optim.fmpr(X=X, Y=Y, cortype=2, corthresh=0,
+      lambda=lambda, gamma=gamma, nfolds=nfolds, eps=1e-3)
 })
 
 # L1 fusion penalty
 system.time({
    opt.s <- optim.spg(X=X, Y=Y, cortype=2, corthresh=0,
-      lambda=lambda, gamma=gamma, nfolds=nfolds)
+      lambda=lambda, gamma=gamma, nfolds=nfolds, tol=1e-3)
 })
 
 
-f <- fmpr(X=X, Y=Y, G=G, lambda=opt.f$opt["lambda"],
+f <- fmpr(X=X, Y=Y, C=C, lambda=opt.f$opt["lambda"],
    gamma=opt.f$opt["gamma"], simplify=TRUE)
 s <- spg(X=X, Y=Y, C=C, lambda=opt.s$opt["lambda"],
    gamma=opt.s$opt["gamma"], simplify=TRUE)
 
 # Lasso, special case of FMPR
-w <- which(opt.f$R2[, 1] == max(opt.f$R2[, 1]))
+w <- which(opt.f$R2[, 1, 1] == max(opt.f$R2[, 1, 1]), arr.ind=TRUE)
 l <- fmpr(X=X, Y=Y, lambda=lambda[w], gamma=0, simplify=TRUE)
 
 
