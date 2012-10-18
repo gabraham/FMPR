@@ -88,7 +88,7 @@ void spg_core(double *xx, double *xy, double *x, double *y,
    double *obj = calloc(maxiter, sizeof(double));
    int iter;
 
-   if(verbose)
+   if(verbose > 1)
       Rprintf("spg_core_new\n");
 
    for(iter = 0 ; iter < maxiter ; iter++)
@@ -156,7 +156,7 @@ void spg_core(double *xx, double *xy, double *x, double *y,
 	 break;
       }
 
-      if(verbose)
+      if(verbose > 1)
 	 Rprintf("SPG iter=%d loss %.10f\n", iter, obj[iter]);
 
       if(iter > 10)
@@ -183,7 +183,7 @@ gamma: %.6f)\n", lambda, gamma, maxiter);
    else 
    {
       *status = TRUE;
-      if(verbose)
+      if(verbose > 1)
 	 Rprintf("SPG converged after %d iterations\n", iter);
    }
 

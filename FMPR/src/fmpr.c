@@ -101,7 +101,7 @@ void lasso(double *x, double *y, double *b,
    lossnull *= oneOnN;
    lossnullF = lossnull * eps;
 	 
-   if(verbose)
+   if(verbose > 1)
       Rprintf("null loss: %.5f\n", lossnull);
 
    for(iter = 0 ; iter < maxiter ; iter++)
@@ -152,7 +152,7 @@ void lasso(double *x, double *y, double *b,
 	 numactive += active[j];
       }
 
-      if(verbose)
+      if(verbose > 1)
       {
 	 Rprintf("%d iter loss %.10f\n", iter, loss);
 	 Rprintf("%d converged at iter %d\n", numconverged, iter);
@@ -160,7 +160,7 @@ void lasso(double *x, double *y, double *b,
 
       if(numconverged == p)
       {
-	 if(verbose)
+	 if(verbose > 1)
 	    Rprintf("all converged at iter %d\n", iter);
 	 if(allconverged == 1)
 	 {
@@ -178,13 +178,13 @@ void lasso(double *x, double *y, double *b,
 		  break;
 	    if(j < 0)
 	    {
-	       if(verbose)
+	       if(verbose > 1)
 		  Rprintf("terminating at iteration %d with %d active vars\n",
 		     iter, numactive);
 	       break;
 	    }
 
-	    if(verbose)
+	    if(verbose > 1)
 	       Rprintf("active set has changed\n");
 
 	    allconverged = 1;
@@ -197,7 +197,7 @@ void lasso(double *x, double *y, double *b,
       }
    }
 
-   if(iter >= maxiter && verbose)
+   if(iter >= maxiter && verbose > 1)
       Rprintf("failed to converge after %d iterations\n", maxiter);
 
    free(active);
@@ -402,7 +402,7 @@ void fmpr(double *x, double *y, double *b,
 	 oldlosstotal += oldloss[k];
       }
 
-      if(verbose)
+      if(verbose > 1)
       {
 	 Rprintf("%d iter loss %.10f\n", iter, losstotal);
 	 Rprintf("%d converged at iter %d\n", numconverged, iter);
@@ -412,7 +412,7 @@ void fmpr(double *x, double *y, double *b,
       /* active-set convergence */
       if(numconverged == pK)
       {
-         if(verbose)
+         if(verbose > 1)
             Rprintf("all (%d) converged at iter %d\n", numconverged, iter);
          if(allconverged == 1)
          {
@@ -431,14 +431,14 @@ void fmpr(double *x, double *y, double *b,
 
             if(j < 0)
             {
-               if(verbose)
+               if(verbose > 1)
         	  Rprintf("terminating at iteration %d with %d active vars\n",
         	     iter, numactive);
 	       *status = TRUE;
                break;
             }
 
-	    if(verbose)
+	    if(verbose > 1)
 	       Rprintf("activeset changed at iter %d\n", iter);
 
             allconverged = 1;
@@ -449,14 +449,14 @@ void fmpr(double *x, double *y, double *b,
             }
          }
       }
-      else if(verbose)
+      else if(verbose > 1)
 	 Rprintf("active set not yet converged at iter %d (numconverged=%d)\n",
 	    iter, numconverged);
    }
 
    if(iter >= maxiter)
    {
-      if(verbose)
+      if(verbose > 1)
 	 Rprintf("fmpr_threshold_warm failed to converge after %d iterations\n",
 	    maxiter);
       *status = FALSE;
