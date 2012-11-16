@@ -22,10 +22,10 @@ ridge <- function(X, Y, lambda=0)
    K <- ncol(Y)
    p <- ncol(X)
    l <- foreach(l=lambda) %dopar% {
-      b <- try(qr.solve(XX + diag(p) * l, XY), silent=TRUE)
-      if(is(b, "try-error")) {
-	 matrix(0, p, K)
-      } else {
+      b <- NULL
+      while(is.null(b) || is(b, "try-error")) {
+	 b <- try(qr.solve(XX + diag(p) * l, XY), silent=FALSE)
+	 l <- l * 1.1
 	 b
       }
    }
@@ -113,11 +113,21 @@ gennetwork <- function(Y, corthresh=0.5, cortype=1)
    C
 }
 
-spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-4,
-   mu=1e-4, maxiter=1e4, simplify=FALSE, verbose=FALSE)
+# svd can fail for perfectly correlated data, but sometimes works for
+# transposed data
+safe.svd <- function(x, ...)
 {
-   fun <- "spg_core"
+   s <- try(svd(x, ...), silent=FALSE)
+   if("try-error" %in% class(s)) {
+      irlba(x, ...)
+   } else {
+      s
+   }
+}
 
+spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-4,
+   mu=1e-4, maxiter=1e4, simplify=FALSE, verbose=FALSE, type=c("l1", "l2"))
+{
    K <- ncol(Y)
    N <- nrow(Y)
    p <- ncol(X)
@@ -133,34 +143,51 @@ spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-4,
    CNorm <- 2 * max(colSums(C^2))
    C0 <- C
 
-   # This is much slower than MATLAB's eig(), and takes up most of the time
-   # for smallish problems
-   #L0 <- eigen(XX, only.values=TRUE, symmetric=TRUE)$values[1]
-   s <- system.time({
-      L0 <- if(p < 1e4L) {
-	 svd(X, nu=0, nv=1)$d[1]^2
-      } else {
-	 sum(XX^2)
-      }
-   })
-   cat("spg: svd took", s, "\n")
+   type <- match.arg(type)
+   fun <- switch(type, "l1"="spg_core", "l2"="spg_l2_core")
 
-   cat("CNorm:", CNorm, "\n")
+   if(verbose) {
+      cat("\nSPG: type=", type, ", lambda=", lambda, "gamma=", gamma, "\n")
+   }
+   # Lipschitz constant of squared loss
+   #
+   # The spectral norm of X^T X is upper-bounded by the Frobenius norm
+   L0 <- if(p < 1e4L) {
+      safe.svd(X, nu=0, nv=1)$d[1]^2
+   } else {
+      sum(XX^2)
+   }
+
+   # Lipschitz constant of l2 fusion penalty
+   eigCC <- if(type == "l1") {
+      NULL
+   } else {
+      safe.svd(C, nu=0, nv=1)$d[1]^2
+   }
 
    B <- foreach(i=seq(along=lambda)) %:% 
       foreach(j=seq(along=gamma)) %dopar% {
-	 L <- L0 + gamma[j]^2 * CNorm / mu
-	 C <- gamma[j] * C0
+	 
+	 # Compute final Lipschitz constant
+	 # SPG with l1 fusion folds the penalty gamma into the matrix C. The
+	 # l2 fusion doesn't.
+	 if(type == "l1") {
+	    L <- L0 + gamma[j]^2 * CNorm / mu
+	    Cj <- gamma[j] * C0
+	 } else if(type == "l2") {
+	    L <- L0 + gamma[j] * eigCC
+	    Cj <- C0
+	 }
 
 	 if(verbose)
-	    cat("spg gamma:", gamma[j], "lambda:", lambda[i], "\n")
+	    cat("spg L:", L, "gamma:", gamma[j], "lambda:", lambda[i], "\n")
 
 	 r <- .C(fun,
    	    as.numeric(XX), as.numeric(XY),
    	    as.numeric(X), as.numeric(Y),
    	    as.integer(N), as.integer(p), as.integer(K),
    	    numeric(p * K),
-   	    as.numeric(C), as.integer(nrow(C)), as.numeric(L), 
+   	    as.numeric(Cj), as.integer(nrow(Cj)), as.numeric(L), 
    	    as.numeric(gamma[j]), as.numeric(lambda[i]),
    	    as.numeric(tol), as.numeric(mu), as.integer(maxiter),
    	    as.integer(verbose), integer(1), integer(1)
@@ -168,8 +195,12 @@ spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-4,
    	 niter <- r[[18]]
 	 status <- r[[19]]
 	 if(!status) {
-	    cat("SPG failed to converge within", niter, "iterations\n")
+	    warning("SPG failed to converge within ", niter, " iterations,",
+	       " lambda=", lambda[i], " gamma=", gamma[j], "\n")
 	 }
+
+	 if(verbose)
+	    cat("\n")
 
 	 matrix(r[[8]], p, K)
    }

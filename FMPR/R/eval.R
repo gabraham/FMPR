@@ -9,6 +9,7 @@ R2 <- function(pr, y)
    s <- sapply(1:ncol(y), function(k) {
       1 - sum((pr[,k] - y[,k])^2) / sum((y[,k] - mean(y[,k]))^2)
    })
+   s[is.nan(s)] <- 0
    mean(pmax(0, s))
 }
 
@@ -44,8 +45,7 @@ crossval.ridge <- function(X, Y, nfolds=5, ...)
    )
 }
 
-crossval.fmpr <- function(X, Y, nfolds=5,
-      cortype=1, corthresh=0, ...)
+crossval.fmpr <- function(X, Y, nfolds=5, cortype=2, corthresh=0, ...)
 {
    N <- nrow(X)
    Y <- cbind(Y)
@@ -68,13 +68,12 @@ crossval.fmpr <- function(X, Y, nfolds=5,
       Ytest <- scalefix(Y[folds == fold, , drop=FALSE])
       Xtrain <- scalefix(X[folds != fold, , drop=FALSE])
       Ytrain <- scalefix(Y[folds != fold, , drop=FALSE])
-      C <- 0
+      C <- NULL
       if(ncol(Y) > 1) {
-	 C <- gennetwork(Y, cortype=cortype, corthresh=corthresh)
+	 C <- gennetwork(Ytrain, cortype=cortype, corthresh=corthresh)
       }
 
-      f <- fmpr(X=scalefix(X[folds != fold, , drop=FALSE]),
-	    Y=scalefix(Y[folds != fold, , drop=FALSE]), C=C, ...)
+      f <- fmpr(X=Xtrain, Y=Ytrain, C=C, ...)
 
       for(i in 1:l)
       {

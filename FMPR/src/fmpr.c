@@ -335,8 +335,7 @@ void fmpr(double *x, double *y, double *b,
 
 	       bjk = b[jpk];
 	       
-	       /* Apply inter-task penalty, summing over all the edges that
-		* task k participates in */
+	       /* Apply inter-task penalty, summing over all K tasks */
 	       pd1 = 0;
 	       pd2 = 0;
 	       for(e = 0 ; e < K ; e++)
@@ -383,6 +382,7 @@ void fmpr(double *x, double *y, double *b,
 		  iNj--;
 	       }
 	       loss[k] *= oneOnN;
+	       
 	       numconverged += fabs(loss[k] - oldloss[k])
 		  / fabs(loss[k]) < eps;
 	       

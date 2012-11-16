@@ -186,11 +186,12 @@ run.fmpr <- function(rep, dir=".", nfolds=10, grid=25,
 # sparsity: [0,1], degree of sparsity per task
 #
 # type: 
-#       same: same weights, same sparsity
-#       sparsity: different weights, same sparsity
-#       random: different weights and different sparsity
+#       same: same weights, same sparsity across all tasks
+#       sparsity: different weights, same sparsity across all tasks
+#       random: different weights and different sparsity across the tasks
 #       mixed: same absolute weights with different sign, same sparsity
-#       cluster; some tasks are related with same weight, some aren't
+#       cluster: some tasks are related with same weight, some aren't
+#       clustersparse: subsets of SNPs and subsets of tasks are related
 getB <- function(p, K, w=0.1, sparsity=0.8, type=NULL, ...)
 {
    if(type == "same") {
@@ -278,13 +279,13 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
 	 N=setup$N, p=setup$p, K=setup$K, B=setup$B, sigma=setup$sigma)
    cat("Simulation done\n")
 
-   funcs <- c(
-      rep("run.fmpr", 8),
-      rep("run.spg", 2),
-      "run.fmpr", # for lasso
-      "run.ridge",
-      "run.fmpr" # for elnet
-   )
+   #funcs <- c(
+   #   rep("run.fmpr", 8),
+   #   rep("run.spg", 2),
+   #   "run.fmpr", # for lasso
+   #   "run.ridge",
+   #   "run.fmpr" # for elnet
+   #)
 
    par.all <- list(dir=dir, grid=grid, nfolds=nfolds)
   
@@ -295,18 +296,19 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
    lambda2 <- c(0, 10^seq(-3, 6, length=grid))
 
    param <- list(
-      "FMPR-w1"=list(cortype=1, lambdar=lambdar, gamma=gamma, lambda2=lambda2),
-      "FMPR-w2"=list(cortype=2, lambdar=lambdar, gamma=gamma, lambda2=lambda2),
-      "GFlasso-w1"=list(cortype=1, lambdar=lambdar, gamma=gamma),
-      "GFlasso-w2"=list(cortype=2, lambdar=lambdar, gamma=gamma),
-      Lasso=list(lambdar=lambdar, gamma=0, lambda2=0),
-      Ridge=list(lambda2=lambda2),
-      Elnet=list(lambdar=lambdar, lambda2=lambda2, gamma=0)
+      #"FMPR-w1"=list(func=run.fmpr, cortype=1, lambdar=lambdar, gamma=gamma, lambda2=lambda2),
+      "FMPR-w2"=list(func=run.fmpr, cortype=2, lambdar=lambdar, gamma=gamma, lambda2=lambda2),
+      #"GFlasso-w1"=list(func=run.spg, cortype=1, lambdar=lambdar, gamma=gamma),
+      "GFlasso-w2"=list(func=run.spg, cortype=2, lambdar=lambdar, gamma=gamma),
+      Lasso=list(func=run.fmpr, lambdar=lambdar, gamma=0, lambda2=0),
+      Ridge=list(func=run.ridge, lambda2=lambda2),
+      Elnet=list(func=run.fmpr, lambdar=lambdar, lambda2=lambda2, gamma=0)
    )
 
-   res <- lapply(seq(along=funcs), function(i) {
+   res <- lapply(seq(along=param), function(i) {
       lapply(1:nreps, function(rep) {
-         do.call(funcs[[i]], c(rep=rep, par.all, param[[i]]))
+         do.call(param[[i]][[1]],
+	    c(rep=rep, par.all, param[[i]][-1]))
       })
    })
 
