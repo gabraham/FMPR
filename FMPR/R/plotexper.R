@@ -30,23 +30,23 @@ plot.rocr <- function(obj, ...)
 
 mytheme <- function(base_size=10)
 {
-   structure(list(
-	 axis.text.x=theme_text(size=24, angle=-90, hjust=0),
-	 axis.text.y=theme_text(size=24, hjust=1),
-	 axis.title.x=theme_text(size=28),
-	 axis.title.y=theme_text(size=28),
-	 axis.ticks=theme_blank(),
-	 plot.title=theme_text(size=30),
-	 legend.text=theme_text(size=20),
-	 legend.title=theme_text(size=20, hjust=0),
+   theme(
+	 axis.text.x=element_text(size=24, angle=-90, hjust=0),
+	 axis.text.y=element_text(size=24, hjust=1),
+	 axis.title.x=element_text(size=28),
+	 axis.title.y=element_text(size=28),
+	 axis.ticks=element_blank(),
+	 plot.title=element_text(size=30),
+	 legend.text=element_text(size=20),
+	 legend.title=element_text(size=20, hjust=0),
 	 legend.key.size=unit(2, "lines"),
-	 legend.background=theme_rect(colour=0, fill=0),
-	 legend.key=theme_blank()
-   ), class="options")
+	 legend.background=element_rect(colour=0, fill=0),
+	 legend.key=element_blank()
+   )
 }
 
 plot.exper <- function(x,
-   lim=list(roc=c(0, 1, 0, 1), prc=c(0, 1, 0, 1)), ...)
+   lim=list(roc=c(0, 1, 0, 1), prc=c(0, 1, 0, 1)), ci=FALSE, ...)
 {
    pdf(sprintf("%s/%s.pdf", x$dir, x$dir), width=12)
    par(mfrow=c(1, 2), mar=c(4.5, 4.1, 2.1, 0.1) + 0.1, pty="s")
@@ -55,6 +55,14 @@ plot.exper <- function(x,
    titles <- c("ROC", "PRC")
    xlab <- c("Specificity", "Recall")
    ylab <- c("Sensitivity", "Precision")
+
+   if(ci) {
+      spread.estimate <- "stderror"
+      spread.scale <- 2
+   } else {
+      spread.estimate <- "none"
+      spread.scale <- 1
+   }
    
    for(i in seq(along=nm))
    {
@@ -64,7 +72,8 @@ plot.exper <- function(x,
       for(j in seq(along=x$recovery))
       {
 	 plot.rocr(x$recovery[[j]][[nm[i]]], avg="threshold", add=TRUE,
-	    col=j, lwd=3, lty=j)
+	    col=j, lwd=3, lty=j,
+	    spread.estimate=spread.estimate, spread.scale=spread.scale)
       }
 
       if(i == 1) {

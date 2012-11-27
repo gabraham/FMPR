@@ -16,7 +16,7 @@ library(glmnet)
 library(ggplot2)
 library(FMPR)
 library(doMC)
-registerDoMC(cores=2)
+registerDoMC(cores=3)
 
 options(error=dump.frames)
 
@@ -27,8 +27,10 @@ set.seed(seed)
 # Configure the experiments here
 setup <- list(
    # The reference setup
-   Expr1=list(dir=c("Expr1"), N=100, p=100, K=10, sigma=1,
-	 B=getB(p=100, K=10, w=0.1, type="same")),
+   #Expr1=list(dir=c("Expr1"), N=100, p=100, K=10, sigma=1,
+#	 B=getB(p=100, K=10, w=0.1, type="same")),
+   Expr1=list(dir=c("Expr1"), N=100, p=50, K=10, sigma=1,
+	 B=getB(p=50, K=10, w=0.1, type="same")),
    
    # Different sample size
    Expr2=list(dir=c("Expr2"), N=50, p=100, K=10, sigma=1,
@@ -61,8 +63,10 @@ setup <- list(
 	 B=getB(p=200, K=10, w=0.1, type="same")),
 
    # Different weights across tasks, same sparsity
-   Expr12=list(dir=c("Expr12"), N=100, p=100, K=10, sigma=1,
-	 B=getB(p=100, K=10, w=0.1, type="sparsity")),
+   #Expr12=list(dir=c("Expr12"), N=100, p=100, K=10, sigma=1,
+#	 B=getB(p=100, K=10, w=0.1, type="sparsity")),
+   Expr12=list(dir=c("Expr12"), N=50, p=50, K=10, sigma=1,
+	 B=getB(p=50, K=10, w=0.1, type="sparsity")),
 
    # Unrelated tasks
    Expr13=list(dir=c("Expr13"), N=100, p=100, K=10, sigma=1,
@@ -79,8 +83,10 @@ setup <- list(
    # Same sparsity, different weight, mean=0.5
    Expr17=list(dir=c("Expr17"), N=100, p=100, K=10, sigma=1,
          B=getB(p=100, K=10, w=NULL, type="sparsity", mean=0.5, sd=0.05)),
-   Expr18=list(dir=c("Expr18"), N=100, p=100, K=10, sigma=1,
-         B=getB(p=100, K=10, w=NULL, type="sparsity", mean=0.5, sd=0.5)),
+   #Expr18=list(dir=c("Expr18"), N=100, p=100, K=10, sigma=1,
+   #      B=getB(p=100, K=10, w=NULL, type="sparsity", mean=0.5, sd=0.5)),
+   Expr18=list(dir=c("Expr18"), N=100, p=50, K=10, sigma=1,
+         B=getB(p=50, K=10, w=NULL, type="sparsity", mean=0.5, sd=0.5)),
    Expr19=list(dir=c("Expr19"), N=100, p=100, K=10, sigma=1,
          B=getB(p=100, K=10, w=NULL, type="sparsity", mean=0.5, sd=2)),
 
@@ -92,14 +98,19 @@ setup <- list(
 	 B=getB(p=100, K=10, w=0.1, type="mixed")),
 
    # Some tasks are related (clusters), some aren't
-   Expr22=list(dir=c("Expr22"), N=100, p=100, K=10, sigma=0.5,
-	 B=getB(p=100, K=10, w=0.1, type="cluster"))
+   #Expr22=list(dir=c("Expr22"), N=100, p=100, K=10, sigma=0.5,
+#	 B=getB(p=100, K=10, w=0.1, type="cluster"))
+   Expr22=list(dir=c("Expr22"), N=50, p=50, K=5, sigma=0.5,
+	 B=getB(p=50, K=5, w=0.1, type="cluster")),
+
+   Expr23=list(dir=c("Expr23"), N=50, p=50, K=20, sigma=0.5,
+	 B=getB(p=50, K=20, w=0.1, type="clustersparse"))
 
 )
 
-nreps <- 10
-grid <- 25
-nfolds <- 5
+nreps <- 50
+grid <- 20
+nfolds <- 10
 
 system.time({
    res <- lapply(setup[idv], run, nreps=nreps, grid=grid, nfolds=nfolds)

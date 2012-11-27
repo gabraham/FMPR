@@ -73,6 +73,7 @@ void spg_core(double *xx, double *xy, double *x, double *y,
 	  mu = *mu_p;
    int maxiter = *maxiter_p;
    double oneOnL = 1.0 / L;
+   double oneOnN = 1.0 / N;
    double theta = 1, theta_new, s1, s2, s3;
 
    double *A = malloc(sizeof(double) * nE * p);
@@ -105,7 +106,7 @@ void spg_core(double *xx, double *xy, double *x, double *y,
          matprod(xx, p, p, W, p, K, tmppK);
          crossprod(A, nE, p, C, nE, K, tmppK2);
          for(i = p * K - 1 ; i >= 0 ; --i)
-            grad[i] = tmppK[i] - xy[i] + tmppK2[i];
+            grad[i] = (tmppK[i] - xy[i] + tmppK2[i]) * oneOnN ;
       }
       else
       {
@@ -117,7 +118,7 @@ void spg_core(double *xx, double *xy, double *x, double *y,
 	 crossprod(A, nE, p, C, nE, K, tmppK2);
 
 	 for(i = p * K - 1 ; i >= 0 ; --i)
-	    grad[i] = tmppK[i] + tmppK2[i];
+	    grad[i] = (tmppK[i] + tmppK2[i]) * oneOnN;
       }
 
       for(i = p * K - 1 ; i >= 0 ; --i)
@@ -131,6 +132,7 @@ void spg_core(double *xx, double *xy, double *x, double *y,
 	 W[i] = beta_new[i] + (1 - theta) / theta 
 	       * theta_new * (beta_new[i] - beta[i]);
 
+      /* temporary matrices for computing the loss */
       matprod(x, N, p, beta_new, p, K, tmpNK);
       tcrossprod(C, nE, K, beta_new, p, K, tmpnEp);
 
@@ -138,7 +140,7 @@ void spg_core(double *xx, double *xy, double *x, double *y,
       s1 = 0;
       for(i = N * K - 1 ; i >= 0 ; --i)
 	 s1 += pow(y[i] - tmpNK[i], 2);
-      s1 *= 0.5;
+      s1 *= 0.5 * oneOnN;
 
       /* l1 fusion loss */
       s2 = 0;
@@ -222,6 +224,7 @@ void spg_l2_core(double *xx, double *xy, double *x, double *y,
 	  tol = *tol_p;
    int iter, maxiter = *maxiter_p;
    double oneOnL = 1.0 / L;
+   double oneOnN = 1.0 / N;
    double theta = 1, theta_new, s1, s2, s3;
    int diverged = FALSE;
 
@@ -248,7 +251,7 @@ void spg_l2_core(double *xx, double *xy, double *x, double *y,
          matprod(xx, p, p, W, p, K, xxW);
          matprod(W, p, K, CC, K, K, WCC);
          for(i = p * K - 1 ; i >= 0 ; --i)
-            grad[i] = xxW[i] - xy[i] + gamma * WCC[i];
+            grad[i] = (xxW[i] - xy[i]) * oneOnN + gamma * WCC[i];
       }
       else
       {
@@ -259,7 +262,7 @@ void spg_l2_core(double *xx, double *xy, double *x, double *y,
 	 crossprod(x, N, p, xW, N, K, xxW); 
          matprod(W, p, K, CC, K, K, WCC);
 	 for(i = p * K - 1 ; i >= 0 ; --i)
-	    grad[i] = xxW[i] + gamma * WCC[i];
+	    grad[i] = xxW[i] * oneOnN + gamma * WCC[i];
       }
 
       for(i = p * K - 1 ; i >= 0 ; --i)
@@ -280,13 +283,13 @@ void spg_l2_core(double *xx, double *xy, double *x, double *y,
       s1 = 0;
       for(i = N * K - 1 ; i >= 0 ; --i)
 	 s1 += pow(y[i] - xW[i], 2);
-      s1 *= 0.5;
+      s1 *= 0.5 * oneOnN;
 
       /* l2 fussion penalty */
       s2 = 0;
       for(i = nE * p - 1 ; i >= 0 ; --i)
 	 s2 += pow(CB[i], 2);
-      s2 *= gamma;
+      s2 *= 0.5 * gamma;
 
       /* l1 lasso penalty */
       s3 = 0;

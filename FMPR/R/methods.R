@@ -1,3 +1,4 @@
+
 lasso <- function(X, y, lambda=0,
       maxiter=1e5, eps=1e-4, verbose=FALSE)
 {
@@ -113,8 +114,7 @@ gennetwork <- function(Y, corthresh=0.5, cortype=1)
    C
 }
 
-# svd can fail for perfectly correlated data, but sometimes works for
-# transposed data
+# svd can fail for perfectly correlated data, so use irlba if it fails.
 safe.svd <- function(x, ...)
 {
    s <- try(svd(x, ...), silent=FALSE)
@@ -132,8 +132,9 @@ spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-4,
    N <- nrow(Y)
    p <- ncol(X)
 
-   # SPG works on raw data scale, not normalising by number of samples N
-   lambda <- lambda * N
+   # SPG works on raw data scale, *not*
+   # normalising by number of samples N
+   #lambda <- lambda * N
 
    if(length(C) == 0)
       C <- matrix(0, 1, K)
@@ -149,28 +150,30 @@ spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-4,
    if(verbose) {
       cat("\nSPG: type=", type, ", lambda=", lambda, "gamma=", gamma, "\n")
    }
+
    # Lipschitz constant of squared loss
    #
-   # The spectral norm of X^T X is upper-bounded by the Frobenius norm
+   # The largest eigenvalue of X^T X is upper-bounded by the Frobenius norm
    L0 <- if(p < 1e4L) {
-      safe.svd(X, nu=0, nv=1)$d[1]^2
+      maxeigen(X) / N
    } else {
-      sum(XX^2)
+      sum(XX^2 / N)
    }
 
    # Lipschitz constant of l2 fusion penalty
    eigCC <- if(type == "l1") {
       NULL
    } else {
-      safe.svd(C, nu=0, nv=1)$d[1]^2
+      maxeigen(C)
    }
 
    B <- foreach(i=seq(along=lambda)) %:% 
       foreach(j=seq(along=gamma)) %dopar% {
 	 
-	 # Compute final Lipschitz constant
+	 # Compute final Lipschitz constant.
 	 # SPG with l1 fusion folds the penalty gamma into the matrix C. The
-	 # l2 fusion doesn't.
+	 # l2 fusion doesn't, because
+	 # \gamma ||B C^T C||_F^2 != ||B Cg^T Cg||_F^2 where Cg = \gamma * C
 	 if(type == "l1") {
 	    L <- L0 + gamma[j]^2 * CNorm / mu
 	    Cj <- gamma[j] * C0
