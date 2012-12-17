@@ -118,12 +118,12 @@ void spg_core(double *xx, double *xy, double *x, double *y,
 	 crossprod(A, nE, p, C, nE, K, tmppK2);
 
 	 for(i = p * K - 1 ; i >= 0 ; --i)
-	    grad[i] = (tmppK[i] + tmppK2[i]) * oneOnN;
+	    grad[i] = tmppK[i] * oneOnN + tmppK2[i];
       }
 
       for(i = p * K - 1 ; i >= 0 ; --i)
-	 beta_new[i] = soft_threshold(W[i] - oneOnL * grad[i],
-	       lambda * oneOnL);
+	 beta_new[i] = soft_threshold(
+	    W[i] - oneOnL * grad[i], lambda * oneOnL);
 
       theta_new = (sqrt(pow(theta, 4) + 4 * theta * theta) 
 	    - theta * theta) * 0.5;
@@ -261,6 +261,7 @@ void spg_l2_core(double *xx, double *xy, double *x, double *y,
 
 	 crossprod(x, N, p, xW, N, K, xxW); 
          matprod(W, p, K, CC, K, K, WCC);
+
 	 for(i = p * K - 1 ; i >= 0 ; --i)
 	    grad[i] = xxW[i] * oneOnN + gamma * WCC[i];
       }
