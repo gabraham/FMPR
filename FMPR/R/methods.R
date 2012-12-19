@@ -132,13 +132,10 @@ spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-4,
    N <- nrow(Y)
    p <- ncol(X)
 
-   # SPG works on raw data scale, *not*
-   # normalising by number of samples N
-   #lambda <- lambda * N
-
    if(length(C) == 0)
       C <- matrix(0, 1, K)
 
+   # Don't normalise by N here, we do in the C code
    XX <- crossprod(X)
    XY <- crossprod(X, Y)
    CNorm <- 2 * max(colSums(C^2))
@@ -148,7 +145,8 @@ spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-4,
    fun <- switch(type, "l1"="spg_core", "l2"="spg_l2_core")
 
    if(verbose) {
-      cat("\nSPG: type=", type, ", lambda=", lambda, "gamma=", gamma, "\n")
+      cat("\nSPG: type=", type, ", lambda=", lambda, "gamma=", gamma,
+	 "CNorm=", CNorm, "\n")
    }
 
    # Lipschitz constant of squared loss
