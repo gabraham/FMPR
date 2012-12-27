@@ -209,8 +209,8 @@ void lasso(double *x, double *y, double *b,
 
 /* Uses the C from gennetwork
  */
-void fmpr(double *x, double *y, double *b,
-      double *LP, int *N_p, int *p_p, int *K_p,
+void fmpr(double *X, double *Y, double *B,
+      double *LP, double *L_p, int *N_p, int *p_p, int *K_p,
       double *lambda_p, double *lambda2_p, double *gamma_p,
       double *C, int *maxiter_p, double *eps_p, int *verbose_p,
       int *status, int *iter_p, int *numactive_p)
@@ -221,7 +221,7 @@ void fmpr(double *x, double *y, double *b,
    int i, j, k;
    int iter;
    double d1;
-   double delta, bjk;
+   double delta, Bjk;
    double eps = *eps_p;
    int maxiter = *maxiter_p;
    int numactive = 0,
@@ -229,15 +229,19 @@ void fmpr(double *x, double *y, double *b,
        numconverged = 0;
    int verbose = *verbose_p;
    int pK = p * K, pK1 = p * K - 1;
-   double s, lambda = *lambda_p, gamma = *gamma_p;
+   double s, lambda = *lambda_p, gamma = *gamma_p, L = *L_p;
    double tmp;
+   double oneOnN = 1.0 / N;
    int iNk, jpk, iNj;
+   int nE = K * (K - 1) / 2, kKk, e, n;
+   double pd1, pd2;
+   double oneOn2N = 1.0 / (2.0 * N);
 
    int *active = malloc(sizeof(int) * p * K);
    int *oldactive = malloc(sizeof(int) * p * K);
    int *ignore = calloc(p * K, sizeof(int));
    double *Err = calloc(N * K, sizeof(double));
-   double *meany = calloc(K, sizeof(double));
+   double *meanY = calloc(K, sizeof(double));
    double *loss = calloc(K, sizeof(double));
    double *oldloss = calloc(K, sizeof(double));
    double *lossnull = calloc(K, sizeof(double));
@@ -245,26 +249,24 @@ void fmpr(double *x, double *y, double *b,
    double *d2_0 = calloc(p * K, sizeof(double));
    double losstotal = 0, oldlosstotal = 0;
    double *oneOnLambda2PlusOne = malloc(sizeof(double) * K);
-   double oneOn2N = 1.0 / (2.0 * N);
-
-   int nE = K * (K - 1) / 2, kKk, e;
-   double pd1, pd2;
-
+   double *gCC = calloc(K * K, sizeof(double));
+   double *BCC = calloc(p * K, sizeof(double));
    double *colsumsB = calloc(K, sizeof(double));
    double *sumsC = calloc(K, sizeof(double));
 
-   double *CC = calloc(K * K, sizeof(double));
-
-   crossprod(C, nE, K, C, nE, K, CC);
-   for(k = K * K - 1 ; k >= 0 ; --k)
-      CC[k] *= gamma;
+   if(nE > 1)
+   {
+      crossprod(C, nE, K, C, nE, K, gCC);
+      for(k = K * K - 1 ; k >= 0 ; --k)
+	 gCC[k] *= gamma;
+   }
 
    /* null loss mean((y - mean(y))^2)*/
    for(k = 0 ; k < K ; k++)
    {
       for(i = N - 1 ; i >= 0 ; --i)
-         meany[k] += y[i];
-      meany[k] *= oneOn2N;
+         meanY[k] += Y[i];
+      meanY[k] *= oneOn2N;
 
       oneOnLambda2PlusOne[k] = 1.0 / (1.0 + *lambda2_p);
    }
@@ -277,7 +279,7 @@ void fmpr(double *x, double *y, double *b,
       {
 	 jpk = j + p * k;
 	 for(i = N - 1 ; i >= 0 ; --i)
-	    d2_0[jpk] +=  x[i + j * N] * x[i + j * N];// * oneOnN;
+	    d2_0[jpk] +=  X[i + j * N] * X[i + j * N] * oneOnN;
 	 ignore[jpk] = (d2_0[jpk] <= ZERO_VAR_THRESH);
       }
    }
@@ -291,8 +293,8 @@ void fmpr(double *x, double *y, double *b,
       for(i = N - 1 ; i >= 0 ; --i)
       {
 	 iNk = i + N * k;
-	 lossnull[k] += pow(y[iNk] - meany[k], 2);
-	 Err[iNk] = LP[iNk] - y[iNk];
+	 lossnull[k] += pow(Y[iNk] - meanY[k], 2);
+	 Err[iNk] = LP[iNk] - Y[iNk];
 	 loss[k] += Err[iNk] * Err[iNk];
       }
       loss[k] *= oneOn2N;
@@ -323,35 +325,35 @@ void fmpr(double *x, double *y, double *b,
 	    }
 	    else
 	    {
-	       /* derivatives of loss function */
-	       d1 = 0; /* superfluous? */
-	       crossprod(x + N * j, N, 1, Err + N * k, N, 1, &d1);
-	       bjk = b[jpk];
+	       /* derivative of loss function wrt B_jk */
+	       crossprod(X + N * j, N, 1, Err + N * k, N, 1, &d1);
+	       d1 *= oneOnN; 
+	       Bjk = B[jpk];
 	       
-	       /* derivatives of fusion penalty */
-	       pd2 = CC[kKk];
-	       pd1 = bjk * pd2;
+	       pd1 = 0;
+	       for(n = 0 ; n < K ; n++)
+	          pd1 += B[j + p * n] * gCC[n * K + k];
 
-	       s = bjk - (d1 + pd1) / (d2_0[jpk] + pd2);
+	       s = Bjk - (d1 + pd1) / L;
 
 	       /* lasso soft-thresholding */
-	       if(fabs(s) <= lambda)
+	       if(fabs(s) <= lambda / L)
 	       {
-	          b[jpk] = 0;
-	          delta = -bjk;
+	          B[jpk] = 0;
+	          delta = -Bjk;
 	       }
 	       else
 	       {
-	          b[jpk] = (s - lambda * sign(s)) * oneOnLambda2PlusOne[k];
-		  if(fabs(b[jpk]) < ZERO_THRESH) // numerically close enough to zero
-		     b[jpk] = 0;
-	          delta = b[jpk] - bjk;
+	          B[jpk] = (s - lambda * sign(s) / L) * oneOnLambda2PlusOne[k];
+		  //if(fabs(b[jpk]) < ZERO_THRESH) // numerically close enough to zero
+		    // b[jpk] = 0;
+	          delta = B[jpk] - Bjk;
 	       }
 	       
 #ifdef DEBUG
 	       Rprintf("[k=%d j=%d] d1=%.6f pd1=%.6f d2=%.6f pd2=%.6f s=%.6f\
  delta=%.6f beta_old=%.6f beta_new=%.6f active:%d\n",
-		  k, j+1, d1, pd1, d2_0[jpk], pd2, s, delta, bjk, b[jpk], active[jpk]);
+		  k, j+1, d1, pd1, d2_0[jpk], pd2, s, delta, Bjk, B[jpk], active[jpk]);
 #endif
 
 	       /* Update loss and errors based on new estimates. */
@@ -361,8 +363,8 @@ void fmpr(double *x, double *y, double *b,
 	       iNj = N * j + N - 1;
 	       for(i = N - 1 ; i >= 0 ; --i)
 	       {
-	          LP[iNk] += x[iNj] * delta;
-		  Err[iNk] = LP[iNk] - y[iNk];
+	          LP[iNk] += X[iNj] * delta;
+		  Err[iNk] = LP[iNk] - Y[iNk];
 	          loss[k] += Err[iNk] * Err[iNk];
 		  iNk--;
 		  iNj--;
@@ -370,18 +372,18 @@ void fmpr(double *x, double *y, double *b,
 	       loss[k] *= oneOn2N;
 
 	       /* update l1 loss */
-	       colsumsB[k] += fabs(b[jpk]) - fabs(bjk);
+	       colsumsB[k] += fabs(B[jpk]) - fabs(Bjk);
 	       loss[k] += lambda * colsumsB[k];
 
 	       /* update fusion loss */
-	       tmp = delta * (2 * b[jpk] + delta);
+	       tmp = delta * (2 * B[jpk] + delta);
 	       for(e = 0 ; e < nE ; e++)
 		  sumsC[k] += C[e + k * nE] * C[e + k * nE] * tmp;
 	       loss[k] += 0.5 * gamma * sumsC[k];
 	       
 	       numconverged += fabs(loss[k] - oldloss[k]) / fabs(loss[k]) < eps;
 	       
-	       active[jpk] = (b[jpk] != 0);
+	       active[jpk] = (B[jpk] != 0);
 	    }
 
 	    numactive += active[jpk];
@@ -461,7 +463,7 @@ void fmpr(double *x, double *y, double *b,
 
    free(active);
    free(oldactive);
-   free(meany);
+   free(meanY);
    free(loss);
    free(oldloss);
    free(lossnull);
@@ -470,8 +472,9 @@ void fmpr(double *x, double *y, double *b,
    free(d2_0);
    free(ignore);
    free(oneOnLambda2PlusOne);
-   free(CC);
+   free(gCC);
    free(colsumsB);
    free(sumsC);
+   free(BCC);
 }
 

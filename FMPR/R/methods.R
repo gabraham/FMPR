@@ -217,7 +217,7 @@ spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-4,
 
 fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
       maxiter=1e5, eps=1e-4, verbose=FALSE, simplify=FALSE,
-      sparse=FALSE, nzmax=nrow(X))
+      sparse=FALSE, nzmax=nrow(X), warm=TRUE)
 {
    if(length(X) == 0 || length(Y) == 0)
       stop("X and/or Y have zero length")
@@ -229,11 +229,20 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
 
    if(nrow(X) != nrow(Y))
       stop("dimensions of X and Y don't agree")
+   
+   Lx <- if(p < 1e4L) {
+      maxeigen(X) / N
+   } else {
+      sum(XX^2 / N)
+   }
 
    if(is.null(C)) {
       nE <- K * (K - 1) / 2
       C <- matrix(0, nE, K)
+   } else {
+      maxeigC <- maxeigen(C)
    }
+
 	       
    B0 <- matrix(0, p, K)
    LP0 <- matrix(0, N, K)
@@ -252,7 +261,7 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
 	    LPjk <- vector("list", length(lambda))
 	    nactive <- numeric(length(lambda))
 
-	    #C1 <- C * gamma[j]
+	    L <- Lx + gamma[j] * maxeigC
 
 	    # process sequential along the l1 penalty
 	    for(i in seq(along=lambda))
@@ -261,7 +270,7 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
 		  cat("\t", l1ord[i], j, ": ")
 	       }
 
-	       if(i == 1) {
+	       if(i == 1 || !warm) {
 		  B <- B0
 		  LP <- LP0
 	       } else {
@@ -274,23 +283,24 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
 		  as.numeric(Y),       	  # 2: Y
 	          as.numeric(B),       	  # 3: B
 		  as.numeric(LP),      	  # 4: LP
-		  nrow(X),	       	  # 5: N
-		  ncol(X),	       	  # 6: p
-		  K,		       	  # 7: K
-       	          lambda[l1ord[i]],    	  # 8: lambda
-		  lambda2[m],	       	  # 9: lambda2
-		  gamma[j],	       	  # 10: gamma
-       	          as.numeric(C),          # 11: C
-		  as.integer(maxiter),	  # 12: maxiter
-       	          as.double(eps),      	  # 13: eps
-		  as.integer(verbose), 	  # 14: verbose
-		  integer(1),	       	  # 15: status
-	          integer(1),	       	  # 16: iter
-		  integer(1)	       	  # 17: numactive
+		  as.numeric(L),	  # 5: Liphschitz constant
+		  nrow(X),	       	  # 6: N
+		  ncol(X),	       	  # 7: p
+		  K,		       	  # 8: K
+       	          lambda[l1ord[i]],    	  # 9: lambda
+		  lambda2[m],	       	  # 10: lambda2
+		  gamma[j],	       	  # 11: gamma
+       	          as.numeric(C),          # 12: C
+		  as.integer(maxiter),	  # 13: maxiter
+       	          as.double(eps),      	  # 14: eps
+		  as.integer(verbose), 	  # 15: verbose
+		  integer(1),	       	  # 16: status
+	          integer(1),	       	  # 17: iter
+		  integer(1)	       	  # 18: numactive
 	       )
-	       status <- r[[15]]
-	       numiter <- r[[16]]
-	       nactive[l1ord[i]] <- r[[17]]
+	       status <- r[[16]]
+	       numiter <- r[[17]]
+	       nactive[l1ord[i]] <- r[[18]]
 	       if(!status) {
 	          cat("fmpr failed to converge within ",
 	             maxiter, " iterations")

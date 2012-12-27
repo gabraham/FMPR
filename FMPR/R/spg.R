@@ -170,8 +170,8 @@ spgL1v2 <- function(X, Y, C, lambda=0, gamma=0, maxiter=1e3, tol=1e-4, mu=1e-4)
       theta_new <- (sqrt(theta^4 + 4 * theta^2) - theta^2) / 2
       W <- B_new + (1 - theta) / theta * theta_new * (B_new - B)
 
-      loss[iter] <- (mean((Y - X %*% B_new)^2) / 2
-	 + sum(abs(tcrossprod(B_new, C)))
+      loss[iter] <- (0.5 * sum((Y - X %*% B_new)^2) / N
+	 + sum(abs(tcrossprod(B_new, C))) # C already includes gamma
 	 + lambda * sum(abs(B_new)))
 
       if(iter > 10 && abs(loss[iter] - loss[iter - 1]) / abs(loss[iter - 1]) < tol)
@@ -212,7 +212,7 @@ spgL2v2 <- function(X, Y, C, lambda=0, gamma=0, maxiter=1e3, tol=1e-4, mu=1e-4)
       theta_new <- (sqrt(theta^4 + 4 * theta^2) - theta^2) / 2
       W <- B_new + (1 - theta) / theta * theta_new * (B_new - B)
 
-      loss[iter] <- (0.5 * mean((Y - X %*% B_new)^2)
+      loss[iter] <- (0.5 * sum((Y - X %*% B_new)^2) / N
 	 + 0.5 * gamma * sum(tcrossprod(B_new, C)^2)
 	 + lambda * sum(abs(B_new)))
 
@@ -249,10 +249,11 @@ fmprR <- function(X, Y, C, lambda=0, gamma=0, maxiter=1e3, eps=1e-4)
 	 {
 	    Err[,k] <- X %*% B[,k] - Y[,k]
 	    d1 <- crossprod(X[, j], Err[,k]) / N + gamma * B[j, k] * CC[k]
-	    d2 <- XX[j] + gamma * CC[k]
+	    #d2 <- XX[j] + gamma * CC[k]
+	    d2 <- 1e4
 	    B[j, k] <- soft_threshold(B[j, k] - d1 / d2, lambda)
       
-	    loss[iter] <- (0.5 * mean((Y - X %*% B)^2)
+	    loss[iter] <- (0.5 * sum((Y - X %*% B)^2) / N
 	       + 0.5 * gamma * sum(tcrossprod(B, C)^2)
 	       + lambda * sum(abs(B)))
 	 }
@@ -262,7 +263,245 @@ fmprR <- function(X, Y, C, lambda=0, gamma=0, maxiter=1e3, eps=1e-4)
 	 break
 
       cat("iter", iter, "loss:", loss[iter], "\n")
+   }
 
+   B
+}
+
+fmprR2 <- function(X, Y, C, lambda=0, gamma=0, maxiter=1e3, eps=1e-4)
+{
+   p <- ncol(X)
+   K <- ncol(Y)
+   N <- nrow(X)
+   B <- matrix(0, p, K)
+
+   loss <- numeric(maxiter)
+   Err <- matrix(0, N, K)
+   
+   CC <- crossprod(C)
+   XX <- diag(crossprod(X) / N)
+
+   for(iter in 1:maxiter)
+   {
+      for(k in 1:K)
+      {
+	 for(j in 1:p)
+	 {
+	    Err[,k] <- X %*% B[,k] - Y[,k]
+	    #d1 <- crossprod(X[, j], Err[,k]) / N + gamma * B[j, k] * CC[k]
+	    d1 <- crossprod(X[, j], Err[,k]) / N + gamma * (B %*% CC)[j, k]
+	    #d2 <- L
+	    W <- B
+	    W[] <- 0
+	    W[j, k] <- 1
+	    d2 <- XX[j] + gamma * (W %*% CC)[j, k]
+	    B[j, k] <- soft_threshold(B[j, k] - d1 / d2, lambda)
+      
+	    loss[iter] <- (0.5 * sum((Y - X %*% B)^2) / N
+	       + 0.5 * gamma * sum(tcrossprod(B, C)^2)
+	       + lambda * sum(abs(B)))
+	 }
+      }
+    
+      if(iter > 10 && abs(loss[iter] - loss[iter - 1]) / abs(loss[iter - 1]) < eps)
+	 break
+
+      cat("iter", iter, "loss:", loss[iter], "\n")
+   }
+
+   B
+}
+
+# Lipschitz constant for step size
+fmprR3 <- function(X, Y, C, lambda=0, gamma=0, maxiter=1e3, eps=1e-4)
+{
+   p <- ncol(X)
+   K <- ncol(Y)
+   N <- nrow(X)
+   B <- matrix(0, p, K)
+
+   loss <- numeric(maxiter)
+   Err <- matrix(0, N, K)
+   
+   L <- maxeigen(X) / N + gamma * maxeigen(C)
+
+   CC <- crossprod(C)
+   XX <- diag(crossprod(X) / N)
+
+   for(iter in 1:maxiter)
+   {
+      for(k in 1:K)
+      {
+	 for(j in 1:p)
+	 {
+	    Err[,k] <- X %*% B[,k] - Y[,k]
+	    d1 <- crossprod(X[, j], Err[,k]) / N + gamma * (B %*% CC)[j, k]
+	    B[j, k] <- soft_threshold(B[j, k] - d1 / L, lambda / L)
+      
+	    loss[iter] <- (0.5 * sum((Y - X %*% B)^2) / N
+	       + 0.5 * gamma * sum(tcrossprod(B, C)^2)
+	       + lambda * sum(abs(B)))
+	 }
+      }
+    
+      if(iter > 10 && abs(loss[iter] - loss[iter - 1]) / abs(loss[iter - 1]) < eps)
+	 break
+
+      cat("iter", iter, "loss:", loss[iter], "\n")
+   }
+
+   B
+}
+
+fmprR5 <- function(X, Y, C, lambda=0, gamma=0, maxiter=1e3, eps=1e-4)
+{
+   p <- ncol(X)
+   K <- ncol(Y)
+   N <- nrow(X)
+   B <- matrix(0, p, K)
+
+   loss <- numeric(maxiter)
+   Err <- matrix(0, N, K)
+   
+   CC <- crossprod(C)
+   XX <- diag(crossprod(X) / N)
+
+   for(iter in 1:maxiter)
+   {
+      for(k in 1:K)
+      {
+	 for(j in 1:p)
+	 {
+	    Err[,k] <- X %*% B[,k] - Y[,k]
+	    #d1 <- crossprod(X[, j], Err[,k]) / N + gamma * B[j, k] * CC[k]
+	    d1 <- crossprod(X[, j], Err[,k]) / N + gamma * (B %*% CC)[j, k]
+	    #d2 <- L
+	    W <- B
+	    W[] <- 0
+	    W[j, k] <- 1
+	    d2 <- XX[j] + gamma * (W %*% CC)[j, k]
+	    B[j, k] <- soft_threshold(B[j, k] - d1 / d2, lambda)
+      
+	    loss[iter] <- (0.5 * sum((Y - X %*% B)^2) / N
+	       + 0.5 * gamma * sum(tcrossprod(B, C)^2)
+	       + lambda * sum(abs(B)))
+	 }
+      }
+    
+      if(iter > 10 && abs(loss[iter] - loss[iter - 1]) / abs(loss[iter - 1]) < eps)
+	 break
+
+      cat("iter", iter, "loss:", loss[iter], "\n")
+   }
+
+   B
+}
+
+fmprR6 <- function(X, Y, C, lambda=0, gamma=0, maxiter=1e3, eps=1e-4)
+{
+   p <- ncol(X)
+   K <- ncol(Y)
+   N <- nrow(X)
+   B <- matrix(0, p, K)
+
+   loss <- numeric(maxiter)
+   Err <- matrix(0, N, K)
+   
+   CC <- crossprod(C)
+   XX <- diag(crossprod(X) / N)
+   L <- maxeigen(X) / N + gamma * maxeigen(C)
+
+   for(iter in 1:maxiter)
+   {
+      for(k in 1:K)
+      {
+	 for(j in 1:p)
+	 {
+	    Err[,k] <- X %*% B[,k] - Y[,k]
+	    d1 <- crossprod(X[, j], Err[,k]) / N 
+	    #g <- sapply(1:nrow(C), function(e) {
+	    #   B[j, ] %*% C[e, ] * C[e, k]
+	    #})
+	    #d1 <- d1 + gamma * sum(g)
+	    d1 <- d1 + gamma * (B %*% CC)[j, k]
+	    #d2 <- XX[j] + gamma * sum(C[,k]^2)
+	    #B[j, k] <- soft_threshold(B[j, k] - d1 / d2, lambda)
+	    B[j, k] <- soft_threshold(B[j, k] - d1 / L, lambda / L)
+      
+	    loss[iter] <- (0.5 * sum((Y - X %*% B)^2) / N
+	       + 0.5 * gamma * sum(tcrossprod(B, C)^2)
+	       + lambda * sum(abs(B)))
+	 }
+      }
+    
+      if(iter > 1 && abs(loss[iter] - loss[iter - 1]) / abs(loss[iter - 1]) < eps)
+	 break
+
+      cat("iter", iter, "loss:", loss[iter], "\n")
+   }
+
+   B
+}
+
+gd <- function(X, Y, C, lambda=0, gamma=0, maxiter=1e6, eps=1e-4, mu=1e-4)
+{
+   p <- ncol(X)
+   K <- ncol(Y)
+   N <- nrow(X)
+   B <- matrix(0, p, K)
+
+   loss <- numeric(maxiter)
+   Err <- matrix(0, N, K)
+
+   CC <- crossprod(C)
+   XX <- diag(crossprod(X) / N)
+
+   for(iter in 1:maxiter)
+   {
+      Err <- X %*% B - Y
+      d1 <- crossprod(X, Err) / N + gamma * B %*% CC
+      B <- soft_threshold(B - d1 * mu, lambda)
+      
+      loss[iter] <- (0.5 * sum((Y - X %*% B)^2) / N
+         + 0.5 * gamma * sum(tcrossprod(B, C)^2)
+         + lambda * sum(abs(B)))
+    
+      if(iter > 10 && abs(loss[iter] - loss[iter - 1]) / abs(loss[iter - 1]) < eps)
+	 break
+
+      cat("iter", iter, "loss:", loss[iter], "\n")
+   }
+
+   B
+}
+
+gd2 <- function(X, Y, C, lambda=0, gamma=0, maxiter=1e6, eps=1e-4)
+{
+   p <- ncol(X)
+   K <- ncol(Y)
+   N <- nrow(X)
+   B <- matrix(0, p, K)
+
+   loss <- numeric(maxiter)
+   Err <- matrix(0, N, K)
+
+   CC <- crossprod(C)
+   L <- maxeigen(X) / N + gamma * maxeigen(C)
+
+   for(iter in 1:maxiter)
+   {
+      Err <- X %*% B - Y
+      grad <- crossprod(X, Err) / N + gamma * B %*% CC
+      B <- soft_threshold(B - grad / L, lambda / L)
+      
+      loss[iter] <- (0.5 * sum((Y - X %*% B)^2) / N
+         + 0.5 * gamma * sum(tcrossprod(B, C)^2)
+         + lambda * sum(abs(B)))
+    
+      if(iter > 10 && abs(loss[iter] - loss[iter - 1]) / abs(loss[iter - 1]) < eps)
+	 break
+
+      cat("iter", iter, "loss:", loss[iter], "\n")
    }
 
    B

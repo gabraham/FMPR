@@ -108,8 +108,10 @@ setup <- list(
 
 )
 
-nreps <- 50
+#nreps <- 50
+nreps <- 30
 grid <- 20
+#nfolds <- 10
 nfolds <- 10
 
 system.time({
