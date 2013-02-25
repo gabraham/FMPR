@@ -29,7 +29,7 @@ void maxlambda1(double *x, double *y, double *lambda,
    int N = *N_p,
        p = *p_p,
        K = *K_p;
-   int i, j, k, m;
+   int i, j, k;
    double d1, d2, s, xij;
    double const eps = 1e-16;
 
@@ -75,7 +75,7 @@ void lasso(double *x, double *y, double *b,
    double delta, bj;
    double eps = *eps_p;
    int maxiter = *maxiter_p;
-   int numactive, allconverged = 1, numconverged = 0;
+   int numactive = 0, allconverged = 1, numconverged = 0;
    int verbose = *verbose_p;
    double meany = 0;
    double lambda = *lambda_p;
@@ -223,13 +223,13 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
    double delta, bjk;
    double eps = *eps_p;
    int maxiter = *maxiter_p;
-   int numactive,
+   int numactive = 0,
        allconverged = 1,
        numconverged = 0;
    int verbose = *verbose_p;
    int pK = p * K, pK1 = p * K - 1;
    double s, lambda = *lambda_p, gamma = *gamma_p;
-   int g, q, iNk, kqK, jpk;
+   int q, iNk, kqK, jpk;
 
    int *active = malloc(sizeof(int) * p * K);
    int *oldactive = malloc(sizeof(int) * p * K);
@@ -245,8 +245,8 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
    double *signG = calloc(K * K, sizeof(double));
    double losstotal = 0, oldlosstotal = 0;
    double *oneOnLambda2PlusOne = malloc(sizeof(double) * K);
-   double oneOnN = 1.0 / N,
-	  oneOnKp = 1.0 / (K * p);
+   double oneOnN = 1.0 / N;//,
+	  //oneOnKp = 1.0 / (K * p);
 
    /* null loss mean((y - mean(y))^2)*/
    for(k = 0 ; k < K ; k++)

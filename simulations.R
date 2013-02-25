@@ -16,7 +16,7 @@ library(glmnet)
 library(ggplot2)
 library(FMPR)
 library(doMC)
-registerDoMC(cores=2)
+registerDoMC(cores=3)
 
 options(error=dump.frames)
 
