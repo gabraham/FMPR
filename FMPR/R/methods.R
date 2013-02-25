@@ -22,15 +22,15 @@ ridge <- function(X, Y, lambda=0)
    XY <- crossprod(X, Y)
    K <- ncol(Y)
    p <- ncol(X)
-   l <- foreach(l=lambda) %dopar% {
+   res <- foreach(l=lambda) %dopar% {
       b <- NULL
       while(is.null(b) || is(b, "try-error")) {
 	 b <- try(qr.solve(XX + diag(p) * l, XY), silent=FALSE)
 	 l <- l * 1.1
-	 b
       }
+      b
    }
-   l
+   res
 }
 
 # zero mean, unit norm (not unit variance)
@@ -126,7 +126,8 @@ safe.svd <- function(x, ...)
 }
 
 spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-4,
-   mu=1e-4, maxiter=1e4, simplify=FALSE, verbose=FALSE, type=c("l1", "l2"))
+   mu=1e-4, maxiter=1e4, simplify=FALSE, verbose=FALSE, type=c("l1", "l2"),
+   divbyN=TRUE)
 {
    K <- ncol(Y)
    N <- nrow(Y)
@@ -153,9 +154,13 @@ spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-4,
    #
    # The largest eigenvalue of X^T X is upper-bounded by the Frobenius norm
    L0 <- if(p < 1e4L) {
-      maxeigen(X) / N
+      maxeigen(X)
    } else {
-      sum(XX^2 / N)
+      sum(XX^2)
+   }
+
+   if(divbyN) {
+      L0 <- L0 / N
    }
 
    # Lipschitz constant of l2 fusion penalty
@@ -184,14 +189,26 @@ spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-4,
 	    cat("spg L:", L, "gamma:", gamma[j], "lambda:", lambda[i], "\n")
 
 	 r <- .C(fun,
-   	    as.numeric(XX), as.numeric(XY),
-   	    as.numeric(X), as.numeric(Y),
-   	    as.integer(N), as.integer(p), as.integer(K),
+   	    as.numeric(XX),
+	    as.numeric(XY),
+   	    as.numeric(X),
+	    as.numeric(Y),
+   	    as.integer(N),
+	    as.integer(p),
+	    as.integer(K),
    	    numeric(p * K),
-   	    as.numeric(Cj), as.integer(nrow(Cj)), as.numeric(L), 
-   	    as.numeric(gamma[j]), as.numeric(lambda[i]),
-   	    as.numeric(tol), as.numeric(mu), as.integer(maxiter),
-   	    as.integer(verbose), integer(1), integer(1)
+   	    as.numeric(Cj),
+	    as.integer(nrow(Cj)),
+	    as.numeric(L), 
+   	    as.numeric(gamma[j]),
+	    as.numeric(lambda[i]),
+   	    as.numeric(tol),
+	    as.numeric(mu),
+	    as.integer(maxiter),
+   	    as.integer(verbose),
+	    integer(1),
+	    integer(1),
+	    as.integer(divbyN)
    	 )
    	 niter <- r[[18]]
 	 status <- r[[19]]
@@ -217,7 +234,7 @@ spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-4,
 
 fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
       maxiter=1e5, eps=1e-4, verbose=FALSE, simplify=FALSE,
-      sparse=FALSE, nzmax=nrow(X), warm=TRUE)
+      sparse=FALSE, nzmax=nrow(X), warm=TRUE, divbyN=TRUE)
 {
    if(length(X) == 0 || length(Y) == 0)
       stop("X and/or Y have zero length")
@@ -231,9 +248,13 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
       stop("dimensions of X and Y don't agree")
    
    Lx <- if(p < 1e4L) {
-      maxeigen(X) / N
+      maxeigen(X)
    } else {
-      sum(XX^2 / N)
+      sum(XX^2)
+   }
+
+   if(divbyN) {
+      Lx <- Lx / N
    }
 
    if(is.null(C)) {
@@ -243,7 +264,6 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
       maxeigC <- maxeigen(C)
    }
 
-	       
    B0 <- matrix(0, p, K)
    LP0 <- matrix(0, N, K)
 
@@ -296,7 +316,8 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
 		  as.integer(verbose), 	  # 15: verbose
 		  integer(1),	       	  # 16: status
 	          integer(1),	       	  # 17: iter
-		  integer(1)	       	  # 18: numactive
+		  integer(1),    	  # 18: numactive
+		  as.integer(divbyN)      # 19: divbyN
 	       )
 	       status <- r[[16]]
 	       numiter <- r[[17]]

@@ -43,7 +43,7 @@ makedata <- function(rep, dir=".", N=100, p=50, K=5, B, sigma=0.01,
 run.spg <- function(rep, dir=".", nfolds=10, grid=25,
    lambdar=2^seq(-10, 0, length=grid),
    gamma=10^seq(-3, 6, length=grid),
-   corthresh=0, cortype=1, type="l1")
+   corthresh=0, cortype=1, type="l1", divbyN=TRUE)
 {
    oldwd <- getwd()
    setwd(dir)
@@ -73,7 +73,7 @@ run.spg <- function(rep, dir=".", nfolds=10, grid=25,
    opt <- optim.spg(X=Xtrain, Y=Ytrain,
 	 nfolds=nfolds, type=type,
 	 corthresh=corthresh, cortype=cortype,
-	 lambda=lambda, gamma=gamma,
+	 lambda=lambda, gamma=gamma, divbyN=divbyN,
 	 maxiter=1e5)
    cat("optim.spg end\n")
    g <- spg(X=Xtrain, Y=Ytrain, C=C, type=type,
@@ -279,36 +279,26 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
 	 N=setup$N, p=setup$p, K=setup$K, B=setup$B, sigma=setup$sigma)
    cat("Simulation done\n")
 
-   #funcs <- c(
-   #   rep("run.fmpr", 8),
-   #   rep("run.spg", 2),
-   #   "run.fmpr", # for lasso
-   #   "run.ridge",
-   #   "run.fmpr" # for elnet
-   #)
-
    par.all <- list(dir=dir, grid=grid, nfolds=nfolds)
   
    # proportional to the largest lambda that makes all betas zero
    lambdar <- 2^seq(-10, 0, length=grid)
    gamma <- c(0, 10^seq(-3, 6, length=grid))
-   #lambda2 <- c(0, 10^seq(-3, 6, length=grid))
-   lambda2 <- 0
+   lambda2 <- 10^seq(-3, 6, length=grid)
 
    param <- list(
-      "FMPR-w1"=list(func=run.fmpr, cortype=1, lambdar=lambdar, gamma=gamma, lambda2=lambda2),
-      #"FMPR-w2"=list(func=run.fmpr, cortype=2, lambdar=lambdar, gamma=gamma, lambda2=lambda2),
+      "FMPR-w1"=list(func=run.fmpr, cortype=1,
+	 lambdar=lambdar, gamma=gamma, lambda2=0),
+      "FMPR-w2"=list(func=run.fmpr, cortype=2,
+	 lambdar=lambdar, gamma=gamma, lambda2=0),
       "GFlasso-l1-w1"=list(func=run.spg, cortype=1, lambdar=lambdar,
-	 gamma=gamma, type="l1"),
-      "GFlasso-l2-w1"=list(func=run.spg, cortype=1, lambdar=lambdar,
-	 gamma=gamma, type="l2")#,
-      #"GFlasso-l1-w2"=list(func=run.spg, cortype=2, lambdar=lambdar,
-#	 gamma=gamma, type="l1"),
- #     "GFlasso-l2-w2"=list(func=run.spg, cortype=2, lambdar=lambdar,
-#	 gamma=gamma, type="l2")#,
-      #Lasso=list(func=run.fmpr, lambdar=lambdar, gamma=0, lambda2=0),
-      #Ridge=list(func=run.ridge, lambda2=lambda2),
-      #Elnet=list(func=run.fmpr, lambdar=lambdar, lambda2=lambda2, gamma=0)
+         gamma=gamma, type="l1", divbyN=FALSE),
+      "GFlasso-l1-w2"=list(func=run.spg, cortype=2, lambdar=lambdar,
+         gamma=gamma, type="l1", divbyN=FALSE),
+      Lasso=list(func=run.fmpr, lambdar=lambdar, gamma=0, lambda2=0),
+      Ridge=list(func=run.ridge, lambda2=lambda2),
+      Elnet=list(func=run.fmpr,
+	 lambdar=lambdar, lambda2=lambda2, gamma=0)
    )
 
    res <- lapply(seq(along=param), function(i) {
@@ -317,12 +307,6 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
 	    c(rep=rep, par.all, param[[i]][-1]))
       })
    })
-
-   #res <- foreach(i=seq(along=funcs)) %dopar% {
-   #   lapply(1:nreps, function(rep) {
-   #      do.call(funcs[[i]], c(rep=rep, par.all, param[[i]]))
-   #   })
-   #}
 
    names(res) <- names(param)
 

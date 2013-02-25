@@ -46,7 +46,7 @@ mytheme <- function(base_size=10)
 }
 
 plot.exper <- function(x,
-   lim=list(roc=c(0, 1, 0, 1), prc=c(0, 1, 0, 1)), ci=FALSE, ...)
+   lim=list(roc=c(0.95, 1, 0, 1), prc=c(0, 1, 0, 1)), ci=FALSE, ...)
 {
    pdf(sprintf("%s/%s.pdf", x$dir, x$dir), width=12)
    par(mfrow=c(1, 2), mar=c(4.5, 4.1, 2.1, 0.1) + 0.1, pty="s")

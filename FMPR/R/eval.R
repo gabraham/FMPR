@@ -35,8 +35,12 @@ crossval.ridge <- function(X, Y, nfolds=5, ...)
       g <- ridge(scalefix(X[folds != fold, ]), scalefix(Y[folds != fold, ]), ...)
 
       sapply(g, function(m) {
-	 p <- scalefix(X[folds == fold, ]) %*% m
-	 R2(p, scalefix(Y[folds == fold, ]))
+	 if(is.null(m)) {
+	    0
+	 } else {
+	    p <- scalefix(X[folds == fold, ]) %*% m
+	    R2(p, scalefix(Y[folds == fold, ]))
+	 }
       })
    })
    list(

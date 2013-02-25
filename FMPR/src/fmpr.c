@@ -233,8 +233,8 @@ void fmpr(double *X, double *Y, double *B,
    double tmp;
    double oneOnN = 1.0 / N;
    int iNk, jpk, iNj;
-   int nE = K * (K - 1) / 2, kKk, e, n;
-   double pd1, pd2;
+   int nE = K * (K - 1) / 2, e, n;
+   double pd1;
    double oneOn2N = 1.0 / (2.0 * N);
 
    int *active = malloc(sizeof(int) * p * K);
@@ -314,7 +314,6 @@ void fmpr(double *X, double *Y, double *B,
 	 for(j = 0 ; j < p ; j++)
 	 {
 	    jpk = j + p * k;
-	    kKk = k + K * k;
 
 	    if(!active[jpk])
 	    {
@@ -351,9 +350,9 @@ void fmpr(double *X, double *Y, double *B,
 	       }
 	       
 #ifdef DEBUG
-	       Rprintf("[k=%d j=%d] d1=%.6f pd1=%.6f d2=%.6f pd2=%.6f s=%.6f\
+	       Rprintf("[k=%d j=%d] d1=%.6f pd1=%.6f d2=%.6f s=%.6f\
  delta=%.6f beta_old=%.6f beta_new=%.6f active:%d\n",
-		  k, j+1, d1, pd1, d2_0[jpk], pd2, s, delta, Bjk, B[jpk], active[jpk]);
+		  k, j+1, d1, pd1, d2_0[jpk], s, delta, Bjk, B[jpk], active[jpk]);
 #endif
 
 	       /* Update loss and errors based on new estimates. */
