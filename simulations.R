@@ -100,7 +100,7 @@ setup <- list(
 
 )
 
-nreps <- 50
+nreps <- 10
 grid <- 10
 nfolds <- 5
 

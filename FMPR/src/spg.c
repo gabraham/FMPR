@@ -58,7 +58,7 @@ void spg_core(double *XX, double *XY, double *X, double *Y,
    int *N_p, int *p_p, int *K_p, double *beta, double *C, int *nE_p,
    double *L_p, double *gamma_p, double *lambda_p,
    double *tol_p, double *mu_p, int *maxiter_p, int *verbose_p,
-   int *niter, int *status, int divbyN)
+   int *niter, int *status, int *divbyN)
 {
    int N = *N_p,
        p = *p_p,
@@ -73,7 +73,7 @@ void spg_core(double *XX, double *XY, double *X, double *Y,
 	  mu = *mu_p;
    int maxiter = *maxiter_p;
    double oneOnL = 1.0 / L;
-   double oneOnN = divbyN ? 1.0 / N : 1.0;
+   double oneOnN = *divbyN ? 1.0 / N : 1.0;
    double theta = 1, theta_new, s1, s2, s3;
 
    double *A = malloc(sizeof(double) * nE * p);
@@ -285,7 +285,7 @@ void spg_l2_core(double *XX, double *XY, double *X, double *Y,
    int *N_p, int *p_p, int *K_p, double *beta, double *C, int *nE_p,
    double *L_p, double *gamma_p, double *lambda_p,
    double *tol_p, double *mu_p, int *maxiter_p, int *verbose_p,
-   int *niter, int *status, int divbyN)
+   int *niter, int *status, int *divbyN)
 {
    int N = *N_p,
        p = *p_p,
@@ -299,7 +299,7 @@ void spg_l2_core(double *XX, double *XY, double *X, double *Y,
 	  tol = *tol_p;
    int iter, maxiter = *maxiter_p;
    double oneOnL = 1.0 / L;
-   double oneOnN = divbyN ? 1.0 / N : 1.0;
+   double oneOnN = *divbyN ? 1.0 / N : 1.0;
    double theta = 1, theta_new, s1, s2, s3;
    int diverged = FALSE;
 

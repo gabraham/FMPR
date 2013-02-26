@@ -77,14 +77,13 @@ plot.exper <- function(x,
       }
 
       if(i == 1) {
-	 legend(lim[[i]][1] - 0.03, lim[[i]][3] + 0.75,
+	 legend(0.98, 1,
       	    legend=names(x$recovery),
       	    col=seq(along=x$recovery),
       	    lty=seq(along=x$recovery),
 	    lwd=3, bty="n"
       	 )
       }
-
    }
 
    dev.off()

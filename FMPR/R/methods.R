@@ -189,26 +189,26 @@ spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-4,
 	    cat("spg L:", L, "gamma:", gamma[j], "lambda:", lambda[i], "\n")
 
 	 r <- .C(fun,
-   	    as.numeric(XX),
-	    as.numeric(XY),
-   	    as.numeric(X),
-	    as.numeric(Y),
-   	    as.integer(N),
-	    as.integer(p),
-	    as.integer(K),
-   	    numeric(p * K),
-   	    as.numeric(Cj),
-	    as.integer(nrow(Cj)),
-	    as.numeric(L), 
-   	    as.numeric(gamma[j]),
-	    as.numeric(lambda[i]),
-   	    as.numeric(tol),
-	    as.numeric(mu),
-	    as.integer(maxiter),
-   	    as.integer(verbose),
-	    integer(1),
-	    integer(1),
-	    as.integer(divbyN)
+   	    as.numeric(XX),        # 1
+	    as.numeric(XY),        # 2
+   	    as.numeric(X),         # 3
+	    as.numeric(Y),         # 4
+   	    as.integer(N),         # 5
+	    as.integer(p),         # 6
+	    as.integer(K),         # 7
+   	    numeric(p * K),        # 8   B
+   	    as.numeric(Cj),        # 9   C
+	    as.integer(nrow(Cj)),  # 10  nE
+	    as.numeric(L),         # 11  L
+   	    as.numeric(gamma[j]),  # 12  gamma
+	    as.numeric(lambda[i]), # 13  lambda
+   	    as.numeric(tol),       # 14  tol
+	    as.numeric(mu),        # 15  mu
+	    as.integer(maxiter),   # 16  maxiter
+   	    as.integer(verbose),   # 17  verbose
+	    integer(1),            # 18  niter
+	    integer(1),            # 19  status
+	    as.integer(divbyN)     # 20  divbyN
    	 )
    	 niter <- r[[18]]
 	 status <- r[[19]]
@@ -247,22 +247,16 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
    if(nrow(X) != nrow(Y))
       stop("dimensions of X and Y don't agree")
    
-   Lx <- if(p < 1e4L) {
-      maxeigen(X)
-   } else {
-      sum(XX^2)
-   }
-
-   if(divbyN) {
-      Lx <- Lx / N
-   }
-
+   Ccomp <- matrix(0, K - 1, K)
+   
    if(is.null(C)) {
       nE <- K * (K - 1) / 2
       C <- matrix(0, nE, K)
    } else {
-      maxeigC <- maxeigen(C)
+      # compress the (nE) by (K) matrix to a (K-1) by (K) matrix
+      Ccomp[] <- C[C != 0]
    }
+
 
    B0 <- matrix(0, p, K)
    LP0 <- matrix(0, N, K)
@@ -281,7 +275,7 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
 	    LPjk <- vector("list", length(lambda))
 	    nactive <- numeric(length(lambda))
 
-	    L <- Lx + gamma[j] * maxeigC
+	    #L <- Lx + gamma[j] * maxeigC
 
 	    # process sequential along the l1 penalty
 	    for(i in seq(along=lambda))
@@ -303,14 +297,16 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
 		  as.numeric(Y),       	  # 2: Y
 	          as.numeric(B),       	  # 3: B
 		  as.numeric(LP),      	  # 4: LP
-		  as.numeric(L),	  # 5: Liphschitz constant
+		  #as.numeric(L),	  # 5: Liphschitz constant
+		  as.numeric(0),
 		  nrow(X),	       	  # 6: N
 		  ncol(X),	       	  # 7: p
 		  K,		       	  # 8: K
        	          lambda[l1ord[i]],    	  # 9: lambda
 		  lambda2[m],	       	  # 10: lambda2
 		  gamma[j],	       	  # 11: gamma
-       	          as.numeric(C),          # 12: C
+       	          #as.numeric(Ccomp),      # 12: C
+       	          as.numeric(C),      # 12: C
 		  as.integer(maxiter),	  # 13: maxiter
        	          as.double(eps),      	  # 14: eps
 		  as.integer(verbose), 	  # 15: verbose
