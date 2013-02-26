@@ -10,7 +10,8 @@ R2 <- function(pr, y)
       1 - sum((pr[,k] - y[,k])^2) / sum((y[,k] - mean(y[,k]))^2)
    })
    s[is.nan(s)] <- 0
-   mean(pmax(0, s))
+   #mean(pmax(0, s))
+   mean(s)
 }
 
 mse <- function(pr, y) mean((pr - y)^2)
