@@ -247,19 +247,16 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
    if(nrow(X) != nrow(Y))
       stop("dimensions of X and Y don't agree")
    
-   Ccomp <- matrix(0, K - 1, K)
-   
    if(is.null(C)) {
       nE <- K * (K - 1) / 2
       C <- matrix(0, nE, K)
-   } else {
-      # compress the (nE) by (K) matrix to a (K-1) by (K) matrix
-      Ccomp[] <- C[C != 0]
    }
-
 
    B0 <- matrix(0, p, K)
    LP0 <- matrix(0, N, K)
+
+   # mapping of edges to vertices (two vertices per edge), zero-based index
+   edges <- t(apply(C, 1, function(r) which(r != 0))) - 1
 
    # fit models in increasing order of lambda, without messing with
    # the original ordering of lambda requested by user
@@ -305,19 +302,19 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
        	          lambda[l1ord[i]],    	  # 9: lambda
 		  lambda2[m],	       	  # 10: lambda2
 		  gamma[j],	       	  # 11: gamma
-       	          #as.numeric(Ccomp),      # 12: C
-       	          as.numeric(C),      # 12: C
-		  as.integer(maxiter),	  # 13: maxiter
-       	          as.double(eps),      	  # 14: eps
-		  as.integer(verbose), 	  # 15: verbose
-		  integer(1),	       	  # 16: status
-	          integer(1),	       	  # 17: iter
-		  integer(1),    	  # 18: numactive
-		  as.integer(divbyN)      # 19: divbyN
+       	          as.numeric(C),          # 12: C
+		  as.integer(edges),      # 13: edges
+		  as.integer(maxiter),	  # 14: maxiter
+       	          as.double(eps),      	  # 15: eps
+		  as.integer(verbose), 	  # 16: verbose
+		  integer(1),	       	  # 17: status
+	          integer(1),	       	  # 18: iter
+		  integer(1),    	  # 19: numactive
+		  as.integer(divbyN)      # 20: divbyN
 	       )
-	       status <- r[[16]]
-	       numiter <- r[[17]]
-	       nactive[l1ord[i]] <- r[[18]]
+	       status <- r[[17]]
+	       numiter <- r[[18]]
+	       nactive[l1ord[i]] <- r[[19]]
 	       if(!status) {
 	          cat("fmpr failed to converge within ",
 	             maxiter, " iterations")

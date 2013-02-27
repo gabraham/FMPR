@@ -20,7 +20,8 @@ registerDoMC(cores=3)
 
 options(error=dump.frames)
 
-seed <- sample(1e6L, 1)
+#seed <- sample(1e6L, 1)
+seed <- 202184
 set.seed(seed)
 
 ################################################################################
@@ -97,7 +98,6 @@ setup <- list(
 
    Expr23=list(dir=c("Expr23"), N=100, p=100, K=20, sigma=0.5,
 	 B=getB(p=100, K=20, w=0.1, type="clustersparse"))
-
 )
 
 nreps <- 10

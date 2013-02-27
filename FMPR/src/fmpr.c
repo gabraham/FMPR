@@ -212,8 +212,9 @@ void lasso(double *x, double *y, double *b,
 void fmpr(double *X, double *Y, double *B,
       double *LP, double *L_p, int *N_p, int *p_p, int *K_p,
       double *lambda_p, double *lambda2_p, double *gamma_p,
-      double *C, int *maxiter_p, double *eps_p, int *verbose_p,
-      int *status, int *iter_p, int *numactive_p, int *divbyN)
+      double *C, int *edges, int *maxiter_p,
+      double *eps_p, int *verbose_p, int *status, int *iter_p,
+      int *numactive_p, int *divbyN)
 {
    int N = *N_p,
        p = *p_p,
@@ -237,6 +238,7 @@ void fmpr(double *X, double *Y, double *B,
    double df1, df2;
    double oneOn2N = 1.0 / (2.0 * N);
    double sv;
+   int v1, v2;
 
    int *active = malloc(sizeof(int) * p * K);
    int *oldactive = malloc(sizeof(int) * p * K);
@@ -254,12 +256,14 @@ void fmpr(double *X, double *Y, double *B,
    double *diagCC = calloc(K, sizeof(double));
    double *BCC = calloc(p * K, sizeof(double));
    double *colsumsB = calloc(K, sizeof(double));
+
+   /* per task sum of losses */
    double *sumsC = calloc(K, sizeof(double));
 
    if(nE > 1)
    {
-      //crossprod(C, K - 1, K, C, K - 1, K, CC);
-      crossprod(C, nE, K, C, nE, K, CC);
+      crossprod(C, K - 1, K, C, K - 1, K, CC);
+      //crossprod(C, nE, K, C, nE, K, CC);
       for(k = 0 ; k < K ; k++)
 	 diagCC[k] = CC[k * K + k];
    }
@@ -334,22 +338,22 @@ void fmpr(double *X, double *Y, double *B,
 	       
 	       /* 1st derivative of fusion loss */
 	       df1 = 0;
-	       //for(n = 0 ; n < K ; n++)
-	       //   pd1 += B[j + p * n] * CC[n * K + k];
-	       
-	       //for(e = 0 ; e < K - 1 ; e++)
+	       // TODO: most tasks are zero for each
+	       // pair, most e can be skipped
+	       //for(e = 0 ; e < nE ; e++) 
 	       //{
-	       //   sv = 0;
-	       //   for(v = 0 ; v < K ; v++)
-	       //      sv += B[j + v * p] * C[e + v * (K - 1)];
-	       //   df1 += C[e + k * (K - 1)] * sv;
+	       //   v1 = edges[e];
+	       //   v2 = edges[e + nE];
+	       //   sv = B[j + v1 * p] * C[e + v1 * nE]
+	       //      + B[j + v2 * p] * C[e + v2 * nE];
+	       //   df1 += sv * C[e + k * nE];
 	       //}
 	       for(e = 0 ; e < nE ; e++)
 	       {
-		  sv = 0;
-		  for(v = 0 ; v < K ; v++)
-		     sv += B[j + v * p] * C[e + v * nE];
-		  df1 += C[e + k * nE] * sv;
+	          sv = 0;
+	          for(v = 0 ; v < K ; v++)
+	             sv += B[j + v * p] * C[e + v * nE];
+	          df1 += C[e + k * nE] * sv;
 	       }
 
 	       df1 *= gamma;
@@ -361,24 +365,35 @@ void fmpr(double *X, double *Y, double *B,
 	       s = Bjk - (d1 + df1) / (d2[jpk] + df2);
 
 	       /* lasso soft-thresholding */
-	       if(fabs(s) <= lambda)
-	       {
-	          B[jpk] = 0;
-	          delta = -Bjk;
-	       }
-	       else
-	       {
-	          B[jpk] = (s - lambda * sign(s)) * oneOnLambda2PlusOne[k];
-		  //if(fabs(b[jpk]) < ZERO_THRESH) // numerically close enough to zero
-		    // b[jpk] = 0;
-	          delta = B[jpk] - Bjk;
-	       }
-	       
-#ifdef DEBUG
-	       Rprintf("[k=%d j=%d] d1=%.6f df1=%.6f d2=%.6f s=%.6f\
- delta=%.6f beta_old=%.6f beta_new=%.6f active:%d\n",
-		  k, j+1, d1, df1, d2[jpk], s, delta, Bjk, B[jpk], active[jpk]);
-#endif
+	       //if(fabs(s) <= lambda)
+	       //{
+	       //   B[jpk] = 0;
+	       //   delta = -Bjk;
+	       //}
+	       //else
+	       //{
+	       //   B[jpk] = (s - lambda * sign(s)) * oneOnLambda2PlusOne[k];
+	       //   //if(fabs(b[jpk]) < ZERO_THRESH) // numerically close enough to zero
+	       //   // b[jpk] = 0;
+	       //   delta = B[jpk] - Bjk;
+	       //}
+	       //B[jpk] = sign(s) * fmax(fabs(s) - lambda / (d2[jpk] + df2), 0);
+	       B[jpk] = sign(s) * fmax(fabs(s) - lambda, 0);
+	       delta = B[jpk] - Bjk;
+
+	       //#ifdef DEBUG
+	       Rprintf("[k=%d j=%d] d1=%.6f df1=%.6f d2=%.6f df2=%.6f s=%.6f \
+delta=%.6f beta_old=%.6f beta_new=%.6f active:%d\n",
+		     k, j+1, d1, df1, d2[jpk], df2, s, delta, Bjk, B[jpk], active[jpk]);
+	       //#endif
+ 
+	       //if(B[jpk] * Bjk < 0)
+	       //{
+	       //   Rprintf("sign mismatch, s: %.6f old: %.6f new: %.6f lambda: %.6f\n",
+	       //      s, Bjk, B[jpk], lambda);
+	       //   return;
+	       //}
+
 
 	       /* Update loss and errors based on new estimates. */
 	       oldloss[k] = loss[k];
@@ -387,9 +402,9 @@ void fmpr(double *X, double *Y, double *B,
 	       iNj = N * j + N - 1;
 	       for(i = N - 1 ; i >= 0 ; --i)
 	       {
-	          LP[iNk] += X[iNj] * delta;
+		  LP[iNk] += X[iNj] * delta;
 		  Err[iNk] = LP[iNk] - Y[iNk];
-	          loss[k] += Err[iNk] * Err[iNk];
+		  loss[k] += Err[iNk] * Err[iNk];
 		  iNk--;
 		  iNj--;
 	       }
@@ -400,14 +415,21 @@ void fmpr(double *X, double *Y, double *B,
 	       loss[k] += lambda * colsumsB[k];
 
 	       /* update fusion loss */
-	       tmp = delta * (2 * B[jpk] + delta);
-	       //for(e = 0 ; e < K - 1 ; e++)
-	//	  sumsC[k] += C[e + k * (K - 1)] * C[e + k * (K - 1)] * tmp;
-	       for(e = 0 ; e < nE ; e++)
-		  sumsC[k] += C[e + k * nE] * C[e + k * nE] * tmp;
-	       loss[k] += 0.5 * gamma * sumsC[k];
+	       //tmp = delta * (2 * B[jpk] + delta);
+	       //for(e = 0 ; e < nE ; e++)
+	       //   sumsC[k] += C[e + k * nE] * C[e + k * nE] * tmp;
+	       //loss[k] += 0.5 * gamma * sumsC[k];
 	       
-	       numconverged += fabs(loss[k] - oldloss[k]) / fabs(loss[k]) < eps;
+	       //numconverged += fabs(loss[k] - oldloss[k]) / fabs(loss[k]) < eps;
+	       if(isnan(delta))
+	       {
+		  Rprintf("delta is bad: %.6f\n", delta);
+		  return;
+	       }
+	       if((delta == 0 && Bjk == 0) || fabs(delta) / fabs(Bjk) < eps)
+		  numconverged++;
+	       //else
+		  //Rprintf("delta: %.6f s: %.6f\n", delta,  fabs(delta) / fabs(Bjk));
 	       
 	       active[jpk] = (B[jpk] != 0);
 	    }
