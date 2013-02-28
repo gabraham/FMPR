@@ -127,7 +127,7 @@ safe.svd <- function(x, ...)
 
 spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-4,
    mu=1e-4, maxiter=1e4, simplify=FALSE, verbose=FALSE, type=c("l1", "l2"),
-   divbyN=TRUE)
+   divbyN=FALSE)
 {
    K <- ncol(Y)
    N <- nrow(Y)
@@ -233,7 +233,7 @@ spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-4,
 }
 
 fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
-      maxiter=1e5, eps=1e-4, verbose=FALSE, simplify=FALSE,
+      maxiter=1e5, eps=1e-3, verbose=FALSE, simplify=FALSE,
       sparse=FALSE, nzmax=nrow(X), warm=TRUE, divbyN=TRUE)
 {
    if(length(X) == 0 || length(Y) == 0)
@@ -256,7 +256,12 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
    LP0 <- matrix(0, N, K)
 
    # mapping of edges to vertices (two vertices per edge), zero-based index
-   edges <- t(apply(C, 1, function(r) which(r != 0))) - 1
+   # assumes that C is full size, i.e., all K(K-1)/2 edges are in it.
+   # This is the same as cbind(C_J, ncol=2) from gennetwork()
+   pairs <- t(apply(C, 1, function(r) which(r != 0))) - 1
+
+   # each kth column represents which edges task k is involved in
+   edges <- matrix(which(C != 0, arr.ind=TRUE)[,1], K - 1) - 1
 
    # fit models in increasing order of lambda, without messing with
    # the original ordering of lambda requested by user
@@ -303,18 +308,19 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
 		  lambda2[m],	       	  # 10: lambda2
 		  gamma[j],	       	  # 11: gamma
        	          as.numeric(C),          # 12: C
-		  as.integer(edges),      # 13: edges
-		  as.integer(maxiter),	  # 14: maxiter
-       	          as.double(eps),      	  # 15: eps
-		  as.integer(verbose), 	  # 16: verbose
-		  integer(1),	       	  # 17: status
-	          integer(1),	       	  # 18: iter
-		  integer(1),    	  # 19: numactive
-		  as.integer(divbyN)      # 20: divbyN
+		  as.integer(pairs),      # 13: pairs
+		  as.integer(edges),      # 14: edges
+		  as.integer(maxiter),	  # 15: maxiter
+       	          as.double(eps),      	  # 16: eps
+		  as.integer(verbose), 	  # 17: verbose
+		  integer(1),	       	  # 18: status
+	          integer(1),	       	  # 19: iter
+		  integer(1),    	  # 20: numactive
+		  as.integer(divbyN)      # 21: divbyN
 	       )
-	       status <- r[[17]]
-	       numiter <- r[[18]]
-	       nactive[l1ord[i]] <- r[[19]]
+	       status <- r[[18]]
+	       numiter <- r[[19]]
+	       nactive[l1ord[i]] <- r[[20]]
 	       if(!status) {
 	          cat("fmpr failed to converge within ",
 	             maxiter, " iterations")

@@ -6,11 +6,13 @@ nreps <- 5
 # Time with increasing N
 Ns <- c(100, 250, 500, 750, 1000, 2000, 3000, 4000, 5000)
 names(Ns) <- Ns
-p <- 100
+p <- 500
 K <- 10
 gamma <- 1e-3
 verbose <- FALSE
 maxiter <- 1e2
+
+stat <- min
 
 res1 <- lapply(Ns, function(N) {
    cat("N:", N, "\n")
@@ -33,10 +35,10 @@ res1 <- lapply(Ns, function(N) {
    })
 })
 
-res1m <- sapply(res1, apply, 1, mean)
+res1m <- sapply(res1, apply, 1, stat)
 
 # Time with increasing p
-N <- 100
+N <- 1000
 ps <- c(100, 200, 300, 400, 500, 1000, 1500, 2000)
 names(ps) <- ps
 K <- 10
@@ -61,11 +63,11 @@ res2 <- lapply(ps, function(p) {
    })
 })
 
-res2m <- sapply(res2, apply, 1, mean)
+res2m <- sapply(res2, apply, 1, stat)
 
 # Time with increasing K
-N <- 100
-p <- 100
+N <- 1000
+p <- 500
 Ks <- c(2, 5, 10, 25, 50, 75, 100, 150, 200)
 
 res3 <- lapply(Ks, function(K) {
@@ -88,9 +90,9 @@ res3 <- lapply(Ks, function(K) {
    })
 })
 
-res3m <- sapply(res3, apply, 1, mean)
+res3m <- sapply(res3, apply, 1, stat)
 
-save(Ns, ps, Ks, res1, res1m, res2, res2m, res3m, res3,
+save(Ns, ps, Ks, res1, res1m, res2, res2m, res3m, res3, stat,
       file="timing.RData")
 
 pdf("FMPR_timing_samples.pdf")

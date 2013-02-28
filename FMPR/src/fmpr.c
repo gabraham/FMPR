@@ -20,6 +20,12 @@ static void crossprod(double *x, int nrx, int ncx,
       x, &nrx, y, &nry, &zero, z, &ncx);
 }
 
+static double dotprod(double *x, double *y, int n)
+{
+    int one = 1.0;
+    return F77_CALL(ddot)(&n, x, &one, y, &one);
+}
+
 /* really, it's just equivalent to max(abs(crossprod(X, Y))) and probably
  * slower */
 void maxlambda1(double *x, double *y, double *lambda,
@@ -212,14 +218,14 @@ void lasso(double *x, double *y, double *b,
 void fmpr(double *X, double *Y, double *B,
       double *LP, double *L_p, int *N_p, int *p_p, int *K_p,
       double *lambda_p, double *lambda2_p, double *gamma_p,
-      double *C, int *edges, int *maxiter_p,
+      double *C, int *pairs, int *edges, int *maxiter_p,
       double *eps_p, int *verbose_p, int *status, int *iter_p,
       int *numactive_p, int *divbyN)
 {
    int N = *N_p,
        p = *p_p,
        K = *K_p;
-   int i, j, k, v;
+   int i, j, k;
    int iter;
    double d1;
    double delta, Bjk;
@@ -230,15 +236,14 @@ void fmpr(double *X, double *Y, double *B,
        numconverged = 0;
    int verbose = *verbose_p;
    int pK = p * K, pK1 = p * K - 1;
-   double s, lambda = *lambda_p, gamma = *gamma_p, L = *L_p;
-   double tmp;
+   double s, lambda = *lambda_p, gamma = *gamma_p;
    double oneOnN = (*divbyN) ? 1.0 / N : 1.0;
    int iNk, jpk, iNj;
-   int nE = K * (K - 1) / 2, e, n;
+   int nE = K * (K - 1) / 2, e;
    double df1, df2;
    double oneOn2N = 1.0 / (2.0 * N);
    double sv;
-   int v1, v2;
+   int v1, v2, l, kK1;
 
    int *active = malloc(sizeof(int) * p * K);
    int *oldactive = malloc(sizeof(int) * p * K);
@@ -257,13 +262,14 @@ void fmpr(double *X, double *Y, double *B,
    double *BCC = calloc(p * K, sizeof(double));
    double *colsumsB = calloc(K, sizeof(double));
 
+   int dofusion = K > 1 && gamma > 0;
+
    /* per task sum of losses */
-   double *sumsC = calloc(K, sizeof(double));
+   //double *sumsC = calloc(K, sizeof(double));
 
    if(nE > 1)
    {
-      crossprod(C, K - 1, K, C, K - 1, K, CC);
-      //crossprod(C, nE, K, C, nE, K, CC);
+      crossprod(C, nE, K, C, nE, K, CC);
       for(k = 0 ; k < K ; k++)
 	 diagCC[k] = CC[k * K + k];
    }
@@ -318,6 +324,8 @@ void fmpr(double *X, double *Y, double *B,
 
       for(k = 0 ; k < K ; k++)
       {
+	 kK1 = (K - 1) * k;
+
 	 for(j = 0 ; j < p ; j++)
 	 {
 	    jpk = j + p * k;
@@ -332,34 +340,35 @@ void fmpr(double *X, double *Y, double *B,
 	    else
 	    {
 	       /* 1st derivative of loss function wrt B_jk */
-	       crossprod(X + N * j, N, 1, Err + N * k, N, 1, &d1);
+	       //crossprod(X + N * j, N, 1, Err + N * k, N, 1, &d1);
+	       d1 = dotprod(X + N * j, Err + N * k, N);
 	       d1 *= oneOnN; 
 	       Bjk = B[jpk];
 	       
-	       /* 1st derivative of fusion loss */
+	       /* 1st/2nd derivative of fusion loss */
 	       df1 = 0;
-	       // TODO: most tasks are zero for each
-	       // pair, most e can be skipped
-	       //for(e = 0 ; e < nE ; e++) 
-	       //{
-	       //   v1 = edges[e];
-	       //   v2 = edges[e + nE];
-	       //   sv = B[j + v1 * p] * C[e + v1 * nE]
-	       //      + B[j + v2 * p] * C[e + v2 * nE];
-	       //   df1 += sv * C[e + k * nE];
-	       //}
-	       for(e = 0 ; e < nE ; e++)
+	       df2 = 0;
+	       
+	       if(dofusion)
 	       {
-	          sv = 0;
-	          for(v = 0 ; v < K ; v++)
-	             sv += B[j + v * p] * C[e + v * nE];
-	          df1 += C[e + k * nE] * sv;
+		  // For most tasks, C is are zero for each pair,
+	       	  // and can be skipped, as for each task k there are
+	       	  // only K-1 other tasks it shares an edge with
+	       	  for(l = 0 ; l < K - 1 ; l++)
+	       	  {
+	       	     e = edges[l + kK1];
+	       	     v1 = pairs[e];
+	       	     v2 = pairs[e + nE];
+	       	     sv = B[j + v1 * p] * C[e + v1 * nE]
+	       	        + B[j + v2 * p] * C[e + v2 * nE];
+	       	     df1 += sv * C[e + k * nE];
+	       	  }
+
+	       	  df1 *= gamma;
+
+	       	  /* 2nd derivative of fusion loss */
+	       	  df2 = gamma * diagCC[k];
 	       }
-
-	       df1 *= gamma;
-
-	       /* 2nd derivative of fusion loss */
-	       df2 = gamma * diagCC[k];
 
 	       //s = Bjk - (d1 + pd1) / L;
 	       s = Bjk - (d1 + df1) / (d2[jpk] + df2);
@@ -381,11 +390,11 @@ void fmpr(double *X, double *Y, double *B,
 	       B[jpk] = sign(s) * fmax(fabs(s) - lambda, 0);
 	       delta = B[jpk] - Bjk;
 
-	       //#ifdef DEBUG
+	       #ifdef DEBUG
 	       Rprintf("[k=%d j=%d] d1=%.6f df1=%.6f d2=%.6f df2=%.6f s=%.6f \
 delta=%.6f beta_old=%.6f beta_new=%.6f active:%d\n",
 		     k, j+1, d1, df1, d2[jpk], df2, s, delta, Bjk, B[jpk], active[jpk]);
-	       //#endif
+	       #endif
  
 	       //if(B[jpk] * Bjk < 0)
 	       //{
@@ -404,7 +413,7 @@ delta=%.6f beta_old=%.6f beta_new=%.6f active:%d\n",
 	       {
 		  LP[iNk] += X[iNj] * delta;
 		  Err[iNk] = LP[iNk] - Y[iNk];
-		  loss[k] += Err[iNk] * Err[iNk];
+		  //loss[k] += Err[iNk] * Err[iNk];
 		  iNk--;
 		  iNj--;
 	       }
@@ -421,11 +430,11 @@ delta=%.6f beta_old=%.6f beta_new=%.6f active:%d\n",
 	       //loss[k] += 0.5 * gamma * sumsC[k];
 	       
 	       //numconverged += fabs(loss[k] - oldloss[k]) / fabs(loss[k]) < eps;
-	       if(isnan(delta))
-	       {
-		  Rprintf("delta is bad: %.6f\n", delta);
-		  return;
-	       }
+	       //if(isnan(delta))
+	       //{
+	       //   Rprintf("delta is bad: %.6f\n", delta);
+	       //   return;
+	       //}
 	       if((delta == 0 && Bjk == 0) || fabs(delta) / fabs(Bjk) < eps)
 		  numconverged++;
 	       //else
@@ -523,7 +532,7 @@ delta=%.6f beta_old=%.6f beta_new=%.6f active:%d\n",
    free(CC);
    free(diagCC);
    free(colsumsB);
-   free(sumsC);
+   //free(sumsC);
    free(BCC);
 }
 
