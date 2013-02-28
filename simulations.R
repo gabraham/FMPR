@@ -20,6 +20,11 @@ registerDoMC(cores=3)
 
 options(error=dump.frames)
 
+load("HAPGEN/sim_9/chr10.RData")
+if(!exists("geno")) {
+   stop("'geno' object does not exist")
+}
+
 #seed <- sample(1e6L, 1)
 seed <- 202184
 set.seed(seed)
@@ -28,7 +33,7 @@ set.seed(seed)
 # Configure the experiments here
 setup <- list(
    # The reference setup
-   Expr1=list(dir=c("Expr1"), N=100, p=100, K=10, sigma=1,
+   Expr1=list(dir=c("Expr1"), N=100, p=100, K=10, sigma=1, type="real",
 	 B=getB(p=100, K=10, w=0.1, type="same")),
    
    # Different sample size

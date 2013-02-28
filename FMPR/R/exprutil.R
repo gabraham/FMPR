@@ -5,10 +5,29 @@
 #
 # All inputs X and outputs Y are standardised to zero-mean and unit-variance
 makedata <- function(rep, dir=".", N=100, p=50, K=5, B, sigma=0.01,
-      save=TRUE)
+      save=TRUE, type=c("real", "artificial"))
 {
-   Xtrain <- scale(matrix(rnorm(N * p), N, p))
-   Xtest <- scale(matrix(rnorm(N * p), N, p))
+   type <- match.arg(type)
+   if(type == "artificial") {
+      cat("makedata: using artificial data\n")
+      Xtrain <- scale(matrix(rnorm(N * p), N, p))
+      Xtest <- scale(matrix(rnorm(N * p), N, p))
+   } else {
+      cat("makedata: using real data\n")
+      # randomly split samples into training and testing, and from each set
+      # select N samples
+      sample.spl <- sample(c(TRUE, FALSE), nrow(geno), replace=TRUE)
+      wtrain <- sample(which(sample.spl), N)
+      wtest <- sample(which(!sample.spl), N)
+
+      # select a block of SNPs of size p
+      snp.start <- sample(ncol(geno) - p, 1)
+      snps <- snp.start + 1:p - 1
+
+      # can be a few monomorphic SNPs so need to fix the scale
+      Xtrain <- scalefix(geno[wtrain, snps])
+      Xtest <- scalefix(geno[wtest, snps])
+   }
 
    noiseTrain <- rnorm(N * K, 0, sigma)
    noiseTest <- rnorm(N * K, 0, sigma)
@@ -280,7 +299,8 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
       dir.create(dir)
    }
    m <- sapply(1:nreps, makedata, dir=dir,
-	 N=setup$N, p=setup$p, K=setup$K, B=setup$B, sigma=setup$sigma)
+	 N=setup$N, p=setup$p, K=setup$K, B=setup$B, sigma=setup$sigma,
+	 type=setup$type)
    cat("Simulation done\n")
 
    par.all <- list(dir=dir, grid=grid, nfolds=nfolds)
