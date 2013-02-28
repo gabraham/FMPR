@@ -31,7 +31,9 @@ crossval.ridge <- function(X, Y, nfolds=5, ...)
    N <- nrow(X)
    Y <- cbind(Y)
    folds <- sample(1:nfolds, N, TRUE)
-   s <- sapply(1:nfolds, function(fold) {
+   
+   #s <- sapply(1:nfolds, function(fold) {
+   l <- foreach(fold=1:nfolds) %dopar% {
       cat("inner fold", fold, "\n")
       g <- ridge(scalefix(X[folds != fold, ]), scalefix(Y[folds != fold, ]), ...)
 
@@ -43,7 +45,10 @@ crossval.ridge <- function(X, Y, nfolds=5, ...)
 	    R2(p, scalefix(Y[folds == fold, ]))
 	 }
       })
-   })
+   }
+
+   s <- do.call(cbind, l)
+
    list(
       R2=rowMeans(s),
       lambda=list(...)$lambda
@@ -66,8 +71,9 @@ crossval.fmpr <- function(X, Y, nfolds=5, cortype=2, corthresh=0, ...)
    # but we don't use that feature here because we want to run different
    # penalties on the same cross-validation folds rather than different
    # folds every time
-   for(fold in 1:nfolds)
-   {
+   #for(fold in 1:nfolds)
+   resl <- foreach(fold=1:nfolds) %dopar% {
+      r <- array(0, c(l, l2, g))
       cat("inner fold", fold, "\n")
       Xtest <- scalefix(X[folds == fold, , drop=FALSE])
       Ytest <- scalefix(Y[folds == fold, , drop=FALSE])
@@ -87,12 +93,15 @@ crossval.fmpr <- function(X, Y, nfolds=5, cortype=2, corthresh=0, ...)
 	    for(j in 1:g)
 	    {
 	       p <- as.matrix(Xtest %*% f[[i]][[m]][[j]])
-	       res[fold, i, m, j] <- cbind(R2(p, Ytest))
+	       r[i, m, j] <- cbind(R2(p, Ytest))
 	    }
 	 }
       }
-      #if(verbose)
-	 #cat("best R2:", m <- max(res[fold, , ,], na.rm=TRUE), "\n")
+      r
+   }
+ 
+   for(fold in 1:nfolds) {
+      res[fold, , , ] <- resl[[fold]]
    }
 
    list(
@@ -113,8 +122,9 @@ crossval.spg <- function(X, Y, nfolds=5, cortype=2, corthresh=0, ...)
    lg <- max(length(list(...)$gamma), 1)
    res <- array(0, c(nfolds, ll, lg))
 
-   for(fold in 1:nfolds)
-   {
+   #for(fold in 1:nfolds)
+   resl <- foreach(fold=1:nfolds) %dopar% {
+      r <- matrix(0, ll, lg)
       cat("inner fold", fold, "\n")
 
       Xtrain <- scalefix(X[folds != fold, , drop=FALSE])
@@ -129,9 +139,14 @@ crossval.spg <- function(X, Y, nfolds=5, cortype=2, corthresh=0, ...)
 	 for(j in 1:lg)
 	 {
 	    p <- Xtest %*% f[[i]][[j]]
-	    res[fold, i, j] <- cbind(R2(p, Ytest))
+	    r[i, j] <- cbind(R2(p, Ytest))
 	 } 
       }
+      r
+   }
+
+   for(fold in 1:nfolds) {
+      res[fold, , ] <- resl[[fold]]
    }
 
    list(

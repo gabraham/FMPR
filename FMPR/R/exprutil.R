@@ -43,7 +43,7 @@ makedata <- function(rep, dir=".", N=100, p=50, K=5, B, sigma=0.01,
 run.spg <- function(rep, dir=".", nfolds=10, grid=25,
    lambdar=2^seq(-10, 0, length=grid),
    gamma=10^seq(-3, 6, length=grid),
-   corthresh=0, cortype=1, type="l1", divbyN=TRUE)
+   corthresh=0, cortype=1, type="l1", divbyN=FALSE)
 {
    oldwd <- getwd()
    setwd(dir)
@@ -68,7 +68,10 @@ run.spg <- function(rep, dir=".", nfolds=10, grid=25,
    p <- ncol(Xtrain)
 
    cat("optim.spg start rep", rep, "\n")
-   l <- max(maxlambda1(Xtrain, Ytrain))
+   l <- max(abs(crossprod(Xtrain, Ytrain)))
+   if(divbyN) {
+      l <- l / N
+   }
    lambda <- l * lambdar
    opt <- optim.spg(X=Xtrain, Y=Ytrain,
 	 nfolds=nfolds, type=type,
@@ -77,7 +80,8 @@ run.spg <- function(rep, dir=".", nfolds=10, grid=25,
 	 maxiter=1e5)
    cat("optim.spg end\n")
    g <- spg(X=Xtrain, Y=Ytrain, C=C, type=type,
-	 lambda=opt$opt["lambda"], gamma=opt$opt["gamma"], simplify=TRUE)
+	 lambda=opt$opt["lambda"], gamma=opt$opt["gamma"],
+	 simplify=TRUE, divbyN=divbyN)
 
    P <- Xtest %*% g
    res <- R2(as.numeric(P), as.numeric(Ytest))
@@ -151,14 +155,14 @@ run.fmpr <- function(rep, dir=".", nfolds=10, grid=25,
    K <- ncol(Ytrain)
    p <- ncol(Xtrain)
 
-   l <- max(maxlambda1(Xtrain, Ytrain))
+   l <- max(abs(crossprod(Xtrain, Ytrain))) / N
    lambda <- l * lambdar
 
    cat("optim.fmpr start\n")
    opt <- optim.fmpr(X=Xtrain, Y=Ytrain,
 	 nfolds=nfolds,
 	 cortype=cortype, corthresh=corthresh,
-	 lambda=lambda, gamma=gamma, lambda2=lambda2, maxiter=1e5)
+	 lambda=lambda, gamma=gamma, lambda2=lambda2, maxiter=1e6)
 
    cat("optim.fmpr end\n")
    g <- fmpr(X=Xtrain, Y=Ytrain,

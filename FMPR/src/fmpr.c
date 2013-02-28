@@ -8,7 +8,7 @@
 
 #define TRUE 1
 #define FALSE 0
-#define ZERO_THRESH 1e-15
+#define ZERO_THRESH 1e-10
 #define ZERO_VAR_THRESH 1e-6
 
 static void crossprod(double *x, int nrx, int ncx,
@@ -216,7 +216,7 @@ void lasso(double *x, double *y, double *b,
 /* Uses the C from gennetwork
  */
 void fmpr(double *X, double *Y, double *B,
-      double *LP, double *L_p, int *N_p, int *p_p, int *K_p,
+      double *LP, int *N_p, int *p_p, int *K_p,
       double *lambda_p, double *lambda2_p, double *gamma_p,
       double *C, int *pairs, int *edges, int *maxiter_p,
       double *eps_p, int *verbose_p, int *status, int *iter_p,
@@ -293,6 +293,7 @@ void fmpr(double *X, double *Y, double *B,
 	 jpk = j + p * k;
 	 for(i = N - 1 ; i >= 0 ; --i)
 	    d2[jpk] +=  X[i + j * N] * X[i + j * N] * oneOnN;
+	 //ignore[jpk] = (d2[jpk] <= 1.0 / N);
 	 ignore[jpk] = (d2[jpk] <= ZERO_VAR_THRESH);
       }
    }
@@ -388,6 +389,10 @@ void fmpr(double *X, double *Y, double *B,
 	       //}
 	       //B[jpk] = sign(s) * fmax(fabs(s) - lambda / (d2[jpk] + df2), 0);
 	       B[jpk] = sign(s) * fmax(fabs(s) - lambda, 0);
+
+	       /* close enough to zero */
+	       if(fabs(B[jpk]) < ZERO_THRESH)
+		  B[jpk] = 0;
 	       delta = B[jpk] - Bjk;
 
 	       #ifdef DEBUG

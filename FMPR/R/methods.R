@@ -22,14 +22,15 @@ ridge <- function(X, Y, lambda=0)
    XY <- crossprod(X, Y)
    K <- ncol(Y)
    p <- ncol(X)
-   res <- foreach(l=lambda) %dopar% {
+   #res <- foreach(l=lambda) %dopar% {
+   res <- lapply(lambda, function(l){
       b <- NULL
       while(is.null(b) || is(b, "try-error")) {
 	 b <- try(qr.solve(XX + diag(p) * l, XY), silent=FALSE)
 	 l <- l * 1.1
       }
       b
-   }
+   })
    res
 }
 
@@ -170,8 +171,10 @@ spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-4,
       maxeigen(C)
    }
 
-   B <- foreach(i=seq(along=lambda)) %:% 
-      foreach(j=seq(along=gamma)) %dopar% {
+   #B <- foreach(i=seq(along=lambda)) %:% 
+   #   foreach(j=seq(along=gamma)) %dopar% {
+   B <- lapply(seq(along=lambda), function(i) {
+      lapply(seq(along=gamma), function(j) {
 	 
 	 # Compute final Lipschitz constant.
 	 # SPG with l1 fusion folds the penalty gamma into the matrix C. The
@@ -221,7 +224,8 @@ spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-4,
 	    cat("\n")
 
 	 matrix(r[[8]], p, K)
-   }
+      })
+   })
    
    if(simplify
       && length(lambda) == 1 
@@ -272,7 +276,9 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
    # variables for a given gamma, as increasing lambda will only
    # result in no active variables again. This allows us to not waste time on
    # models that will have zero active variables anyway.
-   Btmp <- foreach(j=seq(along=gamma)) %:% foreach(m=seq(along=lambda2)) %dopar% {
+   #Btmp <- foreach(j=seq(along=gamma)) %:% foreach(m=seq(along=lambda2)) %dopar% {
+   Btmp <- lapply(seq(along=gamma), function(j) {
+      lapply(seq(along=lambda2), function(m) {
 	    Bjk <- vector("list", length(lambda))
 	    LPjk <- vector("list", length(lambda))
 	    nactive <- numeric(length(lambda))
@@ -299,31 +305,30 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
 		  as.numeric(Y),       	  # 2: Y
 	          as.numeric(B),       	  # 3: B
 		  as.numeric(LP),      	  # 4: LP
-		  #as.numeric(L),	  # 5: Liphschitz constant
-		  as.numeric(0),
-		  nrow(X),	       	  # 6: N
-		  ncol(X),	       	  # 7: p
-		  K,		       	  # 8: K
-       	          lambda[l1ord[i]],    	  # 9: lambda
-		  lambda2[m],	       	  # 10: lambda2
-		  gamma[j],	       	  # 11: gamma
-       	          as.numeric(C),          # 12: C
-		  as.integer(pairs),      # 13: pairs
-		  as.integer(edges),      # 14: edges
-		  as.integer(maxiter),	  # 15: maxiter
-       	          as.double(eps),      	  # 16: eps
-		  as.integer(verbose), 	  # 17: verbose
-		  integer(1),	       	  # 18: status
-	          integer(1),	       	  # 19: iter
-		  integer(1),    	  # 20: numactive
-		  as.integer(divbyN)      # 21: divbyN
+		  nrow(X),	       	  # 5: N
+		  ncol(X),	       	  # 6: p
+		  K,		       	  # 7: K
+       	          lambda[l1ord[i]],    	  # 8: lambda
+		  lambda2[m],	       	  # 9: lambda2
+		  gamma[j],	       	  # 10: gamma
+       	          as.numeric(C),          # 11: C
+		  as.integer(pairs),      # 12: pairs
+		  as.integer(edges),      # 13: edges
+		  as.integer(maxiter),	  # 14: maxiter
+       	          as.double(eps),      	  # 15: eps
+		  as.integer(verbose), 	  # 16: verbose
+		  integer(1),	       	  # 17: status
+	          integer(1),	       	  # 18: iter
+		  integer(1),    	  # 19: numactive
+		  as.integer(divbyN)      # 20: divbyN
 	       )
-	       status <- r[[18]]
-	       numiter <- r[[19]]
-	       nactive[l1ord[i]] <- r[[20]]
+	       status <- r[[17]]
+	       numiter <- r[[18]]
+	       nactive[l1ord[i]] <- r[[19]]
 	       if(!status) {
 	          cat("fmpr failed to converge within ",
-	             maxiter, " iterations")
+	             maxiter, " iterations, lambda=", lambda[l1ord[i]],
+		     "gamma=", gamma[j], "\n")
 	       } else if(verbose) {
 		  cat("fmpr converged in", numiter, "iterations",
 	             "with", nactive[l1ord[i]], "active variables\n\n")
@@ -333,7 +338,8 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
 	       LPjk[[l1ord[i]]] <- matrix(r[[4]], N, K)
 	    }
 	    Bjk
-   }
+      })
+   })
 
    # Invert the list so that lambda is on the first dimension again
    B <- lapply(seq(along=lambda), function(i) {

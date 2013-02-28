@@ -20,10 +20,10 @@ res1 <- lapply(Ns, function(N) {
       B <- getB(p=p, K=K, w=0.5, type="same")
       d1 <- makedata(N=N, K=K, B=B, p=p, save=FALSE, sigma=2, rep=1)
       C <- gennetwork(d1$Ytrain, corthresh=0, cortype=2)
-      l <- max(abs(crossprod(d1$Xtrain, d1$Ytrain))) / N
+      l <- max(abs(crossprod(d1$Xtrain, d1$Ytrain)))
       s.fmpr <- system.time({
-	 f <- fmpr(X=d1$Xtrain, Y=d1$Ytrain, C=C, lambda=l * 0.9, gamma=gamma,
-	    verbose=verbose, maxiter=maxiter)
+	 f <- fmpr(X=d1$Xtrain, Y=d1$Ytrain, C=C, lambda=l * 0.9 / N,
+	    gamma=gamma, verbose=verbose, maxiter=maxiter)
       })
 
       s.spg <- system.time({
@@ -49,10 +49,10 @@ res2 <- lapply(ps, function(p) {
       B <- getB(p=p, K=K, w=0.5, type="same")
       d1 <- makedata(N=N, K=K, B=B, p=p, save=FALSE, sigma=2, rep=1)
       C <- gennetwork(d1$Ytrain, corthresh=0, cortype=2)
-      l <- max(abs(crossprod(d1$Xtrain, d1$Ytrain))) / N
+      l <- max(abs(crossprod(d1$Xtrain, d1$Ytrain)))
       s.fmpr <- system.time({
-	 f <- fmpr(X=d1$Xtrain, Y=d1$Ytrain, C=C, lambda=l * 0.9, gamma=gamma,
-	    verbose=verbose, maxiter=maxiter)
+	 f <- fmpr(X=d1$Xtrain, Y=d1$Ytrain, C=C, lambda=l * 0.9 / N,
+	    gamma=gamma, verbose=verbose, maxiter=maxiter)
       })
       s.spg <- system.time({
 	 s <- spg(X=d1$Xtrain, Y=d1$Ytrain, C=C, lambda=l * 0.9, gamma=gamma,
@@ -76,14 +76,14 @@ res3 <- lapply(Ks, function(K) {
       B <- getB(p=p, K=K, w=0.5, type="same")
       d1 <- makedata(N=N, K=K, B=B, p=p, save=FALSE, sigma=2, rep=1)
       C <- gennetwork(d1$Ytrain, corthresh=0, cortype=2)
-      l <- max(abs(crossprod(d1$Xtrain, d1$Ytrain))) / N
+      l <- max(abs(crossprod(d1$Xtrain, d1$Ytrain)))
       s.fmpr <- system.time({
-	 fmpr(X=d1$Xtrain, Y=d1$Ytrain, C=C, lambda=l * 0.9, gamma=gamma,
-	    verbose=verbose, maxiter=maxiter)
+	 fmpr(X=d1$Xtrain, Y=d1$Ytrain, C=C, lambda=l * 0.9 / N,
+	    gamma=gamma, verbose=verbose, maxiter=maxiter)
       })
       s.spg <- system.time({
-	 spg(X=d1$Xtrain, Y=d1$Ytrain, C=C, lambda=l * 0.9, gamma=gamma,
-	    verbose=verbose, maxiter=maxiter)
+	 spg(X=d1$Xtrain, Y=d1$Ytrain, C=C, lambda=l * 0.9,
+	    gamma=gamma, verbose=verbose, maxiter=maxiter)
       })
       cat("rep:", rep, "FMPR:", s.fmpr, "SPG:", s.spg, "\n")
       c(FMPR=s.fmpr[3], SPG=s.spg[3])
