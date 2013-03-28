@@ -237,7 +237,7 @@ spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-4,
 }
 
 fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
-      maxiter=1e5, eps=1e-3, verbose=FALSE, simplify=FALSE,
+      maxiter=1e5, eps=1e-6, verbose=FALSE, simplify=FALSE,
       sparse=FALSE, nzmax=nrow(X), warm=TRUE, divbyN=TRUE)
 {
    if(length(X) == 0 || length(Y) == 0)
@@ -250,22 +250,23 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
 
    if(nrow(X) != nrow(Y))
       stop("dimensions of X and Y don't agree")
-   
-   if(is.null(C)) {
-      nE <- K * (K - 1) / 2
-      C <- matrix(0, nE, K)
-   }
 
    B0 <- matrix(0, p, K)
    LP0 <- matrix(0, N, K)
+   
+   pairs <- edges <- 0
+   if(is.null(C)) {
+      nE <- K * (K - 1) / 2
+      C <- 0
+   } else {
+      # mapping of edges to vertices (two vertices per edge), zero-based index
+      # assumes that C is full size, i.e., all K(K-1)/2 edges are in it.
+      # This is the same as cbind(C_J, ncol=2) from gennetwork()
+      pairs <- t(apply(C, 1, function(r) which(r != 0))) - 1
 
-   # mapping of edges to vertices (two vertices per edge), zero-based index
-   # assumes that C is full size, i.e., all K(K-1)/2 edges are in it.
-   # This is the same as cbind(C_J, ncol=2) from gennetwork()
-   pairs <- t(apply(C, 1, function(r) which(r != 0))) - 1
-
-   # each kth column represents which edges task k is involved in
-   edges <- matrix(which(C != 0, arr.ind=TRUE)[,1], K - 1) - 1
+      # each kth column represents which edges task k is involved in
+      edges <- matrix(which(C != 0, arr.ind=TRUE)[,1], K - 1) - 1
+   }
 
    # fit models in increasing order of lambda, without messing with
    # the original ordering of lambda requested by user
@@ -282,8 +283,6 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
 	    Bjk <- vector("list", length(lambda))
 	    LPjk <- vector("list", length(lambda))
 	    nactive <- numeric(length(lambda))
-
-	    #L <- Lx + gamma[j] * maxeigC
 
 	    # process sequential along the l1 penalty
 	    for(i in seq(along=lambda))
@@ -336,6 +335,14 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
 	          
 	       Bjk[[l1ord[i]]] <- matrix(r[[3]], p, K)
 	       LPjk[[l1ord[i]]] <- matrix(r[[4]], N, K)
+
+	       if(nactive[l1ord[i]] > nzmax) {
+		  cat("fmpr reached maximum number of non-zero variables",
+		     " (", nzmax, "): ", nactive[l1ord[i]], ", stopping\n",
+		     sep="")
+		  break
+	       }
+
 	    }
 	    Bjk
       })

@@ -92,8 +92,13 @@ crossval.fmpr <- function(X, Y, nfolds=5, cortype=2, corthresh=0, ...)
 	 {
 	    for(j in 1:g)
 	    {
-	       p <- as.matrix(Xtest %*% f[[i]][[m]][[j]])
-	       r[i, m, j] <- cbind(R2(p, Ytest))
+	       B <- f[[i]][[m]][[j]]
+	       r[i, m, j] <- if(is.null(B)) {
+		  0
+	       } else {
+		  p <- as.matrix(Xtest %*% f[[i]][[m]][[j]])
+		  cbind(R2(p, Ytest))
+	       }
 	    }
 	 }
       }

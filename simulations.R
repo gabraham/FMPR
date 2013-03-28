@@ -9,8 +9,6 @@ if(!exists("idv") || idv == "" || is.na(idv)) {
    stop("idv not specified")
 }
 
-idv <- as.integer(idv)
-
 library(ROCR)
 library(glmnet)
 library(ggplot2)
@@ -25,8 +23,8 @@ if(!exists("geno")) {
    stop("'geno' object does not exist")
 }
 
-#seed <- sample(1e6L, 1)
-seed <- 202184
+seed <- sample(1e6L, 1)
+#seed <- 202184
 set.seed(seed)
 
 ################################################################################
@@ -102,7 +100,12 @@ setup <- list(
 	 B=getB(p=100, K=10, w=0.1, type="cluster")),
 
    Expr23=list(dir=c("Expr23"), N=100, p=100, K=20, sigma=0.5,
-	 B=getB(p=100, K=20, w=0.1, type="clustersparse"))
+	 B=getB(p=100, K=20, w=0.1, type="clustersparse")),
+
+
+   ExprTest=list(dir=c("ExprTest"), N=100, p=100, K=10, sigma=1, type="real",
+	 B=getB(p=100, K=10, w=0.1, type="same"))
+
 )
 
 nreps <- 10
