@@ -129,6 +129,7 @@ safe.svd <- function(x, ...)
 {
    s <- try(svd(x, ...), silent=FALSE)
    if("try-error" %in% class(s)) {
+      cat("using irlba instead\n")
       irlba(x, ...)
    } else {
       s
@@ -247,7 +248,7 @@ spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-4,
 
 fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
       maxiter=1e5, eps=1e-6, verbose=FALSE, simplify=FALSE,
-      sparse=FALSE, nzmax=nrow(X), warm=TRUE, divbyN=TRUE)
+      sparse=FALSE, nzmax=NULL, warm=TRUE, divbyN=TRUE)
 {
    if(length(X) == 0 || length(Y) == 0)
       stop("X and/or Y have zero length")
