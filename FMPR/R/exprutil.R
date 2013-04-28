@@ -5,54 +5,87 @@
 #
 # All inputs X and outputs Y are standardised to zero-mean and unit-variance
 makedata <- function(rep, dir=".", N=100, p=50, K=5, B, sigma=0.01,
-      save=TRUE, type=c("real", "artificial"))
+      save=TRUE, type=c("real", "artificial"), maketest=TRUE)
 {
    type <- match.arg(type)
+
+   Xtest <- Ytest <- Xtest2 <- Ytest2 <- noiseTest <- NULL
+
    if(type == "artificial") {
       cat("makedata: using artificial data\n")
-      Xtrain <- scale(matrix(rnorm(N * p), N, p))
-      Xtest <- scale(matrix(rnorm(N * p), N, p))
+      Xtrain <- matrix(sample(0:2, N * p, replace=TRUE), N, p)
+      if(maketest) {
+	 Xtest <- matrix(sample(0:2, N * p, replace=TRUE), N, p)
+      }
+   } else if(!exists("geno", mode="numeric") || is.null(geno)) {
+      stop("type = real but geno is missing or NULL")
+   } else if(N > nrow(geno)) {
+      stop("N too big: geno only has ", nrows(geno), " rows")
    } else {
       cat("makedata: using real data\n")
       # randomly split samples into training and testing, and from each set
       # select N samples
-      sample.spl <- sample(c(TRUE, FALSE), nrow(geno), replace=TRUE)
-      wtrain <- sample(which(sample.spl), N)
-      wtest <- sample(which(!sample.spl), N)
-
-      # select a block of SNPs of size p
+      wtrain <- sample(nrow(geno), N)
+      # select a contiguous block of SNPs of size p
       snp.start <- sample(ncol(geno) - p, 1)
       snps <- snp.start + 1:p - 1
 
-      # can be a few monomorphic SNPs so need to fix the scale
-      Xtrain <- scalefix(geno[wtrain, snps])
-      Xtest <- scalefix(geno[wtest, snps])
+      if(maketest) {
+	 sample.spl <- sample(c(TRUE, FALSE), nrow(geno), replace=TRUE)
+	 wtrain <- sample(which(sample.spl), N)
+	 wtest <- sample(which(!sample.spl), N)
+	 Xtest <- geno[wtest, snps]
+      }
+      Xtrain <- geno[wtrain, snps]
    }
 
-   noiseTrain <- rnorm(N * K, 0, sigma)
-   noiseTest <- rnorm(N * K, 0, sigma)
-   Ytrain <- scale(Xtrain %*% B + noiseTrain)
-   Ytest <- scale(Xtest %*% B + noiseTest)
+   noiseTrain <- rnorm(nrow(Xtrain) * K, 0, sigma)
+   Ytrain <- Xtrain %*% B + noiseTrain
+   Xtrain2 <- scalefix(Xtrain)
+   Ytrain2 <- scalefix(Ytrain)
+
+   if(maketest) {
+      noiseTest <- rnorm(nrow(Xtrain) * K, 0, sigma)
+      Ytest <- Xtest %*% B + noiseTest
+      Xtest2 <- scalefix(Xtest)
+      Ytest2 <- scalefix(Ytest)
+   }
 
    if(save) {
       write.table(B, file=sprintf("%s/B_%s.txt", dir, rep),
          col.names=FALSE, row.names=FALSE, quote=FALSE)
 
-      write.table(Xtrain, file=sprintf("%s/Xtrain_%s.txt", dir, rep),
+      write.table(Xtrain2, file=sprintf("%s/Xtrain_%s.txt", dir, rep),
             col.names=FALSE, row.names=FALSE, quote=FALSE)
-      write.table(Ytrain, file=sprintf("%s/Ytrain_%s.txt", dir, rep),
+      write.table(Xtrain, file=sprintf("%s/Xtrain_orig_%s.txt", dir, rep),
             col.names=FALSE, row.names=FALSE, quote=FALSE)
 
-      write.table(Xtest, file=sprintf("%s/Xtest_%s.txt", dir, rep),
+      write.table(Ytrain2, file=sprintf("%s/Ytrain_%s.txt", dir, rep),
             col.names=FALSE, row.names=FALSE, quote=FALSE)
-      write.table(Ytest, file=sprintf("%s/Ytest_%s.txt", dir, rep),
+      write.table(Ytrain, file=sprintf("%s/Ytrain_orig_%s.txt", dir, rep),
             col.names=FALSE, row.names=FALSE, quote=FALSE)
+
+      if(maketest) {
+	 write.table(Xtest2, file=sprintf("%s/Xtest_%s.txt", dir, rep),
+      	       col.names=FALSE, row.names=FALSE, quote=FALSE)
+      	 write.table(Xtest, file=sprintf("%s/Xtest_orig_%s.txt", dir, rep),
+      	       col.names=FALSE, row.names=FALSE, quote=FALSE)
+
+      	 write.table(Ytest2, file=sprintf("%s/Ytest_%s.txt", dir, rep),
+      	       col.names=FALSE, row.names=FALSE, quote=FALSE)
+      	 write.table(Ytest, file=sprintf("%s/Ytest_orig_%s.txt", dir, rep),
+      	       col.names=FALSE, row.names=FALSE, quote=FALSE)
+      } 
    } else {
       list(
-	 Xtrain=Xtrain,
-	 Xtest=Xtest,
-	 Ytrain=Ytrain,
-	 Ytest=Ytest,
+	 Xtrain=Xtrain2,
+	 XtrainOrig=Xtrain,
+	 Xtest=Xtest2,
+	 XtestOrig=Xtest,
+	 Ytrain=Ytrain2,
+	 YtrainOrig=Ytrain,
+	 Ytest=Ytest2,
+	 YtestOrig=Ytest,
 	 noiseTrain=noiseTrain,
 	 noiseTest=noiseTest
       )

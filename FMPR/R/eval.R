@@ -38,14 +38,15 @@ crossval.ridge <- function(X, Y, nfolds=5, ...)
    #s <- sapply(1:nfolds, function(fold) {
    l <- foreach(fold=1:nfolds) %dopar% {
       cat("inner fold", fold, "\n")
-      g <- ridge(scalefix(X[folds != fold, ]), scalefix(Y[folds != fold, ]), ...)
+      g <- ridge(scalefix(X[folds != fold, ]),
+	 scalefix(Y[folds != fold, , drop=FALSE]), ...)
 
       sapply(g, function(m) {
 	 if(is.null(m)) {
 	    0
 	 } else {
-	    p <- scalefix(X[folds == fold, ]) %*% m
-	    R2(p, scalefix(Y[folds == fold, ]))
+	    p <- scalefix(X[folds == fold, , drop=FALSE]) %*% m
+	    R2(p, scalefix(Y[folds == fold, , drop=FALSE]))
 	 }
       })
    }
@@ -62,13 +63,18 @@ crossval.fmpr <- function(X, Y, nfolds=5, cortype=2, corthresh=0, ...)
 {
    N <- nrow(X)
    Y <- cbind(Y)
+   K <- ncol(Y)
    folds <- sample(1:nfolds, N, TRUE)
 
    l <- max(length(list(...)$lambda), 1)
    l2 <- max(length(list(...)$lambda2), 1)
    g <- max(length(list(...)$gamma), 1)
    verbose <- list(...)$verbose
-   res <- array(0, c(nfolds, l, l2, g))
+   if(is.null(verbose)) {
+      verbose <- FALSE
+   }
+   res <- array(0, c(nfolds, l, l2, g, K))
+   nz <- array(0, c(nfolds, l, l2, g, K))
 
    # fmpr() is capable of handling lambda,gamma of varying lengths,
    # but we don't use that feature here because we want to run different
@@ -76,8 +82,12 @@ crossval.fmpr <- function(X, Y, nfolds=5, cortype=2, corthresh=0, ...)
    # folds every time
    #for(fold in 1:nfolds)
    resl <- foreach(fold=1:nfolds) %dopar% {
-      r <- array(0, c(l, l2, g))
-      cat("inner fold", fold, "\n")
+      r <- array(0, c(l, l2, g, K))
+      nzl <- array(0, c(l, l2, g, K))
+
+      if(verbose) {
+	 cat("inner fold", fold, "\n")
+      }
       Xtest <- scalefix(X[folds == fold, , drop=FALSE])
       Ytest <- scalefix(Y[folds == fold, , drop=FALSE])
       Xtrain <- scalefix(X[folds != fold, , drop=FALSE])
@@ -96,24 +106,29 @@ crossval.fmpr <- function(X, Y, nfolds=5, cortype=2, corthresh=0, ...)
 	    for(j in 1:g)
 	    {
 	       B <- f[[i]][[m]][[j]]
-	       r[i, m, j] <- if(is.null(B)) {
-		  0
+	       if(is.null(B)) {
+		  r[i, m, j, ] <- 0
+		  nzl[i, m, j, ] <- 0
 	       } else {
-		  p <- as.matrix(Xtest %*% f[[i]][[m]][[j]])
-		  cbind(R2(p, Ytest))
+		  p <- as.matrix(Xtest %*% B)
+		  r[i, m, j, ] <- cbind(R2(p, Ytest, average=FALSE))
+		  nzl[i, m, j, ] <- colSums(B != 0)
 	       }
 	    }
 	 }
       }
-      r
+      list(r=r, nzl=nzl)
    }
  
    for(fold in 1:nfolds) {
-      res[fold, , , ] <- resl[[fold]]
+      res[fold, , , , ] <- resl[[fold]]$r
+      nz[fold, , , , ] <- resl[[fold]]$nzl
    }
 
    list(
       R2=apply(res, c(2, 3, 4), mean, na.rm=TRUE),
+      res=res,
+      nz=nz,
       lambda=list(...)$lambda,
       lambda2=list(...)$lambda2,
       gamma=list(...)$gamma
@@ -196,9 +211,16 @@ optim.fmpr.grid <- function(...)
 {
    r <- crossval.fmpr(...)
 
+   #res <- apply(r$res[,,1,1,], 2:3, mean)
+   #nz <- apply(r$nz[,,1,1,], 2:3, mean)
+   #mx <- apply(apply(r$res, 2:5, mean), 4, which.max)
+   #idmx <- cbind(mx, 1:K)
+
    w <- rbind(which(r$R2 == max(r$R2, na.rm=TRUE), arr.ind=TRUE))[1,]
    list(
       R2=r$R2,
+      res=r$res,
+      nz=r$nz,
       opt=c(
 	 lambda=r$lambda[w[1]],
 	 lambda2=r$lambda2[w[2]],
