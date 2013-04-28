@@ -66,8 +66,8 @@ void maxlambda1(double *x, double *y, double *lambda,
 	 lambda[k] = (lambda[k] > s ? lambda[k] : s);
       }
       /* small fudge factor to ensure penalty is high enough
-       * to truly make everything zero, otherwise numerical error might cause
-       * trouble */
+       * to truly make everything zero, otherwise numerical
+       * error might cause trouble */
       lambda[k] += eps;
    }
 }
@@ -111,36 +111,38 @@ void fmpr(double *X, double *Y, double *B,
    int *ignore = calloc(p * K, sizeof(int));
    double *Err = calloc(N * K, sizeof(double));
    double *d2 = calloc(p * K, sizeof(double));
-   double *CC = calloc(K * K, sizeof(double));
-   double *diagCC = calloc(K, sizeof(double));
-   double *BCC = calloc(p * K, sizeof(double));
-   double *colsumsB = calloc(K, sizeof(double));
    double *oneOnLambda2PlusOne = calloc(K, sizeof(double));
-   double *BCT = calloc(p * nE, sizeof(double));
+   /*double *BCT = NULL; */
+   double *CC = NULL;
+   double *diagCC = NULL;
 
-
-   if(nE > 1)
+   if(dofusion)
    {
+      CC = calloc(K * K, sizeof(double));
+      diagCC = calloc(K, sizeof(double));
+      /*BCT = calloc(p * nE, sizeof(double)); */
+
       crossprod(C, nE, K, C, nE, K, CC);
       for(k = 0 ; k < K ; k++)
 	 diagCC[k] = CC[k * K + k];
+      free(CC);
    }
 
    for(k = 0 ; k < K ; k++)
       oneOnLambda2PlusOne[k] = 1.0 / (1.0 + *lambda2_p);
 
-   /* setup second derivatives of loss and which variables to ignore due to
-    * small variance */
-   for(k = 0 ; k < K ; k++)
-   {
-      for(j = p - 1 ; j >= 0 ; --j) 
-      {
-	 jpk = j + p * k;
-	 for(i = N - 1 ; i >= 0 ; --i)
-	    d2[jpk] +=  X[i + j * N] * X[i + j * N] * oneOnN;
-	 ignore[jpk] = (d2[jpk] <= ZERO_VAR_THRESH);
-      }
-   }
+   /* setup second derivatives of loss and which
+    * variables to ignore due to small variance */
+   //for(k = 0 ; k < K ; k++)
+   //{
+   //   for(j = p - 1 ; j >= 0 ; --j) 
+   //   {
+   //      jpk = j + p * k;
+   //      for(i = N - 1 ; i >= 0 ; --i)
+   //         d2[jpk] +=  X[i + j * N] * X[i + j * N] * oneOnN;
+   //      ignore[jpk] = (d2[jpk] <= ZERO_VAR_THRESH);
+   //   }
+   //}
 
    for(j = pK1 ; j >= 0 ; --j)
    {
@@ -198,8 +200,10 @@ void fmpr(double *X, double *Y, double *B,
 	       	  df2 = gamma * diagCC[k];
 	       }
 
-	       s = Bjk - (d1 + df1) / (d2[jpk] + df2);
-	       B[jpk] = sign(s) * fmax(fabs(s) - lambda, 0);
+	       /*s = Bjk - (d1 + df1) / (d2[jpk] + df2);*/
+	       s = Bjk - (d1 + df1) / (1 + df2);
+	       B[jpk] = sign(s) * fmax(fabs(s) - lambda, 0) 
+		  * oneOnLambda2PlusOne[k];
 
 	       /* close enough to zero */
 	       if(fabs(B[jpk]) < ZERO_THRESH)
@@ -237,7 +241,7 @@ void fmpr(double *X, double *Y, double *B,
 	    loss += tmp;
 	 }
       }
-      loss /= (2.0 * N);
+      loss *= oneOn2N;
 
       l1loss = 0;
       for(j = 0 ; j < p ; j++)
@@ -252,11 +256,11 @@ void fmpr(double *X, double *Y, double *B,
 	 {
 	    for(e = nE - 1 ; e >= 0 ; --e)
 	    {
-	       jep = j + e * p;
-	       BCT[jep] = B[j] * C[e]; /* k = 0 */
-	       for(k = K - 1 ; k >= 1 ; --k)
-		  BCT[jep] += B[j + k * p] * C[e + k * nE];
-	       floss += BCT[jep] * BCT[jep];
+	       v1 = pairs[e];
+	       v2 = pairs[e + nE];
+	       sv = B[j + v1 * p] * C[e + v1 * nE] 
+	          + B[j + v2 * p] * C[e + v2 * nE];
+	       floss += sv * sv;
 	    }
 	 }
 
@@ -265,7 +269,7 @@ void fmpr(double *X, double *Y, double *B,
 
       if(fabs(loss - lossold) / fabs(lossold) < eps)
       {
-	 if(verbose)
+	 if(verbose > 1)
 	 {
 	    timestamp();
 	    Rprintf(" converged, lossold: %.6f loss: %.6f\n", lossold, loss);
@@ -286,7 +290,7 @@ void fmpr(double *X, double *Y, double *B,
             oldactive[j] = active[j];
             active[j] = !ignore[j];
          }
-	 if(verbose)
+	 if(verbose > 1)
 	 {
 	    timestamp();
 	    Rprintf(" resetting activeset at iter %d, loss: %.6f floss: %.6f\n",
@@ -302,7 +306,7 @@ void fmpr(double *X, double *Y, double *B,
 
          if(j < 0)
          {
-            if(verbose)
+            if(verbose > 1)
 	    {
 	       timestamp();
                Rprintf(" terminating at iter %d with %d active vars\n",
@@ -312,7 +316,7 @@ void fmpr(double *X, double *Y, double *B,
             break;
          }
 
-         if(verbose)
+         if(verbose > 1)
 	 {
 	    timestamp();
             Rprintf(" active set changed, %d active vars", numactive);
@@ -364,11 +368,11 @@ void fmpr(double *X, double *Y, double *B,
    free(d2);
    free(ignore);
    free(oneOnLambda2PlusOne);
-   free(CC);
-   free(diagCC);
-   free(colsumsB);
-   //free(sumsC);
-   free(BCC);
-   free(BCT);
+   /*if(CC)
+      free(CC);*/
+   if(diagCC)
+      free(diagCC);
+   /*if(BCT)
+      free(BCT);*/
 }
 
