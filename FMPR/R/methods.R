@@ -298,7 +298,8 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
 	    for(i in seq(along=lambda))
 	    {
 	       if(verbose) {
-		  cat("\t", l1ord[i], j, ": ")
+		  cat("\t", "lambda[", l1ord[i], "] gamma[", j,
+		     "] lambda2[", m, "] : ", sep="")
 	       }
 
 	       if(i == 1 || !warm) {
@@ -346,7 +347,7 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
 	       Bjk[[l1ord[i]]] <- matrix(r[[3]], p, K)
 	       LPjk[[l1ord[i]]] <- matrix(r[[4]], N, K)
 
-	       if(nactive[l1ord[i]] > nzmax) {
+	       if(!is.null(nzmax) && nactive[l1ord[i]] > nzmax) {
 		  cat("fmpr reached maximum number of non-zero variables",
 		     " (", nzmax, "): ", nactive[l1ord[i]], ", stopping\n",
 		     sep="")
@@ -362,7 +363,11 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
    B <- lapply(seq(along=lambda), function(i) {
 	    lapply(seq(along=lambda2), function(m) {
 	       lapply(seq(along=gamma), function(j) {
-		  Btmp[[j]][[m]][[i]]
+		  if(sparse) {
+		     Matrix(Btmp[[j]][[m]][[i]], sparse=TRUE)
+		  } else {
+		     Btmp[[j]][[m]][[i]]
+		  }
 	       })
 	    })
    })
