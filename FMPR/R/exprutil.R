@@ -323,7 +323,7 @@ recovery <- function(obj, dir, cleanROCR=TRUE)
 }
 
 # Evaluate methods over each setup
-run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
+run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE, models=NULL)
 {
    dir <- setup$dir
 
@@ -348,15 +348,19 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE)
 	 lambdar=lambdar, gamma=gamma, lambda2=0),
       "FMPR-w2"=list(func=run.fmpr, cortype=2,
 	 lambdar=lambdar, gamma=gamma, lambda2=0),
-      "GFlasso-l1-w1"=list(func=run.spg, cortype=1, lambdar=lambdar,
+      "GFlasso-w1"=list(func=run.spg, cortype=1, lambdar=lambdar,
          gamma=gamma, type="l1"),
-      "GFlasso-l1-w2"=list(func=run.spg, cortype=2, lambdar=lambdar,
+      "GFlasso-w2"=list(func=run.spg, cortype=2, lambdar=lambdar,
          gamma=gamma, type="l1"),
       Lasso=list(func=run.fmpr, lambdar=lambdar, gamma=0, lambda2=0),
       Ridge=list(func=run.ridge, lambda2=lambda2),
       Elnet=list(func=run.fmpr,
 	 lambdar=lambdar, lambda2=lambda2, gamma=0)
    )
+
+   if(!is.null(models)) {
+      param <- param[models[models %in% names(param)]]
+   }
 
    res <- lapply(seq(along=param), function(i) {
       lapply(1:nreps, function(rep) {
