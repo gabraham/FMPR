@@ -80,11 +80,20 @@ blockX <- function(X, K)
 # cortype: 0: thresholding to binary values
 #          1: |R|
 #          2: R^2
-gennetwork <- function(Y, corthresh=0.5, cortype=1)
+#
+# full: logical. if TRUE, the full (K-1)K by K  matrix will be created, even
+# for zero-weight edges. Otherwise, only the edges with non-zero weight will
+# be selected.
+gennetwork <- function(Y, corthresh=0, cortype=1)
 {
+   #if(corthresh != 0) {
+   #   stop("corthresh other than 0 not yet supported")
+   #}
+
    R <- cor(Y)
 
-   R[abs(R) < corthresh] <- 0
+   #R[abs(R) < corthresh] <- 0
+   R[abs(R) < corthresh] <- 1e-6 ## HACK to prevent edges from disappearing ##
 
    K <- ncol(Y)
    nV <- K
