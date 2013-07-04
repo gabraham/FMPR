@@ -25,20 +25,12 @@ run.spg.test <- function(N, p, K, matlab.path, spg.path)
    maxiter <- 1e4
    mu <- 1e-6
    R <- abs(cor(Y))
+   corthresh <- 0
 
    C <- matrix(0, 0, 0)
 
    while(nrow(C) == 0) {
-      corthresh <- if(K <= 2) {
-         runif(1, 0, R[1, 2])
-      } else {
-         # ensure threshold selects at least one edge, and add small dithering
-         # factor to account for loss of precision in translating floating point
-         # to ascii and back
-         median(R[upper.tri(R)]) + rnorm(1, 0, 1e-3)
-      }
       cortype <- sample(1:2, 1)
-
       C <- gennetwork(Y, corthresh=corthresh, cortype=cortype)
    }
    g <- spg(X, Y, C, lambda=lambda, gamma=gamma, mu=mu,
@@ -86,7 +78,7 @@ run.spg.test <- function(N, p, K, matlab.path, spg.path)
 }
 
 spg.test <- function(nreps=50,
-   matlab.path="/Applications/MATLAB_R2012a.app/bin/matlab",
+   matlab.path="/Applications/MATLAB_R2013a.app/bin/matlab",
    spg.path="~/Software/SPG_Multi_Graph")
 {
    res <- sapply(1:nreps, function(i) {

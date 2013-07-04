@@ -1,4 +1,14 @@
 
+which.max2 <- function(x, dup=FALSE, dup.idx=1)
+{
+   w <- which(max(x) == x, arr.ind=TRUE)
+   if(!dup) {
+      w[dup.idx, ]
+   } else {
+      w
+   }
+}
+
 R2 <- function(pr, y, average=TRUE) 
 {
    pr <- cbind(pr)
@@ -35,12 +45,10 @@ crossval.ridge <- function(X, Y, nfolds=5, ...)
    Y <- cbind(Y)
    folds <- sample(1:nfolds, N, TRUE)
    
-   #s <- sapply(1:nfolds, function(fold) {
    l <- foreach(fold=1:nfolds) %dopar% {
       cat("inner fold", fold, "\n")
       g <- ridge(scalefix(X[folds != fold, ]),
 	 scalefix(Y[folds != fold, , drop=FALSE]), ...)
-
       sapply(g, function(m) {
 	 if(is.null(m)) {
 	    0
@@ -59,7 +67,8 @@ crossval.ridge <- function(X, Y, nfolds=5, ...)
    )
 }
 
-crossval.fmpr <- function(X, Y, nfolds=5, cortype=2, corthresh=0, ...)
+crossval.fmpr <- function(X, Y, nfolds=5, cortype=2, corthresh=0,
+   cormethod="pearson", ...)
 {
    N <- nrow(X)
    Y <- cbind(Y)
@@ -80,7 +89,6 @@ crossval.fmpr <- function(X, Y, nfolds=5, cortype=2, corthresh=0, ...)
    # but we don't use that feature here because we want to run different
    # penalties on the same cross-validation folds rather than different
    # folds every time
-   #for(fold in 1:nfolds)
    resl <- foreach(fold=1:nfolds) %dopar% {
       r <- array(0, c(l, l2, g, K))
       nzl <- array(0, c(l, l2, g, K))
@@ -94,11 +102,11 @@ crossval.fmpr <- function(X, Y, nfolds=5, cortype=2, corthresh=0, ...)
       Ytrain <- scalefix(Y[folds != fold, , drop=FALSE])
       C <- NULL
       if(ncol(Y) > 1) {
-	 C <- gennetwork(Ytrain, cortype=cortype, corthresh=corthresh)
+	 C <- gennetwork(Ytrain, cortype=cortype, corthresh=corthresh,
+	    cormethod=cormethod)
       }
 
       f <- fmpr(X=Xtrain, Y=Ytrain, C=C, ...)
-
       for(i in 1:l)
       {
 	 for(m in 1:l2)
@@ -145,7 +153,6 @@ crossval.spg <- function(X, Y, nfolds=5, cortype=2, corthresh=0, ...)
    lg <- max(length(list(...)$gamma), 1)
    res <- array(0, c(nfolds, ll, lg))
 
-   #for(fold in 1:nfolds)
    resl <- foreach(fold=1:nfolds) %dopar% {
       r <- matrix(0, ll, lg)
       cat("inner fold", fold, "\n")
@@ -211,13 +218,21 @@ optim.fmpr.grid <- function(...)
 {
    r <- crossval.fmpr(...)
 
-   #res <- apply(r$res[,,1,1,], 2:3, mean)
-   #nz <- apply(r$nz[,,1,1,], 2:3, mean)
-   #mx <- apply(apply(r$res, 2:5, mean), 4, which.max)
-   #idmx <- cbind(mx, 1:K)
+   K <- ncol(list(...)$Y)
+
+   res <- apply(r$res, 2:5, mean)
+   nz <- apply(r$nz, 2:5, mean)
+   idxmax <- apply(res, 4, which.max2)
+   colnames(idxmax) <- paste("Task", 1:K, sep="")
+   rownames(idxmax) <- c("lambda", "lambda2", "gamma")
+   nzmax <- nz[t(rbind(idxmax, 1:K))]
+   resmax <- res[t(rbind(idxmax, 1:K))]
 
    w <- rbind(which(r$R2 == max(r$R2, na.rm=TRUE), arr.ind=TRUE))[1,]
    list(
+      lambda=r$lambda,
+      lambda2=r$lambda2,
+      gamma=r$gamma,
       R2=r$R2,
       res=r$res,
       nz=r$nz,
@@ -225,6 +240,13 @@ optim.fmpr.grid <- function(...)
 	 lambda=r$lambda[w[1]],
 	 lambda2=r$lambda2[w[2]],
 	 gamma=r$gamma[w[3]]
+      ),
+      opt2=list(
+	 res=res,
+	 nz=nz,
+	 idxmax=idxmax,
+	 nzmax=nzmax,
+	 resmax=resmax
       )
    )
 }

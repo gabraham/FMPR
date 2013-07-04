@@ -76,7 +76,7 @@ void maxlambda1(double *x, double *y, double *lambda,
  */
 void fmpr(double *X, double *Y, double *B,
       double *LP, int *N_p, int *p_p, int *K_p,
-      double *lambda_p, double *lambda2_p, double *gamma_p,
+      double *lambda, double *lambda2, double *gamma_p,
       double *C, int *pairs, int *edges, int *maxiter_p,
       double *eps_p, int *verbose_p, int *status, int *iter_p,
       int *numactive_p, int *divbyN)
@@ -94,7 +94,7 @@ void fmpr(double *X, double *Y, double *B,
        allconverged = 0;
    int verbose = *verbose_p;
    int pK = p * K, pK1 = p * K - 1;
-   double s, lambda = *lambda_p, gamma = *gamma_p;
+   double s, gamma = *gamma_p;
    double oneOnN = (*divbyN) ? 1.0 / N : 1.0;
    int iNk, jpk, iNj;
    int nE = K * (K - 1) / 2, e, m, jep;
@@ -112,15 +112,21 @@ void fmpr(double *X, double *Y, double *B,
    double *Err = calloc(N * K, sizeof(double));
    double *d2 = calloc(p * K, sizeof(double));
    double *oneOnLambda2PlusOne = calloc(K, sizeof(double));
-   /*double *BCT = NULL; */
    double *CC = NULL;
    double *diagCC = NULL;
+
+   if(verbose > 1)
+   {
+      Rprintf("lambda: ");
+      for(k = 0 ; k < K ; k++)
+	 Rprintf("%.4f ", lambda[k]);
+      Rprintf("\n");
+   }
 
    if(dofusion)
    {
       CC = calloc(K * K, sizeof(double));
       diagCC = calloc(K, sizeof(double));
-      /*BCT = calloc(p * nE, sizeof(double)); */
 
       crossprod(C, nE, K, C, nE, K, CC);
       for(k = 0 ; k < K ; k++)
@@ -129,20 +135,7 @@ void fmpr(double *X, double *Y, double *B,
    }
 
    for(k = 0 ; k < K ; k++)
-      oneOnLambda2PlusOne[k] = 1.0 / (1.0 + *lambda2_p);
-
-   /* setup second derivatives of loss and which
-    * variables to ignore due to small variance */
-   //for(k = 0 ; k < K ; k++)
-   //{
-   //   for(j = p - 1 ; j >= 0 ; --j) 
-   //   {
-   //      jpk = j + p * k;
-   //      for(i = N - 1 ; i >= 0 ; --i)
-   //         d2[jpk] +=  X[i + j * N] * X[i + j * N] * oneOnN;
-   //      ignore[jpk] = (d2[jpk] <= ZERO_VAR_THRESH);
-   //   }
-   //}
+      oneOnLambda2PlusOne[k] = 1.0 / (1.0 + lambda2[k]);
 
    for(j = pK1 ; j >= 0 ; --j)
    {
@@ -200,9 +193,8 @@ void fmpr(double *X, double *Y, double *B,
 	       	  df2 = gamma * diagCC[k];
 	       }
 
-	       /*s = Bjk - (d1 + df1) / (d2[jpk] + df2);*/
 	       s = Bjk - (d1 + df1) / (1 + df2);
-	       B[jpk] = sign(s) * fmax(fabs(s) - lambda, 0) 
+	       B[jpk] = sign(s) * fmax(fabs(s) - lambda[k], 0) 
 		  * oneOnLambda2PlusOne[k];
 
 	       /* close enough to zero */
@@ -243,11 +235,18 @@ void fmpr(double *X, double *Y, double *B,
       }
       loss *= oneOn2N;
 
-      l1loss = 0;
+      /*l1loss = 0;
       for(j = 0 ; j < p ; j++)
 	 for(k = 0 ; k < K ; k++)
 	    l1loss += fabs(B[j + k * p]);
-      loss += lambda * l1loss;
+      loss += lambda[k] * l1loss;*/
+      for(k = 0 ; k < K ; k++)
+      {
+	 l1loss = 0;
+	 for(j = 0 ; j < p ; j++)
+	    l1loss += fabs(B[j + k * p]);
+	 loss += lambda[k] * l1loss;
+      }
       
       if(dofusion)
       {
@@ -296,7 +295,6 @@ void fmpr(double *X, double *Y, double *B,
 	    Rprintf(" resetting activeset at iter %d, loss: %.6f floss: %.6f\n",
 	       iter, loss, floss);
 	 }
-	 //mult = 2;
       }
       else if(allconverged == 2)
       {
@@ -330,22 +328,7 @@ void fmpr(double *X, double *Y, double *B,
 	    active[j] = !ignore[j]; 
 	 }
 
-	 ///* double the size of the active set */
-	 //for(k = 0 ; k < K ; k++)
-	 //{
-	 //   mx = fminl(mult * numactiveK[k], p);
-	 //   printf("%d ", mx);
-	 //   for(j = mx - 1 ; j >= 0 ; --j)
-	 //   {
-	 //      idx = g->grad_array[j + k * p].index + k * p;
-	 //      g->active[idx] = !g->ignore[idx];
-	 //   }
-	 //}
-
-	 //printf("\n");
-
          allconverged = 0;
-	 //mult *= 2;
       }     
 
       iter++;
@@ -368,11 +351,7 @@ void fmpr(double *X, double *Y, double *B,
    free(d2);
    free(ignore);
    free(oneOnLambda2PlusOne);
-   /*if(CC)
-      free(CC);*/
    if(diagCC)
       free(diagCC);
-   /*if(BCT)
-      free(BCT);*/
 }
 

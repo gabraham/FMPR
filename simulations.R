@@ -14,11 +14,12 @@ library(glmnet)
 library(ggplot2)
 library(FMPR)
 library(doMC)
-registerDoMC(cores=3)
+registerDoMC(cores=5)
 
 options(error=dump.frames)
 
 load("HAPGEN/sim_9/chr10.RData")
+#load("HAPGEN/sim_9/chr10_pruned.RData")
 if(!exists("geno")) {
    stop("'geno' object does not exist")
 }
@@ -31,97 +32,97 @@ set.seed(seed)
 setup <- list(
    # The reference setup
    Expr1=list(dir=c("Expr1"), N=100, p=100, K=10, sigma=1,
-      type="real", 
+      type="geno", 
       B=getB(p=100, K=10, w=0.1, type="same")),
    
    # Different sample size
    Expr2=list(dir=c("Expr2"), N=50, p=100, K=10, sigma=1,
-      type="real", 
+      type="geno", 
       B=getB(p=100, K=10, w=0.1, type="same")),
    Expr3=list(dir=c("Expr3"), N=200, p=100, K=10, sigma=1,
-      type="real", 
+      type="geno", 
       B=getB(p=100, K=10, w=0.1, type="same")),
 
    # Different noise levels
    Expr4=list(dir=c("Expr4"), N=100, p=100, K=10, sigma=0.5,
-      type="real", 
+      type="geno", 
       B=getB(p=100, K=10, w=0.1, type="same")),
    Expr5=list(dir=c("Expr5"), N=100, p=100, K=10, sigma=2,
-      type="real", 
+      type="geno", 
       B=getB(p=100, K=10, w=0.1, type="same")),
 
    # Different number of tasks
    Expr6=list(dir=c("Expr6"), N=100, p=100, K=5, sigma=1,
-      type="real", 
+      type="geno", 
       B=getB(p=100, K=5, w=0.1, type="same")),
    Expr7=list(dir=c("Expr7"), N=100, p=100, K=20, sigma=1,
-      type="real", 
+      type="geno", 
       B=getB(p=100, K=20, w=0.1, type="same")),
 
    # Different weights
    Expr8=list(dir=c("Expr8"), N=100, p=100, K=10, sigma=1,
-      type="real", 
+      type="geno", 
       B=getB(p=100, K=10, w=0.05, type="same")),
    Expr9=list(dir=c("Expr9"), N=100, p=100, K=10, sigma=1,
-      type="real", 
+      type="geno", 
       B=getB(p=100, K=10, w=0.5, type="same")),
 
    # High dimensions, increasing p
    Expr10=list(dir=c("Expr10"), N=100, p=50, K=10, sigma=1,
-      type="real", 
+      type="geno", 
       B=getB(p=50, K=10, w=0.1, type="same")),
    Expr11=list(dir=c("Expr11"), N=100, p=200, K=10, sigma=1,
-      type="real", 
+      type="geno", 
       B=getB(p=200, K=10, w=0.1, type="same")),
 
    # Different weights across tasks, same sparsity
    Expr12=list(dir=c("Expr12"), N=100, p=100, K=10, sigma=1,
-      type="real", 
+      type="geno", 
       B=getB(p=100, K=10, w=0.1, type="sparsity")),
 
    # Unrelated tasks
    Expr13=list(dir=c("Expr13"), N=100, p=100, K=10, sigma=1,
-      type="real", 
+      type="geno", 
       B=getB(p=100, K=10, w=0.1, type="random")),
 
    # Same sparsity, different weight, mean=0
    Expr14=list(dir=c("Expr14"), N=100, p=100, K=10, sigma=1,
-      type="real", 
+      type="geno", 
       B=getB(p=100, K=10, w=0.1, type="sparsity", mean=0, sd=0.1)),
    Expr15=list(dir=c("Expr15"), N=100, p=100, K=10, sigma=1,
-      type="real", 
+      type="geno", 
       B=getB(p=100, K=10, w=0.1, type="sparsity", mean=0, sd=2)),
    Expr16=list(dir=c("Expr16"), N=100, p=100, K=10, sigma=1,
-      type="real", 
+      type="geno", 
       B=getB(p=100, K=10, w=NULL, type="sparsity", mean=0, sd=2)),
 
    # Same sparsity, different weight, mean=0.5
    Expr17=list(dir=c("Expr17"), N=100, p=100, K=10, sigma=1,
-      type="real", 
+      type="geno", 
       B=getB(p=100, K=10, w=NULL, type="sparsity", mean=0.5, sd=0.05)),
    Expr18=list(dir=c("Expr18"), N=100, p=100, K=10, sigma=1,
-      type="real", 
+      type="geno", 
       B=getB(p=100, K=10, w=NULL, type="sparsity", mean=0.5, sd=0.5)),
    Expr19=list(dir=c("Expr19"), N=100, p=100, K=10, sigma=1,
-      type="real", 
+      type="geno", 
       B=getB(p=100, K=10, w=NULL, type="sparsity", mean=0.5, sd=2)),
 
    Expr20=list(dir=c("Expr20"), N=100, p=100, K=10, sigma=1,
-      type="real", 
+      type="geno", 
       B=getB(p=100, K=10, w=NULL, type="sparsity", mean=0.5, sd=0.05)),
 
    # Negative correlations
-   Expr21=list(dir=c("Expr21"), N=100, p=100, K=10, sigma=1, type="real",
-      type="real", 
+   Expr21=list(dir=c("Expr21"), N=100, p=100, K=10, sigma=1, type="geno",
+      type="geno", 
       B=getB(p=100, K=10, w=0.1, type="mixed")),
 
    # Some tasks are related (clusters), some aren't
    Expr22=list(dir=c("Expr22"), N=100, p=100, K=10, sigma=0.5,
-      type="real", 
+      type="geno", 
       B=getB(p=100, K=10, w=0.1, type="cluster")),
 
    Expr23=list(dir=c("Expr23"), N=100, p=100, K=20, sigma=0.5,
-      type="real", 
+      type="geno", 
       B=getB(p=100, K=20, w=0.1, type="clustersparse")),
 
 
@@ -222,15 +223,23 @@ setup <- list(
 	 B=abs(getB(p=100, K=10, sd=2, type="sparsity"))),
 
    ExprTest8=list(dir=c("ExprTest8"), N=100, p=100, K=10, sigma=1, type="artificial",
-	 B=abs(getB(p=100, K=10, sd=4, type="sparsity")))
+	 B=abs(getB(p=100, K=10, sd=4, type="sparsity"))),
+
+   Expr17pruned=list(dir=c("Expr17pruned"), N=100, p=100, K=10, sigma=1,
+      type="geno", 
+      B=getB(p=100, K=10, w=NULL, type="sparsity", mean=0.5, sd=0.05)),
+
+   Expr19pruned=list(dir=c("Expr19pruned"), N=100, p=100, K=10, sigma=1,
+      type="geno", 
+      B=getB(p=100, K=10, w=NULL, type="sparsity", mean=0.5, sd=2))
 
 )
 
 if(!exists("nreps", mode="integer")) {
-   nreps <- 10
+   nreps <- 100
 }
 if(!exists("grid", mode="integer")) {
-   grid <- 10
+   grid <- 20
 }
 if(!exists("nfolds", mode="integer")) {
    nfolds <- 5
@@ -239,10 +248,16 @@ if(!exists("nfolds", mode="integer")) {
 system.time({
    res <- lapply(setup[idv], run, nreps=nreps, grid=grid, nfolds=nfolds)
 })
-save(setup, res, idv, nreps, grid, nfolds, seed,
+res.anl <- analyse(res[[1]], dir=setup[[idv]]$dir)
+save(setup, res.anl, res, idv, nreps, grid, nfolds, seed,
    file=sprintf("%s/results_%s.RData", setup[[idv]]$dir, idv))
 
 ################################################################################
 
-lapply(res, plot)
+plot.exper(res.anl,
+   models.rec=c("FMPR-w1", "FMPR-w2", "GFlasso-w1", "GFlasso-w2", "Lasso",
+      "Ridge", "Elnet", "CCA", "PCA", "Univariable"),
+   models.R2=c("FMPR-w1", "FMPR-w2", "GFlasso-w1",
+      "GFlasso-w2", "Lasso", "Elnet", "Ridge")
+)
 

@@ -5,7 +5,7 @@
 #
 # All inputs X and outputs Y are standardised to zero-mean and unit-variance
 makedata <- function(rep, dir=".", N=100, p=50, K=5, B, sigma=0.01,
-      save=TRUE, type=c("real", "artificial"), maketest=TRUE)
+      save=TRUE, type=c("geno", "expr", "artificial"), maketest=TRUE)
 {
    type <- match.arg(type)
 
@@ -17,12 +17,28 @@ makedata <- function(rep, dir=".", N=100, p=50, K=5, B, sigma=0.01,
       if(maketest) {
 	 Xtest <- matrix(sample(0:2, N * p, replace=TRUE), N, p)
       }
+   } else if(type == "expr") {
+      cat("makedata: using expression data\n")
+      # randomly split samples into training and testing, and from each set
+      # select N samples
+      wtrain <- sample(nrow(expr), N)
+      # select a contiguous block of probes of size p
+      prb.start <- sample(ncol(expr) - p, 1)
+      probes <- prb.start + 1:p - 1
+
+      if(maketest) {
+	 sample.spl <- sample(c(TRUE, FALSE), nrow(expr), replace=TRUE)
+	 wtrain <- sample(which(sample.spl), N)
+	 wtest <- sample(which(!sample.spl), N)
+	 Xtest <- expr[wtest, probes]
+      }
+      Xtrain <- expr[wtrain, probes]
    } else if(!exists("geno", mode="numeric") || is.null(geno)) {
-      stop("type = real but geno is missing or NULL")
+      stop("type = geno but geno is missing or NULL")
    } else if(N > nrow(geno)) {
-      stop("N too big: geno only has ", nrows(geno), " rows")
+      stop("N too big: geno only has ", nrow(geno), " rows")
    } else {
-      cat("makedata: using real data\n")
+      cat("makedata: using genotype data\n")
       # randomly split samples into training and testing, and from each set
       # select N samples
       wtrain <- sample(nrow(geno), N)
@@ -181,6 +197,99 @@ run.ridge <- function(rep, dir=".", nfolds=10, grid=25,
    )
 }
 
+run.lm <- function(rep, dir=".", ...)
+{
+   oldwd <- getwd()
+   setwd(dir)
+
+   Xtrain <- as.matrix(read.table(sprintf("Xtrain_%s.txt", rep),
+	    header=FALSE))
+   Xtest <- as.matrix(read.table(sprintf("Xtest_%s.txt", rep), header=FALSE))
+   Ytrain <- as.matrix(read.table(sprintf("Ytrain_%s.txt", rep),
+	    header=FALSE))
+   Ytest <- as.matrix(read.table(sprintf("Ytest_%s.txt", rep), header=FALSE))
+
+   N <- nrow(Xtrain)
+   K <- ncol(Ytrain)
+   p <- ncol(Xtrain)
+
+   ytest <- as.numeric(Ytest)
+   
+   g <- lm.simple(Xtrain, Ytrain)
+   P <- Xtest %*% g$B
+   res <- R2(as.numeric(P), ytest)
+   cat("rep", rep, "R2 Univariable:", res, "\n")
+   nlogpval <- -1 * log10(g$pval)
+
+   setwd(oldwd)
+
+   list(
+      R2=res,
+      #beta=matrix(g, p, K)
+      beta=nlogpval
+   )
+}
+
+run.pca <- function(rep, dir=".", ...)
+{
+   oldwd <- getwd()
+   setwd(dir)
+
+   Xtrain <- as.matrix(read.table(sprintf("Xtrain_%s.txt", rep),
+	    header=FALSE))
+   Xtest <- as.matrix(read.table(sprintf("Xtest_%s.txt", rep), header=FALSE))
+   Ytrain <- as.matrix(read.table(sprintf("Ytrain_%s.txt", rep),
+	    header=FALSE))
+   Ytest <- as.matrix(read.table(sprintf("Ytest_%s.txt", rep), header=FALSE))
+
+   PCtrain <- prcomp(Ytrain)$x[,1, drop=FALSE]
+   PCtest <- prcomp(Ytest)$x[,1, drop=FALSE]
+
+   N <- nrow(Xtrain)
+   K <- ncol(Ytrain)
+   p <- ncol(Xtrain)
+
+   ytest <- as.numeric(PCtest)
+   
+   g <- lm.simple(Xtrain, PCtrain)
+   cat("rep", rep, "PCA\n")
+   nlogpval <- -1 * log10(g$pval)
+
+   setwd(oldwd)
+
+   list(
+      R2=NA,
+      beta=matrix(nlogpval, p, K) # same across all tasks
+   )
+}
+
+# CCA of all phenotypes on one SNP at a time, like PLINK.multivariate
+run.cca <- function(rep, dir=".", ...)
+{
+   oldwd <- getwd()
+   setwd(dir)
+
+   Xtrain <- as.matrix(read.table(sprintf("Xtrain_%s.txt", rep),
+      header=FALSE))
+   Ytrain <- as.matrix(read.table(sprintf("Ytrain_%s.txt", rep),
+      header=FALSE))
+
+   K <- ncol(Ytrain)
+   p <- ncol(Xtrain)
+
+   g <- cca(Xtrain, Ytrain)
+
+   cat("rep", rep, "CCA:\n")
+   nlogpval <- -1 * log10(g$pval)
+
+   setwd(oldwd)
+
+   list(
+      R2=NA,
+      beta=matrix(nlogpval, p, K) # same across all tasks
+   )
+}
+
 run.fmpr <- function(rep, dir=".", nfolds=10, grid=25,
    corthresh=0, cortype=2,
    lambdar=2^seq(-10, 0, length=grid),
@@ -248,7 +357,7 @@ run.fmpr <- function(rep, dir=".", nfolds=10, grid=25,
 #       mixed: same absolute weights with different sign, same sparsity
 #       cluster: some tasks are related with same weight, some aren't
 #       clustersparse: subsets of SNPs and subsets of tasks are related
-getB <- function(p, K, w=0.1, sparsity=0.8, type=NULL, ...)
+getB <- function(p, K, w=0.1, sparsity=0.8, type=NULL, rowsparsity=0.8,...)
 {
    if(type == "same") {
       b <- 0
@@ -278,7 +387,7 @@ getB <- function(p, K, w=0.1, sparsity=0.8, type=NULL, ...)
       b <- 0
       B <- 0
       while(all(B == 0)) {
-	 b <- w * sample(0:1, p, TRUE, prob=c(sparsity, 1 - sparsity))
+	 b <- w * sample(0:1, p, TRUE, prob=c(rowsparsity, 1 - rowsparsity))
 	 B <- sapply(1:K, function(k) sample(c(-1, 0, 1), 1) * b)
       }
    } else if(type == "clustersparse") {
@@ -286,7 +395,7 @@ getB <- function(p, K, w=0.1, sparsity=0.8, type=NULL, ...)
       while(all(B == 0)) {
 	 B <- matrix(rnorm(p * K, ...), p, K)
 	 s1 <- sample(0:1, p, TRUE, prob=c(sparsity, 1 - sparsity))
-	 s2 <- sample(0:1, K, TRUE, prob=c(sparsity, 1 - sparsity))
+	 s2 <- sample(0:1, K, TRUE, prob=c(rowsparsity, 1 - rowsparsity))
 	 B[s1 == 0, ] <- 0
 	 B[, s2 == 0] <- 0
       }
@@ -307,23 +416,30 @@ recovery <- function(obj, dir, cleanROCR=TRUE)
    betahat <- sapply(obj, function(r) as.numeric(abs(r$beta)))
 
    pred <- prediction(
-         predictions=betahat,
-         labels=beta != 0
+      predictions=betahat,
+      labels=beta != 0
    )
-   roc <- performance(pred, "sens", "spec")
-   prc <- performance(pred, "prec", "rec")
-   auc <- performance(pred, "auc")
 
-   if(cleanROCR) {
-      roc <- clean.rocr(roc)
-      prc <- clean.rocr(prc)
-      auc <- clean.rocr(auc)
-   }
-   list(roc=roc, prc=prc, auc=auc)
+   roc <- prc <- auc <- NULL
+   try({
+      roc <- performance(pred, "sens", "spec")
+      prc <- performance(pred, "prec", "rec")
+      auc <- performance(pred, "auc")
+      fscore <- performance(pred, "f")
+
+      if(cleanROCR) {
+	 roc <- clean.rocr(roc)
+	 prc <- clean.rocr(prc)
+	 auc <- clean.rocr(auc)
+	 fscore <- clean.rocr(fscore)
+      }
+   })
+   
+   list(roc=roc, prc=prc, auc=auc, fscore=fscore, prediction=pred)
 }
 
 # Evaluate methods over each setup
-run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE, models=NULL)
+run <- function(setup, grid=3, nfolds=3, nreps=3, models=NULL)
 {
    dir <- setup$dir
 
@@ -355,7 +471,10 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE, models=NULL)
       Lasso=list(func=run.fmpr, lambdar=lambdar, gamma=0, lambda2=0),
       Ridge=list(func=run.ridge, lambda2=lambda2),
       Elnet=list(func=run.fmpr,
-	 lambdar=lambdar, lambda2=lambda2, gamma=0)
+	 lambdar=lambdar, lambda2=lambda2, gamma=0),
+      CCA=list(func=run.cca),
+      PCA=list(func=run.pca),
+      Univariable=list(func=run.lm)
    )
 
    if(!is.null(models)) {
@@ -370,9 +489,17 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, cleanROCR=TRUE, models=NULL)
    })
 
    names(res) <- names(param)
+   res
+}
 
+analyse <- function(res, dir="./", cleanROCR=TRUE)
+{
    res.R2 <- sapply(res, sapply, function(x) x$R2)
-   res.recovery <- lapply(res, recovery, dir=dir, cleanROCR=cleanROCR)
+   res.recovery <- lapply(seq(along=res), function(i) {
+      cat(names(res)[i], "recovery\n")
+      recovery(res[[i]], dir=dir, cleanROCR=cleanROCR)
+   })
+   names(res.recovery) <- names(res)
    ex <- list(
       dir=dir,
       weights=lapply(res, function(x) x$beta),

@@ -1,4 +1,13 @@
 
+# Plots for the paper
+
+library(FMPR)
+
+library(gridExtra)
+
+#source("FMPR/R/plotexper.R")
+
+
 # Remove ROC/PRC replications that had non-sensical results
 clean.rocr <- function(obj)
 {
@@ -45,12 +54,12 @@ mytheme <- function(base_size=10)
    )
 }
 
-plot.exper <- function(x,
+plot.recovery <- function(x,
    lim=list(roc=c(0.95, 1, 0, 1), prc=c(0, 1, 0, 1)), ci=FALSE,
       models.rec=NULL, models.R2=NULL,
       cex=2, suffix="", col=NULL,
       legend.x=NULL, legend.y=NULL, plot.prc=TRUE, plot.legend=TRUE,
-      main=NULL, outlier.shape=1, ...)
+      main=NULL, outlier.shape=1, annotate=NULL, ...)
 {
    if(is.null(col)) {
       # remove yellow, make it black
@@ -66,10 +75,7 @@ plot.exper <- function(x,
       width <- 6
    }
 
-   pdf(sprintf("%s/%s%s.pdf", x$dir, x$dir, suffix), width=width)
-   par(mfrow=c(1, length(sq)), mar=c(4, 4.5, 2, 0.5) + 0.1, pty="s")
    usr <- par("usr")
-
    nm <- c("roc", "prc")
    titles <- c("ROC", "PRC")
    xlab <- c("Specificity", "Recall")
@@ -93,9 +99,10 @@ plot.exper <- function(x,
    for(i in sq)
    {
       maint <- ifelse(is.null(main), titles[i], main)
-      plot(NULL, main=maint, xlim=lim[[i]][1:2], ylim=lim[[i]][3:4],
+      plot(NULL, xlim=lim[[i]][1:2], ylim=lim[[i]][3:4],
          cex=cex, cex.axis=cex, cex.lab=cex, xlab=xlab[i], ylab=ylab[i],
 	 cex.main=cex)
+      mtext(maint, side=3, cex=2.5)
       
       rr <- if(is.null(models.rec)) {
 	 z <- seq(along=x$recovery)
@@ -113,6 +120,10 @@ plot.exper <- function(x,
 	    spread.estimate=spread.estimate,
 	    spread.scale=spread.scale)
       }
+      
+      if(!is.null(annotate)) {
+	 mtext(annotate, side=3, outer=TRUE, adj=0, line=-2.7, cex=5.1)
+      }
 
       if(plot.legend && i == 1) {
 	 legend(x=legend.x, y=legend.y,
@@ -123,8 +134,15 @@ plot.exper <- function(x,
       } 
    }
 
-   dev.off()
-   
+}
+
+plot.R2 <- function(x,
+   lim=list(roc=c(0.95, 1, 0, 1), prc=c(0, 1, 0, 1)), ci=FALSE,
+      models.rec=NULL, models.R2=NULL,
+      cex=2, suffix="", col=NULL,
+      legend.x=NULL, legend.y=NULL, plot.prc=TRUE, plot.legend=TRUE,
+      main=NULL, outlier.shape=1, ...)
+{
    r2 <- melt(x$R2)
    m <- as.character(r2[,2])
    r2[, 2] <- factor(m)
@@ -141,8 +159,42 @@ plot.exper <- function(x,
    g <- g + stat_summary(fun.data="mean_cl_normal", size=1.5)
    g <- g + ggtitle(main)
    
-   pdf(sprintf("%s/%s%s_R2.pdf", x$dir, x$dir, suffix))
-   print(g)
-   dev.off()
+   #pdf(sprintf("%s/%s%s_R2.pdf", x$dir, x$dir, suffix))
+   #print(g)
+   #dev.off()
+   g 
 }
+
+
+mod <- c("FMPR-w1", "FMPR-w2", "GFlasso-w1", "GFlasso-w2",
+   "Lasso", "Ridge", "Elnet")
+
+load("Expr1/results_Expr1.RData")
+res.anl.1 <- analyse(res[[1]], dir=setup[[idv]]$dir)
+
+load("Expr18/results_Expr18.RData")
+res.anl.18 <- analyse(res[[1]], dir=setup[[idv]]$dir)
+
+pdf("Expr1_Expr18_recovery.pdf", width=12)
+par(mfrow=c(1, 2), mar=c(4, 4.5, 2, 0.5) + 0.1, pty="s")
+
+plot.recovery(res.anl.1, models.R2=mod,
+   lim=list(roc=c(0.95, 1, 0, 0.4), prc=c(0, 1, 0.2, 0.65)),
+   plot.prc=FALSE, legend.x=0.9725, legend.y=0.42, main="Setup 1b",
+   annotate="a"
+)
+plot.recovery(res.anl.18,
+   models.R2=mod, lim=list(roc=c(0.95, 1, 0, 0.4), prc=c(0, 1, 0.2, 1)),
+   plot.prc=FALSE, plot.legend=FALSE,
+   legend.x=0.9725, legend.y=1.075, main="Setup 2b"
+)
+dev.off()
+
+pdf("Expr1_Expr18_R2.pdf", width=12)
+g1 <- plot.R2(res.anl.1, models.R2=mod, main="Setup 1b")
+g2 <- plot.R2(res.anl.18, models.R2=mod, main="Setup 2b")
+grid.arrange(g1, g2, nrow=1, ncol=2)
+grid.text("b", x=unit(0.025, "npc"), y=unit(0.955, "npc"),
+   gp=gpar(fontsize=60))
+dev.off()
 

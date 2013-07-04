@@ -14,24 +14,94 @@ lasso <- function(X, y, lambda=0,
    })
 }
 
-# Can handle ncol(Y) > 1
-ridge <- function(X, Y, lambda=0)
+## Can handle ncol(Y) > 1
+#ridge <- function(X, Y, lambda=0)
+#{
+#   Y <- cbind(Y)
+#   XX <- crossprod(X)
+#   XY <- crossprod(X, Y)
+#   res <- lapply(lambda, function(l){
+#      b <- NULL
+#      while(is.null(b) || is(b, "try-error")) {
+#	 b <- try(qr.solve(XX + diag(p) * l, XY), silent=FALSE)
+#	 l <- l * 1.1
+#      }
+#      b
+#   })
+#   res
+#}
+
+ridge <- function(X, Y, lambda=1e-3)
 {
    Y <- cbind(Y)
-   XX <- crossprod(X)
-   XY <- crossprod(X, Y)
-   K <- ncol(Y)
-   p <- ncol(X)
-   #res <- foreach(l=lambda) %dopar% {
+   s <- try(svd(X))
+
+   # sometimes svd works for X^T but not for X
+   if(is(s, "try-error")) {
+      s <- try(svd(t(X)))
+      if(is(s, "try-error")) {
+	 stop(s)
+      }
+      # transposed X
+      U <- s$v
+      V <- s$u
+   } else {
+      U <- s$u
+      V <- s$v
+   }
+
+   D <- diag(s$d)
+   R <- U %*% D
+
+   RR <- crossprod(R)
+   RY <- crossprod(R, Y)
    res <- lapply(lambda, function(l){
       b <- NULL
       while(is.null(b) || is(b, "try-error")) {
-	 b <- try(qr.solve(XX + diag(p) * l, XY), silent=FALSE)
+	 b <- try(
+	    V %*% qr.solve(RR + diag(ncol(R)) * l, RY), silent=FALSE
+	 )
 	 l <- l * 1.1
       }
       b
    })
    res
+}
+
+lm.simple <- function(X, Y)
+{
+   res <- lapply(1:ncol(Y), function(i) {
+      lapply(1:ncol(X), function(j) {
+	 l <- coef(summary(lm(Y[,i] ~ X[,j])))
+	 if(nrow(l) == 2) {
+	    c(beta=l[2, 1], pval=l[2, 4])
+	 } else {
+	    c(beta=NA, pval=NA)
+	 }
+      })
+   })
+
+   B <- sapply(res, sapply, function(x) x[1])
+   pval <- sapply(res, sapply, function(x) x[2])
+
+   list(B=B, pval=pval)
+}
+
+# CCA of all phenotypes on one predictor at a time, like PLINK.multivariate
+cca <- function(X, Y, min.p=1e-16)
+{
+   res <- apply(X, 2, function(x) {
+      if(var(x) <= 1e-9) {
+	 return(NA)
+      }
+      r <- cancor(x, Y)
+      capture.output({
+	 p <- p.asym(r$cor, N=length(x), p=1, q=ncol(Y), tstat="Wilks")$p.value
+      })
+      max(p, min.p)
+   })
+
+   list(B=NULL, pval=res)
 }
 
 # zero mean, unit norm (not unit variance)
@@ -84,13 +154,18 @@ blockX <- function(X, K)
 # full: logical. if TRUE, the full (K-1)K by K  matrix will be created, even
 # for zero-weight edges. Otherwise, only the edges with non-zero weight will
 # be selected.
-gennetwork <- function(Y, corthresh=0, cortype=1)
+gennetwork <- function(Y, corthresh=0, cortype=1,
+   cormethod=c("pearson", "partial"))
 {
-   #if(corthresh != 0) {
-   #   stop("corthresh other than 0 not yet supported")
-   #}
-
-   R <- cor(Y)
+   cormethod <- match.arg(cormethod)
+   
+   R <- if(cormethod == "pearson") {
+      cor(Y)
+   } else if(cormethod == "partial") {
+      pcor.shrink(Y)
+   } else {
+      stop("unknown cormethod '", type, "'")
+   }
 
    #R[abs(R) < corthresh] <- 0
    R[abs(R) < corthresh] <- 1e-6 ## HACK to prevent edges from disappearing ##
@@ -181,8 +256,6 @@ spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-4,
       maxeigen(C)
    }
 
-   #B <- foreach(i=seq(along=lambda)) %:% 
-   #   foreach(j=seq(along=gamma)) %dopar% {
    B <- lapply(seq(along=lambda), function(i) {
       lapply(seq(along=gamma), function(j) {
 	 
@@ -248,7 +321,7 @@ spg <- function(X, Y, C=NULL, lambda=0, gamma=0, tol=1e-4,
 
 fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
       maxiter=1e5, eps=1e-6, verbose=FALSE, simplify=FALSE,
-      sparse=FALSE, nzmax=NULL, warm=TRUE, divbyN=TRUE)
+      sparse=FALSE, nzmax=NULL, warm=TRUE, divbyN=TRUE, dup=TRUE)
 {
    if(length(X) == 0 || length(Y) == 0)
       stop("X and/or Y have zero length")
@@ -263,22 +336,35 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
 
    B0 <- matrix(0, p, K)
    LP0 <- matrix(0, N, K)
-   
+
    pairs <- edges <- 0
    if(is.null(C)) {
+      if(length(gamma) > 1 && gamma > 0) {
+	 stop("gamma is non-zero but C is not set")
+      }
       nE <- K * (K - 1) / 2
       C <- 0
+      pairs <- 0
+      edges <- 0
    } else {
       # mapping of edges to vertices (two vertices per edge), zero-based index
       # assumes that C is full size, i.e., all K(K-1)/2 edges are in it.
       # This is the same as cbind(C_J, ncol=2) from gennetwork()
-      pairs <- t(apply(C, 1, function(r) which(r != 0))) - 1
-
-      # each kth column represents which edges task k is involved in
-      edges <- matrix(which(C != 0, arr.ind=TRUE)[,1], K - 1) - 1
+      if(is(C, "matrix")) {
+	 pairs <- t(apply(C, 1, function(r) which(r != 0))) - 1
+	 # each kth column represents which edges task k is involved in
+	 edges <- matrix(which(C != 0, arr.ind=TRUE)[,1], K - 1) - 1
+      } else if(is(C, "list") 
+	 && exists("pairs", where=C)
+	 && exists("edges", where=C)) {
+	 pairs <- C$pairs
+	 edges <- C$edges
+      } else {
+	 stop("C is neither a matrix nor a list containing pairs and edges")
+      }
    }
 
-   # fit models in increasing order of lambda, without messing with
+   # fit models in decreasing order of lambda, without messing with
    # the original ordering of lambda requested by user
    l1ord <- order(lambda, decreasing=TRUE)
 
@@ -287,7 +373,6 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
    # variables for a given gamma, as increasing lambda will only
    # result in no active variables again. This allows us to not waste time on
    # models that will have zero active variables anyway.
-   #Btmp <- foreach(j=seq(along=gamma)) %:% foreach(m=seq(along=lambda2)) %dopar% {
    Btmp <- lapply(seq(along=gamma), function(j) {
       lapply(seq(along=lambda2), function(m) {
 	    Bjk <- vector("list", length(lambda))
@@ -306,31 +391,32 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
 		  B <- B0
 		  LP <- LP0
 	       } else {
-		  B <- Bjk[[l1ord[i-1]]]
 		  LP <- LPjk[[l1ord[i-1]]]
+		  B <- Bjk[[l1ord[i-1]]]
 	       }
 
 	       r <- .C("fmpr",
-		  as.numeric(X),	  # 1: X
-		  as.numeric(Y),       	  # 2: Y
-	          as.numeric(B),       	  # 3: B
-		  as.numeric(LP),      	  # 4: LP
-		  nrow(X),	       	  # 5: N
-		  ncol(X),	       	  # 6: p
-		  K,		       	  # 7: K
-       	          lambda[l1ord[i]],    	  # 8: lambda
-		  lambda2[m],	       	  # 9: lambda2
-		  gamma[j],	       	  # 10: gamma
-       	          as.numeric(C),          # 11: C
-		  as.integer(pairs),      # 12: pairs
-		  as.integer(edges),      # 13: edges
-		  as.integer(maxiter),	  # 14: maxiter
-       	          as.double(eps),      	  # 15: eps
-		  as.integer(verbose), 	  # 16: verbose
-		  integer(1),	       	  # 17: status
-	          integer(1),	       	  # 18: iter
-		  integer(1),    	  # 19: numactive
-		  as.integer(divbyN)      # 20: divbyN
+		  as.numeric(X),	    # 1: X
+		  as.numeric(Y),       	    # 2: Y
+	          as.numeric(B),       	    # 3: B
+		  as.numeric(LP),      	    # 4: LP
+		  nrow(X),	       	    # 5: N
+		  ncol(X),	       	    # 6: p
+		  K,		       	    # 7: K
+       	          rep(lambda[l1ord[i]], K), # 8: lambda
+		  rep(lambda2[m], K),       # 9: lambda2
+		  gamma[j],	       	    # 10: gamma
+       	          as.numeric(C),            # 11: C
+		  as.integer(pairs),        # 12: pairs
+		  as.integer(edges),        # 13: edges
+		  as.integer(maxiter),	    # 14: maxiter
+       	          as.double(eps),      	    # 15: eps
+		  as.integer(verbose), 	    # 16: verbose
+		  integer(1),	       	    # 17: status
+	          integer(1),	       	    # 18: iter
+		  integer(1),    	    # 19: numactive
+		  as.integer(divbyN),       # 20: divbyN
+		  DUP=dup
 	       )
 	       status <- r[[17]]
 	       numiter <- r[[18]]
@@ -344,8 +430,14 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
 	             "with", nactive[l1ord[i]], "active variables\n\n")
 	       }
 	          
-	       Bjk[[l1ord[i]]] <- matrix(r[[3]], p, K)
+	       # The linear predictor isn't sparse
 	       LPjk[[l1ord[i]]] <- matrix(r[[4]], N, K)
+
+	       if(sparse) {
+		  Bjk[[l1ord[i]]] <- Matrix(matrix(r[[3]], p, K), sparse=TRUE)
+	       } else {
+		  Bjk[[l1ord[i]]] <- matrix(r[[3]], p, K)
+	       }
 
 	       if(!is.null(nzmax) && nactive[l1ord[i]] > nzmax) {
 		  cat("fmpr reached maximum number of non-zero variables",
@@ -355,6 +447,7 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
 	       }
 
 	    }
+
 	    Bjk
       })
    })
@@ -363,11 +456,7 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
    B <- lapply(seq(along=lambda), function(i) {
 	    lapply(seq(along=lambda2), function(m) {
 	       lapply(seq(along=gamma), function(j) {
-		  if(sparse) {
-		     Matrix(Btmp[[j]][[m]][[i]], sparse=TRUE)
-		  } else {
-		     Btmp[[j]][[m]][[i]]
-		  }
+		  Btmp[[j]][[m]][[i]]
 	       })
 	    })
    })
@@ -380,5 +469,110 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
    } else {
       B
    }
+}
+
+# here, a lambda/lambda2/gamma vector represents applying a different penalty
+# to each task
+fmpr.single <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
+      maxiter=1e5, eps=1e-6, verbose=FALSE, sparse=FALSE,
+      nzmax=NULL, divbyN=TRUE, dup=TRUE)
+{
+   if(length(X) == 0 || length(Y) == 0)
+      stop("X and/or Y have zero length")
+
+   p <- ncol(X)
+   Y <- cbind(Y)
+   K <- ncol(Y)
+   N <- nrow(X)
+
+   if(length(gamma) > 1) {
+      gamma <- gamma[1]
+      warning("length(gamma) > 1, using first value only")
+   } else if(length(gamma) == 0) {
+      gamma <- 0
+   }
+
+   if(nrow(X) != nrow(Y))
+      stop("dimensions of X and Y don't agree")
+
+   pairs <- edges <- 0
+   if(is.null(C)) {
+      if(length(gamma) > 1 && gamma > 0) {
+	 stop("gamma is non-zero but C is not set")
+      }
+      nE <- K * (K - 1) / 2
+      C <- 0
+      pairs <- 0
+      edges <- 0
+   } else {
+      # mapping of edges to vertices (two vertices per edge), zero-based index
+      # assumes that C is full size, i.e., all K(K-1)/2 edges are in it.
+      # This is the same as cbind(C_J, ncol=2) from gennetwork()
+      if(is(C, "matrix")) {
+	 pairs <- t(apply(C, 1, function(r) which(r != 0))) - 1
+	 # each kth column represents which edges task k is involved in
+	 edges <- matrix(which(C != 0, arr.ind=TRUE)[,1], K - 1) - 1
+      } else if(is(C, "list") 
+	 && exists("pairs", where=C)
+	 && exists("edges", where=C)) {
+	 pairs <- C$pairs
+	 edges <- C$edges
+      } else {
+	 stop("C is neither a matrix nor a list containing pairs and edges")
+      }
+   }
+
+   B0 <- matrix(0, p, K)
+   LP0 <- matrix(0, N, K)
+
+   r <- .C("fmpr",
+      as.numeric(X),	   # 1: X
+      as.numeric(Y),       # 2: Y
+      as.numeric(B0),      # 3: B
+      as.numeric(LP0),     # 4: LP
+      nrow(X),	       	   # 5: N
+      ncol(X),	       	   # 6: p
+      K,		   # 7: K
+      as.numeric(lambda),  # 8: lambda
+      as.numeric(lambda2), # 9: lambda2
+      gamma,	       	   # 10: gamma
+      as.numeric(C),       # 11: C
+      as.integer(pairs),   # 12: pairs
+      as.integer(edges),   # 13: edges
+      as.integer(maxiter), # 14: maxiter
+      as.double(eps),      # 15: eps
+      as.integer(verbose), # 16: verbose
+      integer(1),	   # 17: status
+      integer(1),	   # 18: iter
+      integer(1),    	   # 19: numactive
+      as.integer(divbyN),  # 20: divbyN
+      DUP=dup
+   )
+   status <- r[[17]]
+   numiter <- r[[18]]
+   nactive <- r[[19]]
+   if(!status) {
+      cat("fmpr failed to converge within ",
+         maxiter, " iterations, lambda=", lambda,
+         "gamma=", gamma, "\n")
+   } else if(verbose) {
+      cat("fmpr converged in", numiter, "iterations",
+         "with", nactive, "active variables\n\n")
+   }
+      
+   B <- if(sparse) {
+      Matrix(matrix(r[[3]], p, K), sparse=TRUE)
+   } else {
+      matrix(r[[3]], p, K)
+   }
+
+   if(!is.null(nzmax) && nactive > nzmax) {
+      cat("fmpr reached maximum number of non-zero variables",
+         " (", nzmax, "): ", nactive, ", stopping\n",
+         sep="")
+      break
+   }
+
+   B
 }
 
