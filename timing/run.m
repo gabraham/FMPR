@@ -1,0 +1,18 @@
+addpath ' ~/Software/SPG_Multi_Graph ';
+X = dlmread('X.txt');
+Y = dlmread('Y.txt');
+option.cortype =  2 ;
+option.corthreshold =  0 ;
+option.maxiter =  10000 ;
+option.tol =  1e-06 ;
+option.verbose = true;
+option.display_iter = 1;
+option.mu =  1e-06 ;
+lambda =  895.742524415255 ;
+gamma =  762.907634722069 ;
+[C, CNorm, E, Ecoef, Esign, R] = gennetwork(Y, option);
+[beta, obj, density, iter, time] = SPG_multi(Y, X, gamma, lambda, C, CNorm, option);
+save('beta.txt', 'beta', '-ascii');
+Cf = full(C);
+save('C.txt', 'Cf', '-ascii');
+quit;
