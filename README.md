@@ -1,7 +1,7 @@
 FMPR
 ====
 
-Fused Multi-task Penalised Regression
+Fused Multi-task Penalized Regression
 
 To get the latest version:
 

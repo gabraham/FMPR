@@ -9,7 +9,7 @@
 % VignetteIndexEntry{FMPR}
 
 \hypersetup{
-   pdftitle={FMPR: Fused Multi-task Penalised Regression},
+   pdftitle={FMPR: Fused Multi-task Penalized Regression},
    pdfauthor={Gad Abraham},
    colorlinks=true,
    citecolor=black,
@@ -19,7 +19,7 @@
 }
 
 
-\title{FMPR: Fused Multi-task Penalised Regression}
+\title{FMPR: Fused Multi-task Penalized Regression}
 \author{Gad Abraham\\
 gad.abraham@unimelb.edu.au}
 
@@ -62,7 +62,7 @@ the number of tasks (outputs).  We wish to use a linear model of the outputs
 \end{equation}
 where $\mathbf{B}$ is a $p \times K$ matrix of weights and $\mathbf{E} \sim
 \mathcal{N}(\mathbf{0}, \sigma^2 \mathbf{I})$ is iid random noise.
-We assume that both $\mathbf{X}$ and $\mathbf{Y}$ are standardised to
+We assume that both $\mathbf{X}$ and $\mathbf{Y}$ are standardized to
 zero mean and unit variance, therefore, there is no intercept term in the
 model. The $i$th row of $\mathbf{X}$ is denoted $x_i$ (a $p$-vector of
 observations for the $i$th sample). The $k$th column of
@@ -79,7 +79,7 @@ encourages sparsity in the differences, leading to borrowing of power across
 correlated outputs and tending to select the same inputs across multiple related
 outputs. In addition, a standard lasso $\ell_1$ penalty is imposed on the
 weights within each task to promote sparsity in the model.  The
-GFlasso-penalised loss function for the squared loss (linear regression) is
+GFlasso-penalized loss function for the squared loss (linear regression) is
 \begin{eqnarray} \nonumber
 \mathbf{B}^* = \arg \min_{\mathbf{B} \in \mathbb{R}^{p \times K}}
 \frac{1}{2} \sum_{k=1}^K \sum_{i=1}^N (y_{ik} - x_i^T \beta_k)^2 
@@ -107,9 +107,9 @@ original SPG MATLAB code from
 
 Instead of using an $\ell_1$ fusion, another option is to use an $\ell_2$ fusion
 penalty, which has the nice properties that it is differentiable and therefore
-can be optimised using simple and fast methods such as coordinate descent,
+can be optimized using simple and fast methods such as coordinate descent,
 leading to substantial speedups over methods such as SPG.  We formulate our
-fused multitask penalised squared loss as follows:
+fused multitask penalized squared loss as follows:
 \begin{eqnarray} \nonumber
 B^* = \arg \min_{B \in \mathbb{R}^{p \times K}} 
 \frac{1}{2} \sum_{k=1}^K \sum_{i=1}^N (y_{ik} - x_i^T \beta_k)^2
