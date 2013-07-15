@@ -25,17 +25,13 @@ run.spg.test <- function(N, p, K, matlab.path, spg.path)
    maxiter <- 1e4
    mu <- 1e-6
    R <- abs(cor(Y))
-   corthresh <- if(K <= 2) {
-      runif(1, 0, R[1, 2])
-   } else {
-      # ensure threshold selects at least one edge, and add small dithering
-      # factor to account for loss of precision in translating floating point
-      # to ascii and back
-      median(R[upper.tri(R)]) + rnorm(1, 0, 1e-3)
-   }
-   cortype <- 1
 
-   C <- gennetwork(Y, corthresh=corthresh, cortype=cortype)
+   C <- matrix(0, 0, 0)
+
+   while(nrow(C) == 0) {
+      cortype <- sample(1:2, 1)
+      C <- gennetwork(Y, cortype=cortype)
+   }
    g <- spg(X, Y, C, lambda=lambda, gamma=gamma, mu=mu,
       tol=tol, maxiter=maxiter, simplify=TRUE, verbose=TRUE)
    
@@ -45,7 +41,7 @@ run.spg.test <- function(N, p, K, matlab.path, spg.path)
          "X = dlmread('X.txt');",
          "Y = dlmread('Y.txt');",
          paste("option.cortype = ", cortype, ";"),
-         paste("option.corthreshold = ", corthresh, ";"),
+         paste("option.corthreshold = ", 0, ";"),
          paste("option.maxiter = ", maxiter, ";"),
          paste("option.tol = ", tol, ";"),
          "option.verbose = true;",
@@ -81,7 +77,7 @@ run.spg.test <- function(N, p, K, matlab.path, spg.path)
 }
 
 spg.test <- function(nreps=50,
-   matlab.path="/Applications/MATLAB_R2012a.app/bin/matlab",
+   matlab.path="/Applications/MATLAB_R2013a.app/bin/matlab",
    spg.path="~/Software/SPG_Multi_Graph")
 {
    res <- sapply(1:nreps, function(i) {
@@ -90,6 +86,11 @@ spg.test <- function(nreps=50,
       K <- sample(1e2, 1) + 1 # ensures K>=2
       run.spg.test(N, p, K, matlab.path, spg.path)
    })
-   apply(res, 1, max)
+   s <- apply(res, 1, max)
+   cat("over", nreps, "replications:\n")
+   cat("\tmaximum mean squared error in C matrix:", s[1], "\n")
+   cat("\tmaximum mean squared error in sign of C matrix:", s[2], "\n")
+   cat("\tmaximum mean squared error in B matrix:", s[3], "\n")
+   s
 }
 

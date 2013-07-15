@@ -2,6 +2,9 @@ useDynLib(FMPR)
 
 S3method(plot, exper)
 
+importFrom("Matrix", colSums)
+importFrom("stats", cancor)
+
 export(
    "optim.fmpr",
    "optim.fmpr.grid",
@@ -20,16 +23,13 @@ export(
    "R2",
    "run",
    "plot.exper",
-   "graph.sqr",
-   "graph.ind",
-   "graph.abs",
    "gennetwork",
    "spg.test",
    "run.spg.test",
-   "graph.ind",
-   "graph.sqr",
-   "graph.abs",
-   "makedata"
+   "makedata",
+   "fmpr.single",
+   "which.max2",
+   "analyse"
 )
 
 

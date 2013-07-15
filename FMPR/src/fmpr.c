@@ -1,28 +1,43 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <time.h>
+
 #include <R.h>
+#include <Rmath.h>
+#include <R_ext/RS.h>     /* for Calloc/Free */
+#include <R_ext/Applic.h> /* for dgemm */
 
 #define TRUE 1
 #define FALSE 0
-#define ZERO_THRESH 1e-15
+#define ZERO_THRESH 1e-10
 #define ZERO_VAR_THRESH 1e-6
 
-static inline double sign(double x)
+void timestamp()
 {
-   if(x < 0) 
-      return -1;
-   else if(x > 0)
-      return 1;
-   else
-      return 0;
+   time_t t = time(NULL);
+   char *s = asctime(localtime(&t));
+   s[strlen(s) - 1] = '\0';
+   printf("[%s]", s);
 }
 
-static inline double soft_threshold(double beta, double gamma)
+static void crossprod(double *x, int nrx, int ncx,
+   double *y, int nry, int ncy, double *z)
 {
-   return sign(beta) * fmax(fabs(beta) - gamma, 0);
+    char *transa = "T", *transb = "N";
+    double one = 1.0, zero = 0.0;
+    F77_CALL(dgemm)(transa, transb, &ncx, &ncy, &nrx, &one,
+      x, &nrx, y, &nry, &zero, z, &ncx);
 }
 
+static double dotprod(double *x, double *y, int n)
+{
+    int one = 1.0;
+    return F77_CALL(ddot)(&n, x, &one, y, &one);
+}
+
+/* really, it's just equivalent to max(abs(crossprod(X, Y))) and probably
+ * slower */
 void maxlambda1(double *x, double *y, double *lambda,
       int *N_p, int *p_p, int *K_p)
 {
@@ -51,384 +66,276 @@ void maxlambda1(double *x, double *y, double *lambda,
 	 lambda[k] = (lambda[k] > s ? lambda[k] : s);
       }
       /* small fudge factor to ensure penalty is high enough
-       * to truly make everything zero, otherwise numerical error might cause
-       * trouble */
+       * to truly make everything zero, otherwise numerical
+       * error might cause trouble */
       lambda[k] += eps;
    }
 }
 
-void lasso(double *x, double *y, double *b,
-      int *N_p, int *p_p, double *lambda_p,
-      int *maxiter_p, double *eps_p, int *verbose_p)
-{
-   int N = *N_p,
-       p = *p_p;
-   int i, j ;
-   int iter;
-   double d1;
-   double loss = INFINITY, oldloss = INFINITY, lossnull = 0, lossnullF;
-   int *active = malloc(sizeof(int) * p);
-   int *oldactive = malloc(sizeof(int) * p);
-   int *ignore = calloc(p, sizeof(int));
-   double *d2 = calloc(p, sizeof(double));
-   double *LP = calloc(N, sizeof(double));
-   double delta, bj;
-   double eps = *eps_p;
-   int maxiter = *maxiter_p;
-   int numactive = 0, allconverged = 1, numconverged = 0;
-   int verbose = *verbose_p;
-   double meany = 0;
-   double lambda = *lambda_p;
-   double s;
-   double oneOnN = 1.0 / N;
-
-   for(j = p - 1 ; j >= 0 ; --j)
-   {
-      for(i = N - 1 ; i >= 0 ; --i)
-	 d2[j] +=  x[i + j * N] * x[i + j * N];
-      ignore[j] = d2[j] <= ZERO_VAR_THRESH;
-   }
-
-   for(j = p - 1 ; j >= 0 ; --j)
-      active[j] = oldactive[j] = !ignore[j];
-
-   /* null loss mean((y - mean(y))^2)*/
-   for(i = N - 1 ; i >= 0 ; --i)
-      meany += y[i];
-   meany *= oneOnN;
-
-   for(i = N - 1 ; i >= 0 ; --i)
-      lossnull += pow(y[i] - meany, 2);
-   lossnull *= oneOnN;
-   lossnullF = lossnull * eps;
-	 
-   if(verbose)
-      Rprintf("null loss: %.5f\n", lossnull);
-
-   for(iter = 0 ; iter < maxiter ; iter++)
-   {
-      numactive = 0;
-      numconverged = 0;
-
-      for(j = 0 ; j < p ; j++)
-      {
-	 oldloss = loss;
-
-	 if(!active[j])
-	 {
-	    numconverged++;
-	    continue;
-	 }
-
-	 d1 = 0;
-	 for(i = N - 1 ; i >= 0 ; --i)
-	    d1 += x[i + j * N] * (LP[i] - y[i]);
-
-	 // soft-thresholding
-	 bj = b[j];
-	 s = bj - d1 / d2[j];
-	 if(fabs(s) <= lambda)
-	 {
-	    b[j] = 0;
-	    delta = -bj;
-	 }
-	 else
-	 {
-	    b[j] = s - lambda * sign(s);
-	    if(fabs(b[j]) < ZERO_THRESH)
-	       b[j] = 0;
-	    delta = b[j] - bj;
-	 }
-
-	 loss = 0;
-	 for(i = N - 1 ; i >= 0 ; --i)
-	 {
-	    LP[i] += x[i + j * N] * delta;
-	    loss += pow(LP[i] - y[i], 2);
-	 }
-	 loss *= oneOnN;
-	 numconverged += fabs(loss - oldloss) < lossnullF;
-
-	 active[j] = b[j] != 0;
-	 numactive += active[j];
-      }
-
-      if(verbose)
-      {
-	 Rprintf("%d iter loss %.10f\n", iter, loss);
-	 Rprintf("%d converged at iter %d\n", numconverged, iter);
-      }
-
-      if(numconverged == p)
-      {
-	 if(verbose)
-	    Rprintf("all converged at iter %d\n", iter);
-	 if(allconverged == 1)
-	 {
-	    for(j = p - 1; j >= 0 ; --j)
-	    {
-	       oldactive[j] = active[j];
-	       active[j] = !ignore[j];
-	    }
-	    allconverged = 2;
-	 }
-	 else
-	 {
-	    for(j = p - 1 ; j >= 0 ; --j)
-	       if(active[j] != oldactive[j])
-		  break;
-	    if(j < 0)
-	    {
-	       if(verbose)
-		  Rprintf("terminating at iteration %d with %d active vars\n",
-		     iter, numactive);
-	       break;
-	    }
-
-	    if(verbose)
-	       Rprintf("active set has changed\n");
-
-	    allconverged = 1;
-	    for(j = p - 1; j >= 0 ; --j)
-	    {
-	       oldactive[j] = active[j];
-	       active[j] = !ignore[j];
-	    }
-	 }
-      }
-   }
-
-   if(iter >= maxiter && verbose)
-      Rprintf("failed to converge after %d iterations\n", maxiter);
-
-   free(active);
-   free(oldactive);
-   free(d2);
-   free(LP);
-   free(ignore);
-}
-
-void fmpr_weighted_warm(double *x, double *y, double *b,
+void fmpr(double *X, double *Y, double *B,
       double *LP, int *N_p, int *p_p, int *K_p,
-      double *lambda_p, double *lambda2_p, double *gamma_p,
-      double *G, int *maxiter_p, double *eps_p, int *verbose_p,
-      int *status, int *iter_p, int *numactive_p)
+      double *lambda, double *lambda2, double *gamma_p,
+      double *C, int *pairs, int *edges, int *maxiter_p,
+      double *eps_p, int *verbose_p, int *status, int *iter_p,
+      int *numactive_p, int *divbyN)
 {
    int N = *N_p,
        p = *p_p,
        K = *K_p;
    int i, j, k;
    int iter;
-   double d1, d2;
-   double delta, bjk;
+   double d1;
+   double delta, Bjk;
    double eps = *eps_p;
    int maxiter = *maxiter_p;
    int numactive = 0,
-       allconverged = 1,
-       numconverged = 0;
+       allconverged = 0;
    int verbose = *verbose_p;
    int pK = p * K, pK1 = p * K - 1;
-   double s, lambda = *lambda_p, gamma = *gamma_p;
-   int q, iNk, kqK, jpk;
+   double s, gamma = *gamma_p;
+   double oneOnN = (*divbyN) ? 1.0 / N : 1.0;
+   int iNk, jpk, iNj;
+   int nE = K * (K - 1) / 2, e, m, jep;
+   double df1, df2;
+   double oneOn2N = 1.0 / (2.0 * N);
+   double sv;
+   int v1, v2, l, kK1;
+   int dofusion = K > 1 && gamma > 0;
+   double tmp;
+   double loss = 0, l1loss = 0, floss = 0, lossold = 0;
 
    int *active = malloc(sizeof(int) * p * K);
    int *oldactive = malloc(sizeof(int) * p * K);
    int *ignore = calloc(p * K, sizeof(int));
    double *Err = calloc(N * K, sizeof(double));
-   double *meany = calloc(K, sizeof(double));
-   double *loss = calloc(K, sizeof(double));
-   double *oldloss = calloc(K, sizeof(double));
-   double *lossnull = calloc(K, sizeof(double));
-   double *lossnullF = calloc(K, sizeof(double));
-   double *d2_0 = calloc(p * K, sizeof(double));
-   double *gammaG = calloc(K * K, sizeof(double));
-   double *signG = calloc(K * K, sizeof(double));
-   double losstotal = 0, oldlosstotal = 0;
-   double *oneOnLambda2PlusOne = malloc(sizeof(double) * K);
-   double oneOnN = 1.0 / N;//,
-	  //oneOnKp = 1.0 / (K * p);
+   double *d2 = calloc(p * K, sizeof(double));
+   double *oneOnLambda2PlusOne = calloc(K, sizeof(double));
+   double *CC = NULL;
+   double *diagCC = NULL;
 
-   /* null loss mean((y - mean(y))^2)*/
-   for(k = 0 ; k < K ; k++)
+   if(verbose > 1)
    {
-      for(i = N - 1 ; i >= 0 ; --i)
-         meany[k] += y[i];
-      meany[k] *= oneOnN;
-
-      oneOnLambda2PlusOne[k] = 1.0 / (1.0 + *lambda2_p);
+      Rprintf("lambda: ");
+      for(k = 0 ; k < K ; k++)
+	 Rprintf("%.4f ", lambda[k]);
+      Rprintf("\n");
    }
 
-   for(k = K * K - 1 ; k >= 0 ; --k)
-      signG[k] = (double)sign(G[k]);
-
-   /* setup second derivatives of loss and which variables to ignore due to
-    * small variance */
-   for(k = 0 ; k < K ; k++)
+   if(dofusion)
    {
-      for(j = p - 1 ; j >= 0 ; --j) 
-      {
-	 jpk = j + p * k;
-	 for(i = N - 1 ; i >= 0 ; --i)
-	    d2_0[jpk] +=  x[i + j * N] * x[i + j * N];
-	 ignore[jpk] = d2_0[jpk] <= ZERO_VAR_THRESH;;
-      }
+      CC = calloc(K * K, sizeof(double));
+      diagCC = calloc(K, sizeof(double));
+
+      crossprod(C, nE, K, C, nE, K, CC);
+      for(k = 0 ; k < K ; k++)
+	 diagCC[k] = CC[k * K + k];
+      free(CC);
    }
+
+   for(k = 0 ; k < K ; k++)
+      oneOnLambda2PlusOne[k] = 1.0 / (1.0 + lambda2[k]);
 
    for(j = pK1 ; j >= 0 ; --j)
-      oldactive[j] = active[j] = !ignore[j];
-
-   /* ensure that fusion weights for tasks with themselves are zero */
-   for(k = 0 ; k < K ; k++)
    {
-      for(q = 0 ; q < K ; q++)
-      {
-	 kqK = k + q * K;
-	 /* must take absolute value of G since f(r_ml) is monotonic in
-	  * abs(r_ml) but G is signed
-	  */
-	 if(q != k)
-	    gammaG[kqK] = gamma * fabs(G[kqK]);
-      }
+      oldactive[j] = active[j] = (B[j] != 0);
    }
 
    for(k = 0 ; k < K ; k++)
    {
-      loss[k] = 0;
       for(i = N - 1 ; i >= 0 ; --i)
       {
 	 iNk = i + N * k;
-	 lossnull[k] += pow(y[iNk] - meany[k], 2);
-	 Err[iNk] = LP[iNk] - y[iNk];
-	 loss[k] += Err[iNk] * Err[iNk];
+	 Err[iNk] = LP[iNk] - Y[iNk];
       }
-      loss[k] *= oneOnN;
-      lossnull[k] *= oneOnN;
-      lossnullF[k] = lossnull[k] * eps;
    }
-   
-   for(iter = 0 ; iter < maxiter ; iter++)
+
+   for(iter = 1 ; iter <= maxiter ; iter++)
    {
       numactive = 0;
-      numconverged = 0;
-      losstotal = 0;
-      oldlosstotal = 0;
 
       for(k = 0 ; k < K ; k++)
       {
+	 kK1 = (K - 1) * k;
+
 	 for(j = 0 ; j < p ; j++)
 	 {
 	    jpk = j + p * k;
 
-	    if(!active[jpk])
-	       numconverged++;
-	    else
+	    if(active[jpk])
 	    {
-	       d1 = 0;
-	       d2 = d2_0[jpk];
-
-	       for(i = N - 1 ; i >= 0 ; --i)
-	          d1 += x[i + j * N] * Err[i + N * k];
-
-	       bjk = b[jpk];
+	       /* 1st derivative of loss function wrt B_jk */
+	       d1 = dotprod(X + N * j, Err + N * k, N);
+	       d1 *= oneOnN; 
+	       Bjk = B[jpk];
 	       
-	       /* Apply inter-task penalty */
-	       for(q = 0 ; q < K ; q++)
+	       /* 1st/2nd derivative of fusion loss */
+	       df1 = 0;
+	       df2 = 0;
+	       
+	       if(dofusion)
 	       {
-	          kqK = k + q * K;
-	          d1 += gammaG[kqK] * (bjk - signG[kqK] * b[j + p * q]);
-	          d2 += gammaG[kqK];
+		  // For most tasks, C is are zero for each pair,
+	       	  // and can be skipped, as for each task k there are
+	       	  // only K-1 other tasks it shares an edge with
+	       	  for(l = K - 2 ; l >= 0 ; --l)
+	       	  {
+	       	     e = edges[l + kK1];
+	       	     v1 = pairs[e];
+	       	     v2 = pairs[e + nE];
+	       	     sv = B[j + v1 * p] * C[e + v1 * nE]
+	       	        + B[j + v2 * p] * C[e + v2 * nE];
+	       	     df1 += sv * C[e + k * nE];
+	       	  }
+
+	       	  df1 *= gamma;
+	       	  df2 = gamma * diagCC[k];
 	       }
 
-	       s = bjk - d1 / d2;
+	       s = Bjk - (d1 + df1) / (1 + df2);
+	       B[jpk] = sign(s) * fmax(fabs(s) - lambda[k], 0) 
+		  * oneOnLambda2PlusOne[k];
 
-	       /* Now apply intra-task lasso */
-	       if(fabs(s) <= lambda)
-	       {
-	          b[jpk] = 0;
-	          delta = -bjk;
-	       }
-	       else
-	       {
-		  /* Apply intra-task ridge regression */
-	          b[jpk] = (s - lambda * sign(s)) * oneOnLambda2PlusOne[k];
-		  if(fabs(b[jpk]) < ZERO_THRESH) // close enough to zero
-		     b[jpk] = 0;
-	          delta = b[jpk] - bjk;
-	       }
+	       /* close enough to zero */
+	       if(fabs(B[jpk]) < ZERO_THRESH)
+		  B[jpk] = 0;
 
-	       /* update loss and errors based on new estimates */
-	       oldloss[k] = loss[k];
-	       loss[k] = 0;
-	       for(i = N - 1 ; i >= 0 ; --i)
+	       delta = B[jpk] - Bjk;
+
+	       if(delta != 0)
 	       {
-		  iNk = i + N * k;
-	          LP[iNk] += x[i + N * j] * delta;
-		  Err[iNk] = LP[iNk] - y[iNk];
-	          loss[k] += Err[iNk] * Err[iNk];
+		  iNk = N * k + N - 1;
+	       	  iNj = N * j + N - 1;
+	       	  for(i = N - 1 ; i >= 0 ; --i)
+	       	  {
+	       	     LP[iNk] += X[iNj] * delta;
+	       	     Err[iNk] = LP[iNk] - Y[iNk];
+	       	     iNk--;
+	       	     iNj--;
+	       	  }
 	       }
-	       loss[k] *= oneOnN;
-	       //loss[k] += lambda * fabs(b[jpk]) * oneOnKp;
-	       numconverged += fabs(loss[k] - oldloss[k]) < lossnullF[k];
+	    	       
+	       active[jpk] = (B[jpk] != 0);
 	    }
 
-	    active[jpk] = b[jpk] != 0;
 	    numactive += active[jpk];
 	 }
-
-	 losstotal += loss[k];
-	 oldlosstotal += oldloss[k];
       }
 
-      if(verbose)
+      loss = 0;
+      for(i = 0 ; i < N ; i++)
       {
-	 Rprintf("%d iter loss %.10f\n", iter, losstotal);
-	 Rprintf("%d converged at iter %d\n", numconverged, iter);
+	 for(k = 0 ; k < K ; k++)
+	 {
+	    m = i + k * N;
+	    tmp = (LP[m] - Y[m]) * (LP[m] - Y[m]);
+	    loss += tmp;
+	 }
+      }
+      loss *= oneOn2N;
+
+      /*l1loss = 0;
+      for(j = 0 ; j < p ; j++)
+	 for(k = 0 ; k < K ; k++)
+	    l1loss += fabs(B[j + k * p]);
+      loss += lambda[k] * l1loss;*/
+      for(k = 0 ; k < K ; k++)
+      {
+	 l1loss = 0;
+	 for(j = 0 ; j < p ; j++)
+	    l1loss += fabs(B[j + k * p]);
+	 loss += lambda[k] * l1loss;
+      }
+      
+      if(dofusion)
+      {
+	 floss = 0;
+	 for(j = p - 1 ; j >= 0 ; --j)
+	 {
+	    for(e = nE - 1 ; e >= 0 ; --e)
+	    {
+	       v1 = pairs[e];
+	       v2 = pairs[e + nE];
+	       sv = B[j + v1 * p] * C[e + v1 * nE] 
+	          + B[j + v2 * p] * C[e + v2 * nE];
+	       floss += sv * sv;
+	    }
+	 }
+
+	 loss += gamma * 0.5 * floss;
       }
 
-      /* active-set convergence */
-      if(numconverged == pK)
+      if(fabs(loss - lossold) / fabs(lossold) < eps)
       {
-         if(verbose)
-            Rprintf("all (%d) converged at iter %d\n", numconverged, iter);
-         if(allconverged == 1)
+	 if(verbose > 1)
+	 {
+	    timestamp();
+	    Rprintf(" converged, lossold: %.6f loss: %.6f\n", lossold, loss);
+	 }
+	 allconverged++;
+      }
+      else
+	 allconverged = 0;
+
+
+       if(allconverged == 1)
+      {
+	 /* reset active-set to contain all (non monomorphic) coordinates, in
+	  * order to check whether non-active coordinates become active again 
+	  * or vice-versa */
+         for(j = pK1 ; j >= 0 ; --j)
          {
-            for(j = pK1; j >= 0 ; --j)
-            {
-               oldactive[j] = active[j];
-               active[j] = !ignore[j];
-            }
-            allconverged = 2;
+            oldactive[j] = active[j];
+            active[j] = !ignore[j];
          }
-         else
-         {
-            for(j = pK1 ; j >= 0 ; --j)
-               if(active[j] != oldactive[j])
-        	  break;
-            if(j < 0)
-            {
-               if(verbose)
-        	  Rprintf("terminating at iteration %d with %d active vars\n",
-        	     iter, numactive);
-	       *status = TRUE;
+	 if(verbose > 1)
+	 {
+	    timestamp();
+	    Rprintf(" resetting activeset at iter %d, loss: %.6f floss: %.6f\n",
+	       iter, loss, floss);
+	 }
+      }
+      else if(allconverged == 2)
+      {
+         for(j = pK1 ; j >= 0 ; --j)
+            if(active[j] != oldactive[j])
                break;
-            }
 
-	    if(verbose)
-	       Rprintf("activeset changed at iter %d\n", iter);
-
-            allconverged = 1;
-            for(j = pK1; j >= 0 ; --j)
-            {
-               oldactive[j] = active[j];
-               active[j] = !ignore[j];
-            }
+         if(j < 0)
+         {
+            if(verbose > 1)
+	    {
+	       timestamp();
+               Rprintf(" terminating at iter %d with %d active vars\n",
+		  iter, numactive);
+	    }
+            *status = TRUE;
+            break;
          }
-      }
+
+         if(verbose > 1)
+	 {
+	    timestamp();
+            Rprintf(" active set changed, %d active vars", numactive);
+	 }
+
+	 /* keep iterating over existing active set, keep track
+	  * of the current active set */
+         for(j = pK1 ; j >= 0 ; --j)
+	 {
+            oldactive[j] = active[j];
+	    active[j] = !ignore[j]; 
+	 }
+
+         allconverged = 0;
+      }     
+
+      iter++;
+      lossold = loss;
    }
 
    if(iter >= maxiter)
    {
-      if(verbose)
+      if(verbose > 1)
 	 Rprintf("fmpr_threshold_warm failed to converge after %d iterations\n",
 	    maxiter);
       *status = FALSE;
@@ -438,16 +345,11 @@ void fmpr_weighted_warm(double *x, double *y, double *b,
 
    free(active);
    free(oldactive);
-   free(meany);
-   free(loss);
-   free(oldloss);
-   free(lossnull);
-   free(lossnullF);
    free(Err);
-   free(d2_0);
+   free(d2);
    free(ignore);
-   free(gammaG);
-   free(signG);
    free(oneOnLambda2PlusOne);
+   if(diagCC)
+      free(diagCC);
 }
 

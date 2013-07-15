@@ -3,7 +3,7 @@ Maintainer: Gad Abraham <gad.abraham@unimelb.edu.au>
 Package: FMPR
 Version: 0.01
 Date: 2012-05-28
-Depends: MASS, ggplot2, foreach, Matrix, ROCR, reshape
+Depends: MASS, ggplot2, foreach, ROCR, reshape2, irlba, Matrix, corpcor, CCP
 Suggests: doMC, doParallel
 LazyData: Yes
 LazyLoad: Yes

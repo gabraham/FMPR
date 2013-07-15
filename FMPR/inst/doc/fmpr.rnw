@@ -150,11 +150,11 @@ in package \texttt{forecast}, for example).
 A suitable graph induction function is required in order to create a graph from
 the outputs~$\mathbf{Y}$. The function must be monotonic in the absolute value
 of the correlation. By default, \texttt{FMPR} uses the correlation matrix of
-$\mathbf{Y}$, and transforms it using the \texttt{graph.sqr} defined as
-$f(r_{ml}) = r_{ml}^2$ or the function \texttt{graph.abs} defined as $f(r_{ml})
-= |r_{ml}|$. In \textsf{R}:
+$\mathbf{Y}$, and transforms it using the absolute correlation,
+$f(r_{ml}) = |r_{ml}|$ (\texttt{cortype=1}). Another option is the 
+squared correlation $f(r_{ml}) = r_{ml}^2$ (\texttt{cortype=2}). In \textsf{R}:
 \begin{verbatim}
-G <- graph.sqr(cor(Y))
+C <- gennetwork(Y, cortype=1)
 \end{verbatim}
 
 \subsection{Penalties}
@@ -199,8 +199,7 @@ Now we induce the inter-task graph based on the square of the correlation of
 $\mathbf{Y}$. Note that \texttt{FMPR} and \texttt{SPG} use a different format
 to indicate task relatedness.
 <<>>=
-G <- graph.sqr(cor(Y))
-C <- gennetwork(Y, corthresh=0, cortype=2)
+C <- gennetwork(Y, cortype=2)
 @
 
 Next we define the penalties $\lambda$ and $\gamma$, and the number of
@@ -215,20 +214,20 @@ nfolds <- 5
 
 Now we run grid search for \texttt{FMPR} and \texttt{SPG} (implementing
 GFlasso), to find the optimal penalties, in terms of cross-validated $R^2$. Note
-that the objects \texttt{G} and \texttt{C} are not passed to the
-cross-validation, as they are re-estimated from scratch within each
-cross-validation replication. Instead, we pass the function \texttt{graph.sqr}
-to \texttt{fmpr} and \texttt{cortype=2} to \texttt{spg}:
+that the matrix \texttt{C} is not passed to the cross-validation, as it is
+re-estimated from scratch within each cross-validation replication. Instead, we
+pass the argument $\texttt{cortype}$ to \texttt{fmpr} and \texttt{cortype=2} to
+\texttt{spg}:
 <<>>=
 # L2 fusion penalty
 system.time({
-   opt.f <- optim.fmpr(X=X, Y=Y, graph.fun=graph.sqr,
+   opt.f <- optim.fmpr(X=X, Y=Y, cortype=2,
       lambda=lambda, gamma=gamma, nfolds=nfolds)
 })
 
 # L1 fusion penalty
 system.time({
-   opt.s <- optim.spg(X=X, Y=Y, cortype=2, corthresh=0,
+   opt.s <- optim.spg(X=X, Y=Y, cortype=2,
       lambda=lambda, gamma=gamma, nfolds=nfolds)
 })
 @
@@ -238,7 +237,7 @@ entire dataset, and return just one estimated matrix $\widehat{\mathbf{B}}$ (not
 the \texttt{simplify=TRUE} argument). Since the lasso is a special case of the
 $\ell_2$ fusion loss with $\gamma=0$, we can get the lasso solution as well.
 <<>>=
-f <- fmpr(X=X, Y=Y, G=G, lambda=opt.f$opt["lambda"],
+f <- fmpr(X=X, Y=Y, C=C, lambda=opt.f$opt["lambda"],
    gamma=opt.f$opt["gamma"], simplify=TRUE)
 s <- spg(X=X, Y=Y, C=C, lambda=opt.s$opt["lambda"],
    gamma=opt.s$opt["gamma"], simplify=TRUE)
@@ -306,10 +305,22 @@ sapply(list(FMPR=f, GFlasso=s, Lasso=l), function(B2) {
 })
 @
 
-%\bibliography{fmpr}
+\section{HAPGEN Data}
+
+We used HAPGEN v2.2.0~\citep{su2011} to simulate 2500 samples with $\sim$74,000
+SNPs from human chromosome~10, based on the HapMap~3 CEU reference
+panel~\citep{HapMap2010}. Further filtering of the SNPs by MAF $\ge 5\%$ left~56,833 SNPs.
+
+The data can be loaded and used for simulations (see the file
+\texttt{simulations.R}):
+\begin{verbatim}
+load("HAPGEN/chr10.RData")
+\end{verbatim}
+
+%\bibliography{FMPR}
 %\bibliographystyle{unsrtnat}
 
-\begin{thebibliography}{9}
+\begin{thebibliography}{11}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
 \expandafter\ifx\csname urlstyle\endcsname\relax
@@ -376,6 +387,17 @@ X.~Chen, Q.~Lin, S.~Kim, J.~G. Carbonell, and E.~P. Xing.
   regression.
 \newblock \emph{Ann. Appl. Statist.}, 2012.
 \newblock To appear.
+
+\bibitem[Su et~al.(2011)Su, Marchini, and Donnelly]{su2011}
+Z.~Su, J.~Marchini, and P.~Donnelly.
+\newblock {HAPGEN2: simulation of multiple disease SNPs}.
+\newblock \emph{Bioinformatics}, 27:\penalty0 2304--2305, 2011.
+
+\bibitem[{International HapMap 3 Consortium}(2010)]{HapMap2010}
+{International HapMap 3 Consortium}.
+\newblock Integrating common and rare genetic variation in diverse human
+  populations.
+\newblock \emph{Nature}, 467:\penalty0 52--58, 2010.
 
 \end{thebibliography}
 
