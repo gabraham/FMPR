@@ -21,7 +21,5 @@ Recommended: R packages doMC or doParallel
 Note: if using doMC, FMPR should be run in the terminal, not under a GUI (see
 http://cran.r-project.org/web/packages/doMC/vignettes/gettingstartedMC.pdf)
 
-Documentation: see FMPR/FMPR/inst/doc/fmpr.pdf
-
-Example code: see FMPR/example.R
+Documentation and example code: see FMPR/FMPR/inst/doc/fmpr.pdf
 
