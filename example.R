@@ -5,20 +5,6 @@ if(require(doMC)) {
    registerDoMC(cores=3)
 }
 
-R2 <- function (pr, y) 
-{
-   pr <- cbind(pr)
-   y <- cbind(y)
-   if (ncol(y) != ncol(pr)) 
-       stop("ncol(y) doesn't match ncol(pr)")
-   s <- sapply(1:ncol(y), function(k) {
-       1 - sum((pr[, k] - y[, k])^2)/sum((y[, k] - mean(y[, 
-           k]))^2)
-   })
-   s[is.nan(s)] <- 0
-   mean(s)
-}
-
 N <- 100
 p <- 100
 K <- 10
@@ -34,20 +20,14 @@ l <- max(maxlambda1(X, Y))
 ngrid <- 20
 lambda <- 2^seq(-0.01, -8, length=ngrid) * l
 gamma <- c(0, 2^seq(-10, 10, length=ngrid))
-#gamma <- 0
 nfolds <- 10
-seed <- sample(1e6, 1)
 maxiter <- 1e5
 
-
-#set.seed(seed)
-# L2 fusion penalty
 system.time({
    opt.f <- optim.fmpr(X=X, Y=Y, cortype=2,
       lambda=lambda, gamma=gamma, nfolds=nfolds)
 })
 
-#set.seed(seed)
 # L1 fusion penalty
 system.time({
    opt.s1 <- optim.spg(X=X, Y=Y, cortype=2,
@@ -55,37 +35,18 @@ system.time({
       maxiter=maxiter)
 })
 
-#set.seed(seed)
-# L2 fusion penalty
-system.time({
-   opt.s2 <- optim.spg(X=X, Y=Y, cortype=2,
-      lambda=lambda, gamma=gamma, nfolds=nfolds, type="l2",
-      maxiter=maxiter)
-})
-
-#opt.r <- optim.ridge(X=X, Y=Y, lambda=gamma, nfolds=nfolds)
-
-
 f <- fmpr(X=X, Y=Y, C=C, lambda=opt.f$opt["lambda"],
    gamma=opt.f$opt["gamma"], simplify=TRUE)
 
 s1 <- spg(X=X, Y=Y, C=C, lambda=opt.s1$opt["lambda"],
    gamma=opt.s1$opt["gamma"], simplify=TRUE, type="l1")
 
-s2 <- spg(X=X, Y=Y, C=C, lambda=opt.s2$opt["lambda"],
-   gamma=opt.s2$opt["gamma"], simplify=TRUE, type="l2")
-
 # Lasso, special case of FMPR
-<<<<<<< HEAD
-w <- which(opt.f$R2[, 1, 1] == max(opt.f$R2[, 1, 1]))
-=======
 w <- which(opt.f$R2[, 1, 1] == max(opt.f$R2[, 1, 1]), arr.ind=TRUE)
->>>>>>> ConvergenceByLoss
 l <- fmpr(X=X, Y=Y, lambda=lambda[w], gamma=0, simplify=TRUE)
 
-
 measures <- list(ROC=c("sens", "spec"), PRC=c("prec", "rec"))
-mods <- list(FMPR=f, "GFlasso-SPG"=s1, "FMPR-SPG"=s2, Lasso=l)
+mods <- list(FMPR=f, GFlasso=s1, Lasso=l)
 res <- lapply(mods, function(B2) {
    lapply(measures, function(m) {
       performance(
