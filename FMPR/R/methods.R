@@ -153,7 +153,8 @@ blockX <- function(X, K)
 # full: logical. if TRUE, the full (K-1)K by K  matrix will be created, even
 # for zero-weight edges. Otherwise, only the edges with non-zero weight will
 # be selected.
-gennetwork <- function(Y, cortype=1, cormethod=c("pearson", "partial"))
+gennetwork <- function(Y, cortype=1, cormethod=c("pearson", "partial"),
+   sparse=TRUE)
 {
    cormethod <- match.arg(cormethod)
    
@@ -187,9 +188,19 @@ gennetwork <- function(Y, cortype=1, cormethod=c("pearson", "partial"))
    C_I <- c(1:nE, 1:nE)
    C_J <- as.numeric(E)
    C_S <- cbind(Ecoef, -Ecoef * Esign)
-   C <- matrix(0, nE, nV)
-   C[cbind(C_I, C_J)] <- C_S
-   C
+   if(sparse) {
+      C <- Matrix(data=0, nrow=nE, ncol=nV, sparse=TRUE)
+      C[cbind(C_I, C_J)] <- C_S
+      attr(C, "edges") <- matrix(C@i, nrow=K - 1) # same as the egdes
+   } else {
+      C <- matrix(0, nE, nV)
+      C[cbind(C_I, C_J)] <- C_S
+      attr(C, "edges") <- matrix(which(C != 0, arr.ind=TRUE)[,1], nrow=K - 1) - 1
+   }
+
+   attr(C, "pairs") <- t(apply(C, 1, function(r) which(r != 0))) - 1
+
+   invisible(C)
 }
 
 # svd can fail for perfectly correlated data, so use irlba if it fails.
@@ -343,7 +354,11 @@ fmpr <- function(X, Y, lambda=0, lambda2=0, gamma=0, C=NULL,
       # mapping of edges to vertices (two vertices per edge), zero-based index
       # assumes that C is full size, i.e., all K(K-1)/2 edges are in it.
       # This is the same as cbind(C_J, ncol=2) from gennetwork()
-      if(is(C, "matrix")) {
+      if(!is.null(attr(C, "pairs")) && !is.null(attr(C, "edges"))) {
+	 pairs <- attr(C, "pairs")
+	 edges <- attr(C, "edges")
+      }
+      else if(is(C, "matrix") || is(C, "Matrix")) {
 	 pairs <- t(apply(C, 1, function(r) which(r != 0))) - 1
 	 # each kth column represents which edges task k is involved in
 	 edges <- matrix(which(C != 0, arr.ind=TRUE)[,1], K - 1) - 1

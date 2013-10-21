@@ -345,6 +345,52 @@ run.fmpr <- function(rep, dir=".", nfolds=10, grid=25,
    )
 }
 
+run.grplasso <- function(rep, dir=".", nfolds=10, grid=25,
+   lambdar=2^seq(-10, 0, length=grid))
+{
+   oldwd <- getwd()
+   setwd(dir)
+
+   cat("run.grplasso rep", rep, "\n")
+
+   Xtrain <- as.matrix(read.table(sprintf("Xtrain_%s.txt", rep),
+      header=FALSE))
+   Xtest <- as.matrix(read.table(sprintf("Xtest_%s.txt", rep),
+      header=FALSE))
+   Ytrain <- as.matrix(read.table(sprintf("Ytrain_%s.txt", rep),
+      header=FALSE))
+   Ytest <- as.matrix(read.table(sprintf("Ytest_%s.txt", rep),
+      header=FALSE))
+
+   N <- nrow(Xtrain)
+   K <- ncol(Ytrain)
+   p <- ncol(Xtrain)
+
+   l <- max(abs(crossprod(Xtrain, Ytrain))) / N
+   lambda <- l * lambdar
+
+   cat("cv.glmnet group lasso start\n")
+   cv <- cv.glmnet(x=Xtrain, y=Ytrain, family="mgaussian",
+      nfolds=nfolds, lambda=lambda)
+
+   cat("cv.glmnet group lasso end\n")
+
+   # glmnet already fits a model to the entire data, no need to refit
+   g <- do.call(cbind, lapply(coef(cv, s="lambda.min"), as.matrix))[-1, ]
+
+   P <- Xtest %*% g
+   res <- R2(as.numeric(P), as.numeric(Ytest))
+
+   cat("rep", rep, "R2 fmpr", res, "\n")
+
+   setwd(oldwd)
+
+   list(
+      R2=res,
+      beta=g
+   )
+}
+
 # p: no. variables per task
 # K: no. tasks
 # w: weight per variable, if using type="same"
@@ -469,6 +515,7 @@ run <- function(setup, grid=3, nfolds=3, nreps=3, models=NULL)
       "GFlasso-w2"=list(func=run.spg, cortype=2, lambdar=lambdar,
          gamma=gamma, type="l1"),
       Lasso=list(func=run.fmpr, lambdar=lambdar, gamma=0, lambda2=0),
+      GroupLasso=list(func=run.grplasso, lambdar=lambdar),
       Ridge=list(func=run.ridge, lambda2=lambda2),
       Elnet=list(func=run.fmpr,
 	 lambdar=lambdar, lambda2=lambda2, gamma=0),

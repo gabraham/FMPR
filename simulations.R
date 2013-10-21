@@ -256,8 +256,8 @@ save(setup, res.anl, res, idv, nreps, grid, nfolds, seed,
 
 plot.exper(res.anl,
    models.rec=c("FMPR-w1", "FMPR-w2", "GFlasso-w1", "GFlasso-w2", "Lasso",
-      "Ridge", "Elnet", "CCA", "PCA", "Univariable"),
+      "Ridge", "Elnet", "GroupLasso", "CCA", "PCA", "Univariable"),
    models.R2=c("FMPR-w1", "FMPR-w2", "GFlasso-w1",
-      "GFlasso-w2", "Lasso", "Elnet", "Ridge")
+      "GFlasso-w2", "Lasso", "Elnet", "GroupLasso", "Ridge")
 )
 
